@@ -3,7 +3,7 @@
 An automated daily scanner for trading **QQQ iron condors**. Every trading
 day (scheduled around market open), it pulls price action, technical
 indicators, volatility data, and news, then proposes concrete iron condor
-strikes for a weekly and a monthly expiration.
+strikes for a same-day (0DTE), a weekly, and a monthly expiration.
 
 > **Not financial advice.** This is a decision-support tool, not an
 > auto-trader — it never places orders. Always verify strikes, prices, and
@@ -22,13 +22,17 @@ Each run:
    Finance, CNBC, MarketWatch) and flags ones mentioning known
    market-moving topics (FOMC, CPI, jobs data, mega-cap earnings,
    geopolitics) so you know when to sit out or size down.
-4. **Iron condor construction** — for a weekly (~5-10 DTE) and monthly
-   (~28-45 DTE) expiration, it selects short strikes closest to a target
-   delta (default ~0.16, roughly a 1-standard-deviation move) using a
-   Black-Scholes delta computed from each contract's implied volatility,
-   adds $5-wide protective long strikes, and reports net credit, max
-   profit/loss, breakevens, return on risk, and an approximate probability
-   of profit.
+4. **Iron condor construction** — for a same-day (0DTE), weekly (~5-10 DTE),
+   and monthly (~28-45 DTE) expiration, it selects short strikes closest to
+   a target delta (default ~0.16 for weekly/monthly, ~0.10 for 0DTE) using
+   a Black-Scholes delta computed from each contract's implied volatility,
+   adds protective long strikes ($5 wide for weekly/monthly, $2 wide for
+   0DTE), and reports net credit, max profit/loss, breakevens, return on
+   risk, and an approximate probability of profit. 0DTE only appears if
+   QQQ actually lists a same-day expiration when the scan runs; it is
+   never approximated with a later expiration under the "0DTE" label.
+   0DTE's Black-Scholes time-to-expiry is computed from actual clock time
+   remaining until the 4:00pm ET close, not a fraction of a calendar day.
 5. **Risk management notes** — position sizing, profit-taking, and
    adjustment guidance, plus a reminder to avoid new positions right before
    flagged catalysts.
@@ -85,14 +89,20 @@ new issues land in your GitHub notifications/email.
   short call delta)` — a common rule-of-thumb, not an exact calculation.
 
 Tune `qqq_iron_condor/config.py` to change the delta target, wing width,
-DTE windows, risk-free rate, or news sources/keywords.
+DTE windows, risk-free rate, or news sources/keywords. Each entry in
+`expiration_targets` is an `ExpirationTarget` and can override the delta
+target and wing width per expiration (0DTE already does this).
 
 ## Limitations & caveats
 
 - Uses free Yahoo Finance data via `yfinance`; option chain liquidity and
   quote freshness vary, especially for far-dated or wide-strike contracts.
+  0DTE quotes in particular can be stale or zero-bid if the scan runs
+  before the market has actually opened.
 - Delta/greeks are Black-Scholes approximations from chain IV, not live
-  broker greeks.
+  broker greeks. This is a bigger caveat for 0DTE, where real-world
+  intraday gamma/pin risk near the short strikes is severe and not fully
+  captured by a static delta snapshot from when the scan ran.
 - News/catalyst detection is a keyword scan over a handful of free RSS
   feeds — it is **not** a substitute for checking an economic calendar
   (FOMC/CPI/NFP dates, earnings dates for QQQ's mega-cap holdings) before

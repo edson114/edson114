@@ -59,21 +59,28 @@ def get_option_chain_for_expiration(symbol: str, expiration: str) -> OptionChain
 
 
 def pick_expirations_for_targets(symbol: str, targets: tuple) -> dict[str, OptionChain]:
-    """Pick the best available expiration for each (label, min_dte, max_dte)
-    target window, preferring the one closest to the midpoint of the window."""
+    """Pick the best available expiration for each ExpirationTarget window,
+    preferring the one closest to the midpoint of the window.
+
+    A target with allow_fallback=False (0DTE) is skipped entirely if
+    nothing in the window is listed today, rather than silently
+    substituting the nearest other expiration under that label.
+    """
     available = list_expirations(symbol)
     today = dt.date.today()
     parsed = [(e, (dt.datetime.strptime(e, "%Y-%m-%d").date() - today).days) for e in available]
 
     picks: dict[str, OptionChain] = {}
-    for label, min_dte, max_dte in targets:
-        midpoint = (min_dte + max_dte) / 2.0
-        in_window = [(e, d) for e, d in parsed if min_dte <= d <= max_dte]
+    for target in targets:
+        midpoint = (target.min_dte + target.max_dte) / 2.0
+        in_window = [(e, d) for e, d in parsed if target.min_dte <= d <= target.max_dte]
+        if not in_window and not target.allow_fallback:
+            continue
         candidates = in_window if in_window else parsed
         if not candidates:
             continue
         best_exp, best_dte = min(candidates, key=lambda item: abs(item[1] - midpoint))
-        picks[label] = get_option_chain_for_expiration(symbol, best_exp)
+        picks[target.label] = get_option_chain_for_expiration(symbol, best_exp)
     return picks
 
 

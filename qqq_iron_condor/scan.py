@@ -31,14 +31,18 @@ def run_scan(cfg: Config) -> str:
 
     chains = pick_expirations_for_targets(cfg.symbol, cfg.expiration_targets)
     condors = {}
-    for label, chain in chains.items():
-        condors[label] = build_iron_condor(
-            label=label,
+    for target in cfg.expiration_targets:
+        chain = chains.get(target.label)
+        if chain is None:
+            condors[target.label] = None
+            continue
+        condors[target.label] = build_iron_condor(
+            label=target.label,
             chain=chain,
             spot=spot,
             rate=cfg.risk_free_rate,
-            target_delta=cfg.short_delta_target,
-            wing_width=cfg.wing_width,
+            target_delta=target.short_delta_target or cfg.short_delta_target,
+            wing_width=target.wing_width or cfg.wing_width,
         )
 
     headlines = get_news(cfg.news_feeds, cfg.max_headlines_per_feed)
@@ -102,11 +106,11 @@ def _self_test_report() -> str:
     snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
     def synth_chain(label: str, dte: int) -> OptionChain:
-        from .options_math import bs_price
+        from .options_math import bs_price, time_to_expiration_years
 
         strikes = np.arange(round(spot) - 40, round(spot) + 40, 1.0)
         iv = 0.18 + rng.uniform(-0.02, 0.02, len(strikes))
-        t_years = dte / 365.0
+        t_years = time_to_expiration_years(dte)
 
         call_fair = np.array([bs_price(spot, k, t_years, cfg.risk_free_rate, v, "call") for k, v in zip(strikes, iv)])
         put_fair = np.array([bs_price(spot, k, t_years, cfg.risk_free_rate, v, "put") for k, v in zip(strikes, iv)])
@@ -129,10 +133,17 @@ def _self_test_report() -> str:
         expiration = (dt.date.today() + dt.timedelta(days=dte)).isoformat()
         return OptionChain(expiration=expiration, dte=dte, calls=calls, puts=puts)
 
-    condors = {
-        "Weekly": build_iron_condor("Weekly", synth_chain("Weekly", 7), spot, cfg.risk_free_rate, cfg.short_delta_target, cfg.wing_width),
-        "Monthly": build_iron_condor("Monthly", synth_chain("Monthly", 35), spot, cfg.risk_free_rate, cfg.short_delta_target, cfg.wing_width),
-    }
+    condors = {}
+    for target in cfg.expiration_targets:
+        rep_dte = 0 if (target.min_dte == 0 and target.max_dte == 0) else round((target.min_dte + target.max_dte) / 2)
+        condors[target.label] = build_iron_condor(
+            target.label,
+            synth_chain(target.label, rep_dte),
+            spot,
+            cfg.risk_free_rate,
+            target.short_delta_target or cfg.short_delta_target,
+            target.wing_width or cfg.wing_width,
+        )
 
     from .data import Headline
     headlines = [
