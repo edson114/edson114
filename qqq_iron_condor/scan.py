@@ -55,16 +55,21 @@ def maybe_create_github_issue(report_md: str, title: str) -> None:
 
     import requests
 
-    resp = requests.post(
-        f"https://api.github.com/repos/{repo}/issues",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-        },
-        json={"title": title, "body": report_md, "labels": ["qqq-scan"]},
-        timeout=30,
-    )
-    resp.raise_for_status()
+    try:
+        resp = requests.post(
+            f"https://api.github.com/repos/{repo}/issues",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+            json={"title": title, "body": report_md, "labels": ["qqq-scan"]},
+            timeout=30,
+        )
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        # Non-fatal: the report was already generated and saved to disk.
+        # A 410 here typically means Issues are disabled for this repo.
+        print(f"Warning: could not create GitHub issue ({exc}). Report was still generated and saved.", file=sys.stderr)
 
 
 def _self_test_report() -> str:
