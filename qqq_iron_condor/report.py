@@ -18,7 +18,11 @@ def _fmt(x: float, decimals: int = 2) -> str:
 
 def _condor_section(trade: IronCondorTrade) -> str:
     if trade is None:
-        return "_No valid iron condor could be constructed for this expiration (illiquid or missing chain data)._\n"
+        return (
+            "_No valid iron condor could be constructed for this expiration -- "
+            "either QQQ has no matching listed expiration today (e.g. no same-day "
+            "0DTE listing), or the chain data was illiquid/missing quotes._\n"
+        )
 
     legs = trade.legs
     lines = [
@@ -127,6 +131,16 @@ def render_report(
 
     parts.append("## Risk Management")
     parts.append("")
+    if "0DTE" in condors:
+        parts.append(
+            "**0DTE note:** a same-day iron condor has almost no time value cushion -- gamma "
+            "is extreme near the short strikes and a fast intraday move can go from 'near max "
+            "profit' to 'near max loss' within minutes, especially in the final 1-2 hours. "
+            "0DTE strike/price data reflects the moment the scan ran; if you're checking this "
+            "later in the session, re-pull quotes before acting. Consider closing well before "
+            "the close rather than letting contracts expire, and size these smaller than "
+            "weekly/monthly positions.\n"
+        )
     parts.append(
         "- Size each trade so **max loss ≤ 1-3% of account equity**; this is a defined-risk "
         "structure but max loss can still be substantial relative to credit received.\n"

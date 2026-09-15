@@ -11,7 +11,7 @@ from typing import Optional
 import pandas as pd
 
 from .data import OptionChain
-from .options_math import bs_delta, expected_move_from_iv, probability_between
+from .options_math import bs_delta, expected_move_from_iv, probability_between, time_to_expiration_years
 
 
 def _mid_price(row: pd.Series) -> float:
@@ -94,8 +94,7 @@ def build_iron_condor(
     target_delta: float,
     wing_width: float,
 ) -> Optional[IronCondorTrade]:
-    dte = max(chain.dte, 1)
-    t_years = dte / 365.0
+    t_years = time_to_expiration_years(chain.dte)
 
     calls = _with_delta(chain.calls, spot, t_years, rate, "call")
     puts = _with_delta(chain.puts, spot, t_years, rate, "put")

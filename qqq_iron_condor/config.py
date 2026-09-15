@@ -1,6 +1,22 @@
 """Central configuration for the QQQ iron condor scanner."""
 
 from dataclasses import dataclass, field
+from typing import Optional
+
+
+@dataclass(frozen=True)
+class ExpirationTarget:
+    label: str
+    min_dte: int
+    max_dte: int
+    # Per-target overrides; fall back to Config.short_delta_target /
+    # Config.wing_width when left as None.
+    short_delta_target: Optional[float] = None
+    wing_width: Optional[float] = None
+    # 0DTE has no "closest available expiration" fallback: if QQQ doesn't
+    # list a same-day expiration today, skip it rather than silently
+    # substitute a multi-day one under the "0DTE" label.
+    allow_fallback: bool = True
 
 
 @dataclass(frozen=True)
@@ -20,10 +36,14 @@ class Config:
     # Wing width in dollars for the long (protective) legs.
     wing_width: float = 5.0
 
-    # DTE (calendar days) windows to scan and label.
+    # DTE (calendar days) windows to scan and label. 0DTE uses a tighter
+    # wing and a lower delta target: intraday gamma risk is much higher,
+    # and QQQ's $1 strike spacing makes a $5 wing disproportionately wide
+    # relative to a same-day expected move.
     expiration_targets: tuple = (
-        ("Weekly", 5, 10),
-        ("Monthly", 28, 45),
+        ExpirationTarget("0DTE", 0, 0, short_delta_target=0.10, wing_width=2.0, allow_fallback=False),
+        ExpirationTarget("Weekly", 5, 10),
+        ExpirationTarget("Monthly", 28, 45),
     )
 
     # Trend strength threshold above which the market is considered

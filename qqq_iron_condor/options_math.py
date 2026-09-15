@@ -1,7 +1,16 @@
 """Black-Scholes option greeks, used only to estimate delta for strike
 selection when the data provider doesn't supply greeks directly."""
 
+import datetime as dt
 import math
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover - zoneinfo is stdlib on Python 3.9+
+    ZoneInfo = None
+
+MARKET_TIMEZONE = "America/New_York"
+MARKET_CLOSE_HOUR = 16
 
 
 def _norm_cdf(x: float) -> float:
@@ -56,6 +65,25 @@ def probability_between(put_delta: float, call_delta: float) -> float:
     p_above_call_strike = call_delta
     p_outside = p_below_put_strike + p_above_call_strike
     return max(0.0, min(1.0, 1.0 - p_outside))
+
+
+def time_to_expiration_years(dte: int, now: "dt.datetime | None" = None) -> float:
+    """Convert a days-to-expiration count into a Black-Scholes T (years).
+
+    For a same-day (0DTE) expiration, a plain dte/365 would collapse to
+    (near) zero regardless of whether it's 9:31am or 3:59pm, which breaks
+    delta/price estimation. Instead this uses actual clock time remaining
+    until the 4:00pm ET close, floored at 15 minutes so it never hits zero.
+    """
+    if dte > 0:
+        return dte / 365.0
+
+    if now is None:
+        now = dt.datetime.now(ZoneInfo(MARKET_TIMEZONE)) if ZoneInfo else dt.datetime.now()
+    close = now.replace(hour=MARKET_CLOSE_HOUR, minute=0, second=0, microsecond=0)
+    seconds_remaining = (close - now).total_seconds()
+    hours_remaining = max(seconds_remaining, 15 * 60) / 3600.0
+    return hours_remaining / (24 * 365.0)
 
 
 def bs_price(spot: float, strike: float, t_years: float, rate: float, iv: float, option_type: str) -> float:
