@@ -43,6 +43,7 @@ def run_scan(cfg: Config) -> str:
             rate=cfg.risk_free_rate,
             target_delta=target.short_delta_target or cfg.short_delta_target,
             wing_width=target.wing_width or cfg.wing_width,
+            reference_hv=snapshot.hv20_pct / 100.0,
         )
 
     headlines = get_news(cfg.news_feeds, cfg.max_headlines_per_feed)
@@ -143,6 +144,7 @@ def _self_test_report() -> str:
             cfg.risk_free_rate,
             target.short_delta_target or cfg.short_delta_target,
             target.wing_width or cfg.wing_width,
+            reference_hv=snapshot.hv20_pct / 100.0,
         )
 
     from .data import Headline

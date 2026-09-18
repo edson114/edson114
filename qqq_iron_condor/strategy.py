@@ -26,7 +26,11 @@ def _mid_price(row: pd.Series) -> float:
 def _with_delta(chain_df: pd.DataFrame, spot: float, t_years: float, rate: float, option_type: str) -> pd.DataFrame:
     df = chain_df.copy()
     df["iv"] = df["impliedVolatility"].fillna(0.0)
-    df = df[df["iv"] > 0.01]
+    # Below ~3% IV a QQQ quote is essentially always stale/untraded (e.g.
+    # pre-market, before that expiration's contracts have seen any volume)
+    # rather than a real read on volatility -- drop it instead of letting
+    # it collapse every delta toward 0 and produce a confidently wrong trade.
+    df = df[df["iv"] > 0.03]
     if df.empty:
         return df
     df["delta"] = df.apply(
@@ -93,6 +97,7 @@ def build_iron_condor(
     rate: float,
     target_delta: float,
     wing_width: float,
+    reference_hv: Optional[float] = None,
 ) -> Optional[IronCondorTrade]:
     t_years = time_to_expiration_years(chain.dte)
 
@@ -159,6 +164,13 @@ def build_iron_condor(
     warning = None
     if max_loss <= 0:
         warning = "Computed max loss is non-positive -- check for stale/illiquid quotes before trading this."
+    elif reference_hv and reference_hv > 0 and atm_iv < 0.5 * reference_hv:
+        warning = (
+            f"ATM IV ({atm_iv * 100:.1f}%) is implausibly low next to trailing realized "
+            f"volatility ({reference_hv * 100:.1f}%) -- this almost always means stale or "
+            "untraded option quotes (e.g. scan ran before the market opened). Treat these "
+            "strikes/greeks/credit as unreliable until confirmed against a live broker quote."
+        )
 
     return IronCondorTrade(
         label=label,
