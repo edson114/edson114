@@ -97,8 +97,15 @@ target and wing width per expiration (0DTE already does this).
 
 - Uses free Yahoo Finance data via `yfinance`; option chain liquidity and
   quote freshness vary, especially for far-dated or wide-strike contracts.
-  0DTE quotes in particular can be stale or zero-bid if the scan runs
-  before the market has actually opened.
+  Per-contract implied volatility can be unreliable both before the open
+  (stale/untraded quotes) and for the first several minutes after it
+  (many strikes haven't traded yet), which can make the delta-targeted
+  strike search land far from its target. `build_iron_condor` has two
+  sanity checks for this -- ATM IV implausibly low vs. trailing realized
+  volatility, and selected short strikes landing far below the delta
+  target -- both surface as an explicit warning on the trade rather than
+  a silently wrong recommendation, but neither guarantees clean data; if
+  you see a warning, re-pull quotes before trusting the strikes.
 - Delta/greeks are Black-Scholes approximations from chain IV, not live
   broker greeks. This is a bigger caveat for 0DTE, where real-world
   intraday gamma/pin risk near the short strikes is severe and not fully

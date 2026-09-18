@@ -161,6 +161,9 @@ def build_iron_condor(
     atm_iv = float(atm_iv_pool.mean()) if not atm_iv_pool.empty else float(pd.concat([calls["iv"], puts["iv"]]).mean() or 0.0)
     expected_move = expected_move_from_iv(spot, atm_iv, t_years)
 
+    short_call_delta_mag = abs(legs["short_call"].delta)
+    short_put_delta_mag = abs(legs["short_put"].delta)
+
     warning = None
     if max_loss <= 0:
         warning = "Computed max loss is non-positive -- check for stale/illiquid quotes before trading this."
@@ -170,6 +173,22 @@ def build_iron_condor(
             f"volatility ({reference_hv * 100:.1f}%) -- this almost always means stale or "
             "untraded option quotes (e.g. scan ran before the market opened). Treat these "
             "strikes/greeks/credit as unreliable until confirmed against a live broker quote."
+        )
+    elif short_call_delta_mag < 0.3 * target_delta and short_put_delta_mag < 0.3 * target_delta:
+        # Both short legs landed far below the delta target even though the
+        # aggregate ATM IV figure can look normal (or even high, if one
+        # nearby strike has a genuine or outlier quote skewing the average).
+        # That combination means most of the chain's per-contract implied
+        # volatility hasn't populated reliably yet -- common in the first
+        # several minutes right after the open, especially for less-liquid
+        # strikes -- so the delta-targeted search couldn't find real
+        # candidates and just picked the least-bad of a bad set.
+        warning = (
+            f"Selected short strikes came in far from the {target_delta:.2f} delta target "
+            f"(call {legs['short_call'].delta:.3f}, put {legs['short_put'].delta:.3f}) despite "
+            "plausible-looking prices -- this usually means per-contract implied volatility "
+            "hasn't populated reliably across the chain yet (common in the first few minutes "
+            "after the open). Re-pull quotes before trusting these strikes."
         )
 
     return IronCondorTrade(
