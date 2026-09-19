@@ -2,6 +2,7 @@
 
 import datetime as dt
 
+from qqq_iron_condor.config import Config
 from qqq_iron_condor.gates import evaluate_gates
 from qqq_iron_condor.news import CatalystHit, Headline
 
@@ -93,3 +94,17 @@ def test_catalyst_hits_are_soft_flag_only():
     result = evaluate_gates(**_base_kwargs(catalyst_hits=hits))
     assert result.skip is False
     assert any("catalyst" in r.lower() for r in result.soft_reasons)
+
+
+def test_default_config_has_2026_fomc_and_cpi_dates():
+    cfg = Config()
+    assert len(cfg.macro_event_dates) == 20
+    assert cfg.macro_event_dates["2026-09-16"] == "FOMC decision"
+    assert cfg.macro_event_dates["2026-10-14"] == "CPI release (September 2026 data)"
+
+
+def test_real_fomc_date_triggers_skip_via_default_config():
+    cfg = Config()
+    result = evaluate_gates(**_base_kwargs(today=dt.date(2026, 9, 16), macro_event_dates=cfg.macro_event_dates))
+    assert result.skip is True
+    assert any("FOMC" in r for r in result.hard_reasons)
