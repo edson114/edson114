@@ -71,3 +71,29 @@ class Config:
     max_headlines_per_feed: int = 8
 
     output_dir: str = "reports"
+
+    # --- Trade gate: skip-day rules ---
+    # Known scheduled macro events (FOMC decisions, CPI prints, etc.) to
+    # hard-skip. There is no live paid economic-calendar feed wired into
+    # this app -- keep this updated from official sources:
+    #   FOMC: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+    #   CPI:  https://www.bls.gov/schedule/news_release/cpi.htm
+    # Keys are "YYYY-MM-DD" (date the scan runs, i.e. the event date).
+    macro_event_dates: dict = field(default_factory=dict)
+
+    # Hard-skip if the opening (or, pre-market, the indicated) gap vs the
+    # prior close is at least this many percentage points in magnitude.
+    gap_threshold_pct: float = 0.8
+
+    # Hard-skip if VIX is at or above this level at scan time. This checks
+    # the level *at the time the scan runs* -- it cannot detect a spike
+    # that develops intraday after the report has already been generated.
+    vix_spike_threshold: float = 20.0
+
+    # Soft "trending + above-average volume" flag: fires when ADX(14) is
+    # at/above adx_trend_threshold AND the most recently completed
+    # session's volume is at least this multiple of its trailing 20-day
+    # average. This is a leading-indicator proxy from the last completed
+    # session, not a live intraday volume read -- a single morning scan
+    # can't yet know today's full-day volume.
+    volume_ratio_threshold: float = 1.3

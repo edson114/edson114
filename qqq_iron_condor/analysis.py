@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from . import indicators as ind
+from .data import is_today_bar_present
 
 
 @dataclass
@@ -38,6 +39,14 @@ class MarketSnapshot:
     low_20d: float
     high_50d: float
     low_50d: float
+
+    # Volume of the most recently *completed* session (excludes today's
+    # in-progress bar if present) and its ratio to the trailing 20-day
+    # average -- a proxy for "the last session was a high-volume/trending
+    # day", not a live read of today's volume-so-far.
+    volume_last_session: float
+    volume_avg20: float
+    volume_ratio: float
 
     vix_level: float
     vix_percentile_1y: float
@@ -83,6 +92,11 @@ def build_snapshot(price_history: pd.DataFrame, vix_history: pd.DataFrame, adx_t
     low_20d = float(low.tail(20).min())
     high_50d = float(high.tail(50).max())
     low_50d = float(low.tail(50).min())
+
+    completed_volume = price_history["Volume"].iloc[:-1] if is_today_bar_present(price_history) else price_history["Volume"]
+    volume_last_session = float(completed_volume.iloc[-1])
+    volume_avg20 = float(completed_volume.tail(20).mean())
+    volume_ratio = volume_last_session / volume_avg20 if volume_avg20 > 0 else float("nan")
 
     vix_close = vix_history["Close"]
     vix_level = float(vix_close.iloc[-1])
@@ -138,6 +152,9 @@ def build_snapshot(price_history: pd.DataFrame, vix_history: pd.DataFrame, adx_t
         low_20d=low_20d,
         high_50d=high_50d,
         low_50d=low_50d,
+        volume_last_session=volume_last_session,
+        volume_avg20=volume_avg20,
+        volume_ratio=volume_ratio,
         vix_level=vix_level,
         vix_percentile_1y=vix_percentile_1y,
         trend_label=trend_label,

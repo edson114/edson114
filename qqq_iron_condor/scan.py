@@ -16,7 +16,8 @@ from pathlib import Path
 
 from .analysis import build_snapshot
 from .config import Config
-from .data import get_news, get_price_history, get_spot_price, get_vix_history, pick_expirations_for_targets
+from .data import get_gap_info, get_news, get_price_history, get_spot_price, get_vix_history, pick_expirations_for_targets
+from .gates import evaluate_gates
 from .news import flag_catalysts
 from .report import render_report
 from .strategy import build_iron_condor
@@ -49,7 +50,22 @@ def run_scan(cfg: Config) -> str:
     headlines = get_news(cfg.news_feeds, cfg.max_headlines_per_feed)
     catalyst_hits = flag_catalysts(headlines, cfg.catalyst_keywords)
 
-    return render_report(cfg.symbol, snapshot, condors, headlines, catalyst_hits)
+    gap_pct, gap_confirmed = get_gap_info(cfg.symbol, price_history)
+    gate = evaluate_gates(
+        today=dt.date.today(),
+        macro_event_dates=cfg.macro_event_dates,
+        gap_pct=gap_pct,
+        gap_confirmed=gap_confirmed,
+        gap_threshold_pct=cfg.gap_threshold_pct,
+        vix_level=snapshot.vix_level,
+        vix_spike_threshold=cfg.vix_spike_threshold,
+        snapshot=snapshot,
+        adx_trend_threshold=cfg.adx_trend_threshold,
+        volume_ratio_threshold=cfg.volume_ratio_threshold,
+        catalyst_hits=catalyst_hits,
+    )
+
+    return render_report(cfg.symbol, snapshot, condors, headlines, catalyst_hits, gate=gate)
 
 
 def maybe_create_github_issue(report_md: str, title: str) -> None:
@@ -84,7 +100,8 @@ def _self_test_report() -> str:
     import numpy as np
     import pandas as pd
 
-    from .data import OptionChain
+    from .data import OptionChain, is_today_bar_present
+    from .gates import evaluate_gates
     from .strategy import build_iron_condor
 
     rng = np.random.default_rng(42)
@@ -154,7 +171,27 @@ def _self_test_report() -> str:
     ]
     catalyst_hits = flag_catalysts(headlines, cfg.catalyst_keywords)
 
-    return render_report(cfg.symbol, snapshot, condors, headlines, catalyst_hits)
+    gap_confirmed = is_today_bar_present(price_history)
+    gap_pct = (
+        (float(price_history["Close"].iloc[-1]) / float(price_history["Close"].iloc[-2]) - 1.0) * 100.0
+        if gap_confirmed
+        else None
+    )
+    gate = evaluate_gates(
+        today=dt.date.today(),
+        macro_event_dates=cfg.macro_event_dates,
+        gap_pct=gap_pct,
+        gap_confirmed=gap_confirmed,
+        gap_threshold_pct=cfg.gap_threshold_pct,
+        vix_level=snapshot.vix_level,
+        vix_spike_threshold=cfg.vix_spike_threshold,
+        snapshot=snapshot,
+        adx_trend_threshold=cfg.adx_trend_threshold,
+        volume_ratio_threshold=cfg.volume_ratio_threshold,
+        catalyst_hits=catalyst_hits,
+    )
+
+    return render_report(cfg.symbol, snapshot, condors, headlines, catalyst_hits, gate=gate)
 
 
 def main(argv=None) -> int:

@@ -46,6 +46,44 @@ def get_spot_price(price_history: pd.DataFrame) -> float:
     return float(price_history["Close"].iloc[-1])
 
 
+def is_today_bar_present(price_history: pd.DataFrame) -> bool:
+    """Whether the daily history's last row is today's (in-progress) bar.
+
+    yfinance only adds a row for the current session once at least one
+    regular-hours trade has printed (i.e. after the open) -- before that,
+    the last row is still the prior session's completed bar.
+    """
+    return price_history.index[-1].date() == dt.date.today()
+
+
+def get_gap_info(symbol: str, price_history: pd.DataFrame) -> tuple[Optional[float], bool]:
+    """Return (gap_pct, is_confirmed_open).
+
+    Once today's daily bar exists (market has opened and printed at least
+    one trade), this is a confirmed move-from-prior-close using the same
+    daily history everything else in the app already relies on. Before
+    that, it falls back to a live quote via yfinance's fast_info for an
+    indicative (unconfirmed) pre-market gap -- fast_info reflects the
+    latest available trade, pre-market included.
+
+    Returns (None, False) if no gap could be determined at all.
+    """
+    if is_today_bar_present(price_history):
+        gap_pct = (float(price_history["Close"].iloc[-1]) / float(price_history["Close"].iloc[-2]) - 1.0) * 100.0
+        return gap_pct, True
+
+    try:
+        fast_info = yf.Ticker(symbol).fast_info
+        last_price = float(fast_info["last_price"])
+        prev_close = float(fast_info["previous_close"])
+    except Exception:
+        return None, False
+
+    if prev_close <= 0:
+        return None, False
+    return (last_price / prev_close - 1.0) * 100.0, False
+
+
 def list_expirations(symbol: str) -> list[str]:
     return list(yf.Ticker(symbol).options)
 

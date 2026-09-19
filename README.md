@@ -33,7 +33,15 @@ Each run:
    never approximated with a later expiration under the "0DTE" label.
    0DTE's Black-Scholes time-to-expiry is computed from actual clock time
    remaining until the 4:00pm ET close, not a fraction of a calendar day.
-5. **Risk management notes** — position sizing, profit-taking, and
+5. **Trade gate (skip-day rules)** — a SKIP/OK verdict at the top of the
+   report, evaluating: a scheduled macro event (FOMC/CPI, from a
+   user-maintained calendar), an opening/pre-market gap beyond a threshold,
+   and whether VIX is at/above a spike level at scan time (hard gates --
+   any one triggers SKIP), plus a trending-day-with-above-average-volume
+   proxy and headline catalyst hits (soft flags -- shown, not forced). See
+   [How the trade gate works](#how-the-trade-gate-works) for what each
+   condition can and can't actually detect from a single morning scan.
+6. **Risk management notes** — position sizing, profit-taking, and
    adjustment guidance, plus a reminder to avoid new positions right before
    flagged catalysts.
 
@@ -92,6 +100,47 @@ Tune `qqq_iron_condor/config.py` to change the delta target, wing width,
 DTE windows, risk-free rate, or news sources/keywords. Each entry in
 `expiration_targets` is an `ExpirationTarget` and can override the delta
 target and wing width per expiration (0DTE already does this).
+
+## How the trade gate works
+
+Every report opens with a `🛑 SKIP TODAY` or `✅ OK to trade` verdict
+(`qqq_iron_condor/gates.py`), implementing: skip on FOMC days, CPI prints,
+surprise macro news, a strong pre-market gap, a trending day with
+above-average volume, or a VIX spike. Not all of those are equally
+checkable from one point-in-time morning scan, so the gate splits them:
+
+**Hard gates** (any one → SKIP):
+- **Scheduled macro event** — today's date matches an entry in
+  `Config.macro_event_dates` (a plain `{"YYYY-MM-DD": "label"}` dict you
+  maintain yourself). There is no live paid economic-calendar API wired
+  in; keep this updated from
+  [federalreserve.gov's FOMC calendar](https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm)
+  and [bls.gov's CPI release schedule](https://www.bls.gov/schedule/news_release/cpi.htm).
+  Left empty by default — until you fill it in, this check never fires.
+- **Gap vs. prior close** — `Config.gap_threshold_pct` (default `0.8`).
+  Once the market has opened and today's daily bar exists, this is a
+  confirmed move from the prior close; before the open, it falls back to
+  a live quote for an indicative (unconfirmed) pre-market gap.
+- **VIX spike** — `Config.vix_spike_threshold` (default `20.0`), checked
+  against VIX's level **at scan time**. This cannot detect a spike that
+  develops intraday after the report has already run.
+
+**Soft flags** (shown, don't force a skip alone):
+- **Trending + above-average volume** — `Config.adx_trend_threshold` and
+  `Config.volume_ratio_threshold` (default `1.3x`), based on the most
+  recently *completed* session's ADX and volume vs. its 20-day average.
+  This is a leading-indicator proxy, not live intraday volume — a single
+  morning scan can't yet know today's full-day volume or how the trend
+  develops.
+- **Catalyst headlines** — any keyword hit from the existing news scan.
+  "Surprise macro news" is unscheduled by definition; this is the best
+  available real-time proxy, not a guarantee of catching one.
+
+If you want the trending/volume or catalyst signals to force a hard skip
+too, that's a one-line change in `gates.evaluate_gates` — they're kept
+soft by default because the catalyst keyword list is broad enough (mentions
+of "earnings", "fed", individual mega-caps, etc.) to fire on most days,
+which would make a hard skip on any hit too aggressive to be useful.
 
 ## Limitations & caveats
 
