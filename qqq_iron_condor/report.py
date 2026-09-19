@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 
 from .analysis import MarketSnapshot
+from .gates import GateResult
 from .news import CatalystHit
 from .data import Headline
 from .strategy import IronCondorTrade
@@ -72,12 +73,46 @@ def _catalyst_section(hits: list[CatalystHit], headlines: list[Headline]) -> str
     return "\n".join(lines)
 
 
+def _gate_section(gate: GateResult) -> str:
+    lines = []
+    if gate.skip:
+        lines.append("## 🛑 Trade Gate: SKIP TODAY")
+        lines.append("")
+        lines.append("**At least one hard skip-day condition is true:**")
+        for reason in gate.hard_reasons:
+            lines.append(f"- ⛔ {reason}")
+    else:
+        lines.append("## ✅ Trade Gate: OK to trade")
+        lines.append("")
+        lines.append("No hard skip-day condition triggered (scheduled macro event, gap, or VIX spike).")
+
+    if gate.soft_reasons:
+        lines.append("")
+        lines.append("**Advisory flags** (don't force a skip alone, but worth weighing -- see caveats below):")
+        for reason in gate.soft_reasons:
+            lines.append(f"- ⚠️ {reason}")
+
+    gap_str = f"{gate.gap_pct:+.2f}%" if gate.gap_pct is not None else "unknown"
+    gap_kind = "confirmed opening" if gate.gap_confirmed else "indicated pre-market (unconfirmed)"
+    lines.append("")
+    lines.append(f"_Gap check: {gap_str} ({gap_kind})._")
+    lines.append(
+        "_Caveats: the trending/volume flag and headline scan are best-effort proxies, not live "
+        "intraday monitoring -- a single morning scan can't observe a VIX spike, volume surge, or "
+        "trend that develops later in the session. The macro calendar only covers dates you've "
+        "entered in `Config.macro_event_dates`; keep it updated from official sources._"
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_report(
     symbol: str,
     snapshot: MarketSnapshot,
     condors: dict,
     headlines: list,
     catalyst_hits: list,
+    gate: GateResult = None,
     generated_at: dt.datetime = None,
 ) -> str:
     generated_at = generated_at or dt.datetime.now()
@@ -90,6 +125,9 @@ def render_report(
         "Verify all prices/strikes against a live broker quote before placing any trade."
     )
     parts.append("")
+
+    if gate is not None:
+        parts.append(_gate_section(gate))
 
     parts.append("## Market Snapshot")
     parts.append("")
