@@ -4,6 +4,46 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
+# 2026 FOMC decision days (the announcement day of each 2-day meeting,
+# 2:00pm ET) and CPI release days, sourced from federalreserve.gov's FOMC
+# calendar and BLS's CPI release schedule (cross-referenced against
+# multiple independent sources and BLS's own archived-release URL naming,
+# e.g. cpi_05122026.htm = published May 12, 2026, covering April data).
+# CPI dates from Feb 2026 onward reflect the schedule as revised after the
+# 2025 government shutdown ("lapse in appropriations") pushed some
+# releases back. Only the FOMC *decision* day is included, not the
+# (lower-impact) first day of each two-day meeting -- add those too if
+# you want extra caution. Re-verify closer to each date in case of further
+# revisions, and extend this table when 2027 dates are published.
+FOMC_2026_DECISION_DAYS = {
+    "2026-01-28": "FOMC decision",
+    "2026-03-18": "FOMC decision",
+    "2026-04-29": "FOMC decision",
+    "2026-06-17": "FOMC decision",
+    "2026-07-29": "FOMC decision",
+    "2026-09-16": "FOMC decision",
+    "2026-10-28": "FOMC decision",
+    "2026-12-09": "FOMC decision",
+}
+
+CPI_2026_RELEASE_DAYS = {
+    "2026-01-13": "CPI release (December 2025 data)",
+    "2026-02-13": "CPI release (January 2026 data)",
+    "2026-03-11": "CPI release (February 2026 data)",
+    "2026-04-10": "CPI release (March 2026 data)",
+    "2026-05-12": "CPI release (April 2026 data)",
+    "2026-06-10": "CPI release (May 2026 data)",
+    "2026-07-14": "CPI release (June 2026 data)",
+    "2026-08-12": "CPI release (July 2026 data)",
+    "2026-09-11": "CPI release (August 2026 data)",
+    "2026-10-14": "CPI release (September 2026 data)",
+    "2026-11-10": "CPI release (October 2026 data)",
+    "2026-12-10": "CPI release (November 2026 data)",
+}
+
+DEFAULT_MACRO_EVENT_DATES = {**FOMC_2026_DECISION_DAYS, **CPI_2026_RELEASE_DAYS}
+
+
 @dataclass(frozen=True)
 class ExpirationTarget:
     label: str
@@ -73,13 +113,15 @@ class Config:
     output_dir: str = "reports"
 
     # --- Trade gate: skip-day rules ---
-    # Known scheduled macro events (FOMC decisions, CPI prints, etc.) to
-    # hard-skip. There is no live paid economic-calendar feed wired into
-    # this app -- keep this updated from official sources:
+    # Known scheduled macro events (FOMC decisions, CPI prints) to
+    # hard-skip. Pre-populated with 2026 dates (see DEFAULT_MACRO_EVENT_DATES
+    # above) -- there is no live paid economic-calendar feed wired into this
+    # app, so this is a point-in-time snapshot, not a self-updating source.
+    # Keep it current and extend it for 2027+ from official sources:
     #   FOMC: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
     #   CPI:  https://www.bls.gov/schedule/news_release/cpi.htm
     # Keys are "YYYY-MM-DD" (date the scan runs, i.e. the event date).
-    macro_event_dates: dict = field(default_factory=dict)
+    macro_event_dates: dict = field(default_factory=lambda: dict(DEFAULT_MACRO_EVENT_DATES))
 
     # Hard-skip if the opening (or, pre-market, the indicated) gap vs the
     # prior close is at least this many percentage points in magnitude.
