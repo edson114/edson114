@@ -139,3 +139,40 @@ class Config:
     # session, not a live intraday volume read -- a single morning scan
     # can't yet know today's full-day volume.
     volume_ratio_threshold: float = 1.3
+
+    # --- Directional (buy calls/puts) signal ---
+    # Ticker used for the intraday relative-strength read (QQQ performance
+    # vs. the broad market today) -- outperformance points to tech-specific
+    # strength rather than a market-wide move.
+    spy_symbol: str = "SPY"
+
+    # Intraday bar size/lookback used for VWAP, opening-range, and
+    # short-window EMA/RSI reads. "1d" period with a 5m interval is what
+    # yfinance reliably serves for the current session.
+    intraday_interval: str = "5m"
+    intraday_period: str = "1d"
+
+    # Width of the opening range (from the first bar of the session) used
+    # for the opening-range-breakout component and, when triggered, as the
+    # underlying stop-loss level.
+    opening_range_minutes: int = 15
+
+    # Target absolute delta for the single-leg call/put suggested to buy.
+    # Near-ATM (unlike the 0.16 short-strike target for the iron condor)
+    # so the contract is responsive to an intraday move rather than mostly
+    # extrinsic value.
+    directional_delta_target: float = 0.45
+
+    # Underlying stop-loss distance (in ATR14 multiples) used when no
+    # opening-range level is available to stop against.
+    stop_atr_multiple: float = 0.75
+
+    # Target = entry + this multiple of the stop distance (risk), i.e. a
+    # 1.5:1 reward:risk underlying target.
+    reward_risk_ratio: float = 1.5
+
+    # Composite score (-1..+1) must reach this magnitude to produce a
+    # CALL/PUT bias; anything smaller is reported as NO TRADE (no edge).
+    signal_score_threshold: float = 0.30
+
+    signals_output_dir: str = "reports/signals"

@@ -122,6 +122,18 @@ def pick_expirations_for_targets(symbol: str, targets: tuple) -> dict[str, Optio
     return picks
 
 
+def get_intraday_history(symbol: str, interval: str = "5m", period: str = "1d") -> pd.DataFrame:
+    """Today's (or the current period's) intraday bars, used for VWAP,
+    opening-range, and short-window EMA/RSI reads in the directional
+    signal -- distinct from the daily-bar history used everywhere else."""
+    ticker = yf.Ticker(symbol)
+    df = ticker.history(period=period, interval=interval, auto_adjust=False)
+    if df.empty:
+        raise RuntimeError(f"No intraday history returned for {symbol} (market may be closed).")
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    return df
+
+
 def get_vix_history(period: str = "1y") -> pd.DataFrame:
     return get_price_history("^VIX", period=period)
 

@@ -1,13 +1,28 @@
-# QQQ Iron Condor Scanner
+# QQQ Trading Tools
+
+Two automated, decision-support tools for trading **QQQ options** off the
+same market data pipeline:
+
+1. **[Iron Condor Scanner](#qqq-iron-condor-scanner)** — a daily,
+   range-bound premium-selling scan.
+2. **[Directional Signal](#qqq-directional-signal-buy-callsputs)** — an
+   on-demand (re-runnable through the session) CALL/PUT/NO-TRADE signal
+   for buying calls or puts.
+
+> **Not financial advice.** Both are decision-support tools, not
+> auto-traders — neither ever places orders. Always verify strikes, prices,
+> and greeks against your broker's live quotes before trading, and see each
+> tool's own limitations section below. **No signal in this repo is, or
+> claims to be, close to "99% profitable" — no legitimate day-trading
+> system is.** These structure the same inputs a discretionary trader would
+> check, consistently; they don't promise a win rate.
+
+## QQQ Iron Condor Scanner
 
 An automated daily scanner for trading **QQQ iron condors**. Every trading
 day (scheduled around market open), it pulls price action, technical
 indicators, volatility data, and news, then proposes concrete iron condor
 strikes for a same-day (0DTE), a weekly, and a monthly expiration.
-
-> **Not financial advice.** This is a decision-support tool, not an
-> auto-trader — it never places orders. Always verify strikes, prices, and
-> greeks against your broker's live quotes before trading.
 
 ## What it does
 
@@ -167,22 +182,120 @@ which would make a hard skip on any hit too aggressive to be useful.
   proxy; it is not QQQ-specific historical IV.
 - This tool never places trades — it only produces an analysis/report.
 
+## QQQ Directional Signal (Buy Calls/Puts)
+
+An on-demand CALL / PUT / NO TRADE signal for buying (not selling) QQQ
+options intraday. Unlike the once-daily iron condor scan, it's meant to be
+re-run through the session — each run reads the *current* intraday bars, so
+the read can change as price action develops.
+
+Each run:
+
+1. **Reuses the same daily market snapshot** as the iron condor scan
+   (trend, RSI, MACD, ADX, ATR, VIX regime) for the higher-timeframe read.
+2. **Pulls today's intraday bars** (5-minute, via `yfinance`) for QQQ and
+   SPY and computes VWAP, an opening-range breakout/breakdown/inside read,
+   a short-window EMA9/EMA21 trend, intraday RSI(14), and QQQ's
+   relative strength vs. SPY today (tech-specific strength/weakness vs. a
+   broad market move).
+3. **Runs the same hard skip-day gate** as the iron condor scan (scheduled
+   FOMC/CPI, a confirmed/indicated gap beyond threshold, or a VIX spike) —
+   any of those forces **NO TRADE** regardless of how bullish/bearish the
+   technicals look.
+4. **Scores seven weighted signals** (daily trend, MACD histogram, daily
+   RSI, VWAP position, intraday EMA trend, opening-range breakout, and
+   QQQ-vs-SPY relative strength) into a single **-1..+1 composite score**.
+   At/above `Config.signal_score_threshold` (default `+0.30`) → **CALL**;
+   at/below `-0.30` → **PUT**; otherwise **NO TRADE** (no edge / choppy).
+5. **Selects a near-ATM contract** (target absolute delta
+   `Config.directional_delta_target`, default `0.45`, vs. the iron condor's
+   0.16 short-strike target) for both a 0DTE and a weekly expiration when
+   actionable — near-ATM so the premium is responsive to the move rather
+   than mostly extrinsic value.
+6. **Proposes a trade plan**: an underlying stop-loss level (the opening
+   range extreme if the breakout triggered the signal, otherwise
+   `Config.stop_atr_multiple` × ATR14) and a target at
+   `Config.reward_risk_ratio` × the stop distance.
+
+The full report is written to `reports/signals/YYYY-MM-DD-HHMM.md` and,
+when `GITHUB_TOKEN` is available, also posted as a GitHub Issue — but
+**only when the signal is actionable** (CALL or PUT), to avoid spamming an
+issue every time it's re-run and lands on NO TRADE.
+
+### Running it
+
+```bash
+# Live signal (requires internet access to Yahoo Finance / RSS feeds)
+python -m qqq_iron_condor.signal
+
+# Offline smoke test with synthetic data (no network needed)
+python -m qqq_iron_condor.signal --self-test
+
+# Skip GitHub issue creation
+python -m qqq_iron_condor.signal --no-issue
+```
+
+### How the score is built
+
+Each of the seven components below contributes `weight × value` (value in
+`[-1, +1]`) to the composite score; weights sum to 1.0:
+
+| Component | Weight | Bullish when... |
+|---|---|---|
+| Daily trend | 0.20 | Uptrend (spot > SMA50 > SMA200, MACD hist > 0) |
+| MACD histogram | 0.10 | Positive |
+| Daily RSI(14) | 0.10 | Above 50, scaled (extremes noted, not flipped) |
+| VWAP position | 0.20 | Price above VWAP |
+| Intraday EMA9/21 | 0.15 | EMA9 > EMA21 |
+| Opening-range breakout | 0.15 | Price above the opening-range high |
+| QQQ vs. SPY relative strength | 0.10 | QQQ outperforming SPY today |
+
+Tune the weights in `qqq_iron_condor/direction.py`'s `_WEIGHTS` dict, and
+the delta target, stop/target multiples, and score threshold in
+`qqq_iron_condor/config.py`.
+
+### Limitations & caveats
+
+- This is a **rules-based checklist**, not a backtested-for-edge or
+  machine-learned model. The score is not a probability of profit — treat
+  it the way you'd treat a discretionary trader's structured opinion, one
+  input among several.
+- Same caveats as the iron condor scan apply: free `yfinance` data can be
+  stale/illiquid (especially right after the open), the macro calendar is
+  a user-maintained snapshot (not a live paid feed), and news/catalyst
+  detection is a keyword scan over a handful of free RSS feeds.
+- **0DTE prices move fast.** If you're reading a saved report more than a
+  few minutes after it ran, re-pull the underlying price, VWAP, and option
+  quotes before acting on it — don't trade a stale signal.
+- Delta/greeks are Black-Scholes approximations from chain IV, not live
+  broker greeks.
+- This tool never places trades — it only produces an analysis/report.
+
 ## Project layout
 
 ```
 qqq_iron_condor/
-  config.py        # all tunable parameters
-  data.py           # price history, option chains, VIX, news (network I/O)
-  news.py           # catalyst keyword flagging
-  indicators.py     # RSI, EMA/SMA, MACD, Bollinger Bands, ATR, ADX, HV
-  options_math.py   # Black-Scholes delta/price helpers
-  analysis.py       # turns raw data into the market snapshot
-  strategy.py       # iron condor strike selection & trade math
-  report.py         # Markdown report rendering
-  scan.py           # CLI entrypoint / orchestration
+  config.py         # all tunable parameters
+  data.py            # price/intraday history, option chains, VIX, news (network I/O)
+  news.py            # catalyst keyword flagging
+  indicators.py      # RSI, EMA/SMA, MACD, Bollinger Bands, ATR, ADX, HV
+  intraday.py         # VWAP, opening-range, intraday EMA/RSI, relative strength
+  options_math.py    # Black-Scholes delta/price helpers
+  analysis.py         # turns raw data into the daily market snapshot
+  strategy.py         # iron condor strike selection & trade math
+  direction.py         # directional (buy calls/puts) scoring & contract selection
+  report.py            # iron condor Markdown report rendering
+  signal_report.py     # directional signal Markdown report rendering
+  scan.py               # iron condor CLI entrypoint / orchestration
+  signal.py             # directional signal CLI entrypoint / orchestration
 tests/
-  test_pipeline.py  # offline smoke test (synthetic data)
-reports/            # daily generated reports land here
+  test_pipeline.py        # iron condor offline smoke test (synthetic data)
+  test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
+  test_direction.py        # directional scoring unit tests
+  test_intraday.py         # VWAP/opening-range/EMA unit tests
+reports/              # daily iron condor reports land here
+reports/signals/      # directional signal reports land here
 .github/workflows/
   qqq-iron-condor-scan.yml
+  qqq-directional-signal.yml
 ```
