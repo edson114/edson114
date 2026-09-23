@@ -111,6 +111,8 @@ def _vwap_component(intraday: IntradaySnapshot) -> tuple[float, str]:
 
 
 def _ema_component(intraday: IntradaySnapshot) -> tuple[float, str]:
+    if intraday.ema9 != intraday.ema9 or intraday.ema21 != intraday.ema21:  # NaN check
+        return 0.0, "Intraday EMA9/21 not available yet (too early in the session for a 21-bar EMA)."
     val = 1.0 if intraday.ema_trend == "bullish" else (-1.0 if intraday.ema_trend == "bearish" else 0.0)
     rel = ">" if val > 0 else ("<" if val < 0 else "≈")
     return val, f"Intraday EMA9 {rel} EMA21 (${intraday.ema9:.2f} vs ${intraday.ema21:.2f}) -- {intraday.ema_trend}."

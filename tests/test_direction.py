@@ -143,6 +143,22 @@ def test_mixed_signals_yield_no_trade_and_no_contracts():
     assert signal.stop_loss_underlying is None
 
 
+def test_ema_component_handles_not_yet_available_nan_without_crashing():
+    cfg = Config()
+    daily = _daily()
+    # Too early in the session for a 21-bar EMA: ema9/ema21 come back as NaN,
+    # not just "equal" (this reproduces a real early-session report).
+    intraday = _intraday(ema9=float("nan"), ema21=float("nan"), ema_trend="flat")
+    gate = _gate()
+    chains = {"Weekly": _synth_chain(7, SPOT, cfg.risk_free_rate)}
+
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=0.0, gate=gate, chains=chains, cfg=cfg)
+
+    ema_component = next(c for c in signal.components if c.name == "ema")
+    assert ema_component.contribution == 0.0
+    assert "nan" not in ema_component.detail.lower()
+
+
 def test_hard_gate_forces_no_trade_even_with_bullish_technicals():
     cfg = Config()
     daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=65.0)
