@@ -14,9 +14,10 @@ import os
 import sys
 from pathlib import Path
 
+from . import providers
 from .analysis import build_snapshot
 from .config import Config
-from .data import get_gap_info, get_news, get_price_history, get_spot_price, get_vix_history, pick_expirations_for_targets
+from .data import get_news
 from .gates import evaluate_gates
 from .news import flag_catalysts
 from .report import render_report
@@ -24,13 +25,13 @@ from .strategy import build_iron_condor
 
 
 def run_scan(cfg: Config) -> str:
-    price_history = get_price_history(cfg.symbol, cfg.price_history_period)
-    vix_history = get_vix_history(cfg.vix_history_period)
-    spot = get_spot_price(price_history)
+    price_history = providers.get_price_history(cfg.symbol, cfg.price_history_period)
+    vix_history = providers.get_vix_history(cfg.vix_history_period, cfg.vix_symbol, cfg.tradier_vix_symbol)
+    spot = providers.get_spot_price(cfg.symbol, price_history)
 
     snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
-    chains = pick_expirations_for_targets(cfg.symbol, cfg.expiration_targets)
+    chains = providers.pick_expirations_for_targets(cfg.symbol, cfg.expiration_targets)
     condors = {}
     for target in cfg.expiration_targets:
         chain = chains.get(target.label)
@@ -50,7 +51,7 @@ def run_scan(cfg: Config) -> str:
     headlines = get_news(cfg.news_feeds, cfg.max_headlines_per_feed)
     catalyst_hits = flag_catalysts(headlines, cfg.catalyst_keywords)
 
-    gap_pct, gap_confirmed = get_gap_info(cfg.symbol, price_history)
+    gap_pct, gap_confirmed = providers.get_gap_info(cfg.symbol, price_history)
     gate = evaluate_gates(
         today=dt.date.today(),
         macro_event_dates=cfg.macro_event_dates,
@@ -65,7 +66,10 @@ def run_scan(cfg: Config) -> str:
         catalyst_hits=catalyst_hits,
     )
 
-    return render_report(cfg.symbol, snapshot, condors, headlines, catalyst_hits, gate=gate)
+    return render_report(
+        cfg.symbol, snapshot, condors, headlines, catalyst_hits,
+        gate=gate, data_provider=providers.active_provider_name(),
+    )
 
 
 def maybe_create_github_issue(report_md: str, title: str) -> None:
@@ -207,6 +211,7 @@ def main(argv=None) -> int:
         if args.self_test:
             report_md = _self_test_report()
         else:
+            print(f"Data provider: {providers.active_provider_name()}", file=sys.stderr)
             report_md = run_scan(cfg)
     except Exception as exc:
         print(f"Scan failed: {exc}", file=sys.stderr)

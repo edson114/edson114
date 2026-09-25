@@ -63,6 +63,11 @@ class ExpirationTarget:
 class Config:
     symbol: str = "QQQ"
     vix_symbol: str = "^VIX"
+    # Symbol convention differs between providers: yfinance wants the
+    # caret-prefixed Yahoo ticker, Tradier's market data generally uses the
+    # bare index symbol. Not verified against a live Tradier account in
+    # this codebase -- adjust if VIX history calls fail with a 4xx.
+    tradier_vix_symbol: str = "VIX"
 
     # Risk-free rate used in the Black-Scholes delta approximation.
     # Approximate short-term T-bill yield; not fetched live to avoid
