@@ -32,6 +32,11 @@ jobs:
       - name: Run QQQ iron condor scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: set the TRADIER_TOKEN repo secret to use real broker
+          # bid/ask/greeks instead of the free yfinance approximation. Empty
+          # when unset, which the scan treats the same as "not configured".
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+          TRADIER_BASE_URL: ${{ secrets.TRADIER_BASE_URL }}
         run: python -m qqq_iron_condor.scan
 
       - name: Commit generated report

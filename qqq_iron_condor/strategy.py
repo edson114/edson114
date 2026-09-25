@@ -33,10 +33,16 @@ def _with_delta(chain_df: pd.DataFrame, spot: float, t_years: float, rate: float
     df = df[df["iv"] > 0.03]
     if df.empty:
         return df
-    df["delta"] = df.apply(
-        lambda r: bs_delta(spot, float(r["strike"]), t_years, rate, float(r["iv"]), option_type),
-        axis=1,
-    )
+    has_real_delta = "delta" in df.columns and df["delta"].notna().any()
+    if has_real_delta:
+        # Broker-computed greeks (e.g. from Tradier) -- use directly rather
+        # than re-deriving via Black-Scholes from our own IV read.
+        df["delta"] = df["delta"].fillna(0.0)
+    else:
+        df["delta"] = df.apply(
+            lambda r: bs_delta(spot, float(r["strike"]), t_years, rate, float(r["iv"]), option_type),
+            axis=1,
+        )
     df["mid"] = df.apply(_mid_price, axis=1)
     return df
 

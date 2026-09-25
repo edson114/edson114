@@ -114,6 +114,7 @@ def render_report(
     catalyst_hits: list,
     gate: GateResult = None,
     generated_at: dt.datetime = None,
+    data_provider: str = None,
 ) -> str:
     generated_at = generated_at or dt.datetime.now()
 
@@ -124,6 +125,17 @@ def render_report(
         "> Automated analysis for informational purposes only. **Not financial advice.** "
         "Verify all prices/strikes against a live broker quote before placing any trade."
     )
+    if data_provider == "tradier":
+        parts.append(
+            "> **Data provider:** Tradier -- real bid/ask and broker-computed greeks "
+            "(delta/gamma/theta/vega), not a Black-Scholes approximation."
+        )
+    elif data_provider == "yfinance":
+        parts.append(
+            "> **Data provider:** yfinance (free) -- delta is a Black-Scholes approximation "
+            "from chain implied volatility, not a live broker greek. Set `TRADIER_TOKEN` to "
+            "use real broker-computed greeks instead."
+        )
     parts.append("")
 
     if gate is not None:

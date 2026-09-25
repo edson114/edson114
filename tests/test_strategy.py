@@ -5,6 +5,7 @@ import datetime as dt
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from qqq_iron_condor.data import OptionChain
 from qqq_iron_condor.options_math import bs_price
@@ -93,6 +94,50 @@ def _chain_with_bad_otm_quotes(dte: int, near_spot_iv: float, far_iv: float, ban
     })
     expiration = (dt.date.today() + dt.timedelta(days=dte)).isoformat()
     return OptionChain(expiration=expiration, dte=dte, calls=calls, puts=puts)
+
+
+def test_real_delta_column_used_instead_of_recomputing_via_black_scholes():
+    # A Tradier-style chain: a linear (not Black-Scholes-shaped) delta
+    # profile that hits exactly +/-0.16 at known strikes 17 away from spot.
+    # A real Black-Scholes calc from the IV column (0.30, a curved profile)
+    # would never land on these exact values at these exact strikes, so if
+    # the selected short strikes match this profile's prediction, the real
+    # column won rather than being recomputed.
+    strikes = np.arange(SPOT - 40, SPOT + 40, 1.0)
+    t_years = 7 / 365.0
+    iv = np.full(len(strikes), 0.30)
+
+    call_fair = np.array([bs_price(SPOT, k, t_years, RATE, v, "call") for k, v in zip(strikes, iv)])
+    put_fair = np.array([bs_price(SPOT, k, t_years, RATE, v, "put") for k, v in zip(strikes, iv)])
+
+    call_delta = np.clip(0.5 - 0.02 * (strikes - SPOT), 0.0, 1.0)
+    put_delta = -np.clip(0.5 - 0.02 * (SPOT - strikes), 0.0, 1.0)
+
+    calls = pd.DataFrame({
+        "strike": strikes,
+        "bid": np.maximum(0.01, call_fair - 0.02),
+        "ask": call_fair + 0.02,
+        "lastPrice": call_fair,
+        "impliedVolatility": iv,
+        "delta": call_delta,
+    })
+    puts = pd.DataFrame({
+        "strike": strikes,
+        "bid": np.maximum(0.01, put_fair - 0.02),
+        "ask": put_fair + 0.02,
+        "lastPrice": put_fair,
+        "impliedVolatility": iv,
+        "delta": put_delta,
+    })
+    expiration = (dt.date.today() + dt.timedelta(days=7)).isoformat()
+    chain = OptionChain(expiration=expiration, dte=7, calls=calls, puts=puts)
+
+    trade = build_iron_condor("Weekly", chain, SPOT, RATE, 0.16, 5.0)
+    assert trade is not None
+    assert trade.legs["short_call"].strike == pytest.approx(SPOT + 17)
+    assert trade.legs["short_call"].delta == pytest.approx(0.16)
+    assert trade.legs["short_put"].strike == pytest.approx(SPOT - 17)
+    assert trade.legs["short_put"].delta == pytest.approx(-0.16)
 
 
 def test_short_strikes_far_from_target_delta_flagged_even_with_normal_atm_iv():

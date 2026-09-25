@@ -39,15 +39,17 @@ Each run:
    geopolitics) so you know when to sit out or size down.
 4. **Iron condor construction** — for a same-day (0DTE), weekly (~5-10 DTE),
    and monthly (~28-45 DTE) expiration, it selects short strikes closest to
-   a target delta (default ~0.16 for weekly/monthly, ~0.10 for 0DTE) using
-   a Black-Scholes delta computed from each contract's implied volatility,
+   a target delta (default ~0.16 for weekly/monthly, ~0.10 for 0DTE),
    adds protective long strikes ($5 wide for weekly/monthly, $2 wide for
    0DTE), and reports net credit, max profit/loss, breakevens, return on
    risk, and an approximate probability of profit. 0DTE only appears if
    QQQ actually lists a same-day expiration when the scan runs; it is
    never approximated with a later expiration under the "0DTE" label.
-   0DTE's Black-Scholes time-to-expiry is computed from actual clock time
-   remaining until the 4:00pm ET close, not a fraction of a calendar day.
+   Delta comes from a real broker-computed greek when `TRADIER_TOKEN` is
+   set (see [Data providers](#data-providers) below), otherwise from a
+   Black-Scholes approximation whose time-to-expiry for 0DTE is computed
+   from actual clock time remaining until the 4:00pm ET close, not a
+   fraction of a calendar day.
 5. **Trade gate (skip-day rules)** — a SKIP/OK verdict at the top of the
    report, evaluating: a scheduled macro event (FOMC/CPI, from a
    user-maintained calendar), an opening/pre-market gap beyond a threshold,
@@ -97,12 +99,54 @@ can also trigger it manually from the Actions tab (`workflow_dispatch`).
 To get notified, watch this repository (or just the `qqq-scan` label) so
 new issues land in your GitHub notifications/email.
 
+## Data providers
+
+By default the scan uses **yfinance** (free, no signup) for price history
+and option chains. Delta is then a Black-Scholes approximation derived from
+the chain's own implied volatility field -- which is exactly the thing that
+caused this project's worst bugs: in the first several minutes after the
+open, per-contract IV on free data often hasn't populated reliably yet,
+producing deltas near 0.000 or picking strikes far from any sane target.
+Two sanity checks (`strategy.build_iron_condor`) catch and flag this when
+it happens, but they're a safety net, not a fix for the root cause.
+
+Set the `TRADIER_TOKEN` environment variable (or repo secret, for the
+GitHub Actions workflow) to switch to **Tradier** instead:
+
+```bash
+export TRADIER_TOKEN=your-token-here
+python -m qqq_iron_condor.scan
+```
+
+Tradier returns real bid/ask and **broker-computed greeks** (delta, gamma,
+theta, vega -- via ORATS) with every quote, so the app uses that delta
+directly instead of re-deriving it from IV. This removes the whole class
+of "IV hasn't populated yet" artifacts, not just the ones the sanity
+checks happen to catch.
+
+Getting a token:
+- A free **developer sandbox** account (no funded brokerage required) at
+  [tradier.com](https://tradier.com) gives 15-minute-delayed data --
+  plenty for a once-daily scan. Generate a token at
+  [web.tradier.com/user/api](https://web.tradier.com/user/api) and set
+  `TRADIER_BASE_URL=https://sandbox.tradier.com/v1` alongside it.
+- A funded/linked brokerage account gives real-time data against the
+  default production URL (`https://api.tradier.com/v1`) with no extra
+  configuration needed.
+
+Every report states which provider produced it. The Tradier integration
+(`qqq_iron_condor/tradier.py`) is built from Tradier's documented response
+shapes and covered by parsing tests, but hasn't been exercised against a
+live account from this codebase -- if `get_vix_history()` fails, the VIX
+symbol convention (`Config.tradier_vix_symbol`, default `"VIX"`) is the
+first thing to check.
+
 ## How strikes are chosen
 
 - **Short strikes**: closest available strike to a target absolute delta
-  (`Config.short_delta_target`, default `0.16`) on each side, computed via
-  Black-Scholes from the option chain's implied volatility (the data
-  provider doesn't supply broker greeks directly).
+  (`Config.short_delta_target`, default `0.16`) on each side -- a real
+  broker-computed delta when Tradier is active, otherwise a Black-Scholes
+  approximation from the option chain's own implied volatility.
 - **Long strikes**: `Config.wing_width` (default `$5`) beyond each short
   strike, snapped to the nearest listed strike — this caps max loss
   (defined risk).
@@ -170,8 +214,9 @@ which would make a hard skip on any hit too aggressive to be useful.
   target -- both surface as an explicit warning on the trade rather than
   a silently wrong recommendation, but neither guarantees clean data; if
   you see a warning, re-pull quotes before trusting the strikes.
-- Delta/greeks are Black-Scholes approximations from chain IV, not live
-  broker greeks. This is a bigger caveat for 0DTE, where real-world
+- Without `TRADIER_TOKEN` set, delta/greeks are Black-Scholes approximations
+  from chain IV, not live broker greeks -- see [Data providers](#data-providers).
+  Even with real greeks, this is a bigger caveat for 0DTE, where real-world
   intraday gamma/pin risk near the short strikes is severe and not fully
   captured by a static delta snapshot from when the scan ran.
 - News/catalyst detection is a keyword scan over a handful of free RSS
@@ -275,26 +320,32 @@ the delta target, stop/target multiples, and score threshold in
 
 ```
 qqq_iron_condor/
-  config.py         # all tunable parameters
-  data.py            # price/intraday history, option chains, VIX, news (network I/O)
-  news.py            # catalyst keyword flagging
-  indicators.py      # RSI, EMA/SMA, MACD, Bollinger Bands, ATR, ADX, HV
-  intraday.py         # VWAP, opening-range, intraday EMA/RSI, relative strength
-  options_math.py    # Black-Scholes delta/price helpers
-  analysis.py         # turns raw data into the daily market snapshot
-  strategy.py         # iron condor strike selection & trade math
-  direction.py         # directional (buy calls/puts) scoring & contract selection
-  report.py            # iron condor Markdown report rendering
-  signal_report.py     # directional signal Markdown report rendering
-  scan.py               # iron condor CLI entrypoint / orchestration
-  signal.py             # directional signal CLI entrypoint / orchestration
+  config.py               # all tunable parameters
+  data.py                 # yfinance-backed price/intraday history, option chains, news
+  tradier.py              # Tradier-backed price history, option chains (real greeks)
+  providers.py            # picks data.py or tradier.py based on TRADIER_TOKEN
+  news.py                 # catalyst keyword flagging
+  gates.py                # trade gate: skip-day rules (hard gates + soft flags)
+  indicators.py           # RSI, EMA/SMA, MACD, Bollinger Bands, ATR, ADX, HV
+  intraday.py             # VWAP, opening-range, intraday EMA/RSI, relative strength
+  options_math.py         # Black-Scholes delta/price helpers (fallback provider)
+  analysis.py             # turns raw data into the daily market snapshot
+  strategy.py             # iron condor strike selection & trade math
+  direction.py            # directional (buy calls/puts) scoring & contract selection
+  report.py               # iron condor Markdown report rendering
+  signal_report.py        # directional signal Markdown report rendering
+  scan.py                 # iron condor CLI entrypoint / orchestration
+  signal.py               # directional signal CLI entrypoint / orchestration
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
-  test_direction.py        # directional scoring unit tests
-  test_intraday.py         # VWAP/opening-range/EMA unit tests
-reports/              # daily iron condor reports land here
-reports/signals/      # directional signal reports land here
+  test_direction.py       # directional scoring unit tests
+  test_intraday.py        # VWAP/opening-range/EMA unit tests
+  test_strategy.py        # strike selection, sanity checks, real-vs-BS delta
+  test_gates.py           # trade gate unit tests
+  test_tradier.py         # Tradier response-parsing tests (mocked HTTP)
+reports/                  # daily iron condor reports land here
+reports/signals/          # directional signal reports land here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
