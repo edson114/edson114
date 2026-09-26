@@ -130,8 +130,10 @@ def test_simulate_day_force_closes_open_trade_at_end_of_day():
     daily_history = _daily_history(end_date=day - dt.timedelta(days=1))
     vix_history = _vix_history(end_date=day - dt.timedelta(days=1))
 
-    # A rally that never quite reaches the target nor gives back the stop.
-    closes = [400.0, 401.0, 400.5] + list(np.linspace(402.0, 405.0, 20))
+    # A brief breakout, then a narrow sideways wiggle that stays inside the
+    # (ATR-capped, intentionally tight) stop/target band for the rest of the
+    # session -- neither level gets touched before the close.
+    closes = [400.0, 401.0, 400.5] + [400.7, 400.6, 400.75, 400.65, 400.7, 400.6, 400.72, 400.68, 400.7, 400.65, 400.7] * 2
     qqq_bars = _bars(day, closes)
     spy_bars = _flat_spy_bars(day, len(closes))
 

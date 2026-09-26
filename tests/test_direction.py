@@ -4,6 +4,7 @@ import datetime as dt
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from qqq_iron_condor.analysis import MarketSnapshot
 from qqq_iron_condor.config import Config
@@ -93,6 +94,54 @@ def _synth_chain(dte: int, spot: float, rate: float) -> OptionChain:
     puts = pd.DataFrame({"strike": strikes, "bid": put_fair - 0.02, "ask": put_fair + 0.02, "lastPrice": put_fair, "impliedVolatility": iv})
     expiration = (dt.date.today() + dt.timedelta(days=dte)).isoformat()
     return OptionChain(expiration=expiration, dte=dte, calls=calls, puts=puts)
+
+
+def test_orb_stop_used_when_tighter_than_atr_cap_for_call():
+    cfg = Config()  # stop_atr_multiple=0.35, atr14=4.0 -> atr-based stop distance 1.4
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0, atr14=4.0)
+    intraday = _intraday(
+        price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range",
+        opening_range_low=SPOT - 1.0,  # tighter than the 1.4 ATR-based distance
+    )
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=0.4, gate=_gate(), chains={}, cfg=cfg)
+    assert signal.bias == "CALL"
+    assert signal.stop_loss_underlying == pytest.approx(SPOT - 1.0)
+
+
+def test_atr_fallback_used_when_orb_stop_is_wider_for_call():
+    cfg = Config()
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0, atr14=4.0)
+    intraday = _intraday(
+        price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range",
+        opening_range_low=SPOT - 5.0,  # wider than the 1.4 ATR-based distance
+    )
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=0.4, gate=_gate(), chains={}, cfg=cfg)
+    assert signal.bias == "CALL"
+    assert signal.stop_loss_underlying == pytest.approx(SPOT - cfg.stop_atr_multiple * daily.atr14)
+
+
+def test_orb_stop_used_when_tighter_than_atr_cap_for_put():
+    cfg = Config()
+    daily = _daily(trend_label="Downtrend", macd_hist=-0.8, rsi14=38.0, atr14=4.0)
+    intraday = _intraday(
+        price_vs_vwap_pct=-0.4, ema_trend="bearish", orb_status="below_range",
+        opening_range_high=SPOT + 1.0,  # tighter than the 1.4 ATR-based distance
+    )
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=-0.4, gate=_gate(), chains={}, cfg=cfg)
+    assert signal.bias == "PUT"
+    assert signal.stop_loss_underlying == pytest.approx(SPOT + 1.0)
+
+
+def test_atr_fallback_used_when_orb_stop_is_wider_for_put():
+    cfg = Config()
+    daily = _daily(trend_label="Downtrend", macd_hist=-0.8, rsi14=38.0, atr14=4.0)
+    intraday = _intraday(
+        price_vs_vwap_pct=-0.4, ema_trend="bearish", orb_status="below_range",
+        opening_range_high=SPOT + 6.0,  # wider than the 1.4 ATR-based distance
+    )
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=-0.4, gate=_gate(), chains={}, cfg=cfg)
+    assert signal.bias == "PUT"
+    assert signal.stop_loss_underlying == pytest.approx(SPOT + cfg.stop_atr_multiple * daily.atr14)
 
 
 def test_all_bullish_signals_produce_call_bias():

@@ -168,9 +168,16 @@ class Config:
     # extrinsic value.
     directional_delta_target: float = 0.45
 
-    # Underlying stop-loss distance (in ATR14 multiples) used when no
-    # opening-range level is available to stop against.
-    stop_atr_multiple: float = 0.75
+    # Underlying stop-loss distance (in ATR14 multiples), used as a cap on
+    # the opening-range stop and as the fallback when no ORB level is
+    # available. Empirically tightened from an initial 0.75: at that
+    # wider distance, a `directional_backtest.py` run over real 5-min bars
+    # found 80% of trades never actually reached their stop or target --
+    # they just drifted to an arbitrary end-of-day price instead of being
+    # managed by the plan. 0.35 leaves less room, so more trades actually
+    # resolve one way or the other within the session; re-validate this
+    # against the backtest if you change it.
+    stop_atr_multiple: float = 0.35
 
     # Target = entry + this multiple of the stop distance (risk), i.e. a
     # 1.5:1 reward:risk underlying target.

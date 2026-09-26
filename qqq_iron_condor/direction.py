@@ -244,12 +244,24 @@ def build_directional_signal(
         spot = daily.spot
         atr_stop = cfg.stop_atr_multiple * daily.atr14
 
+        # An opening-range level is only used as the stop when it's at least
+        # as tight as the ATR-based distance -- otherwise a wide early range
+        # would set a stop (and, scaled off it, a target) so far away that a
+        # single session rarely has room to reach either, and the trade just
+        # drifts to an arbitrary end-of-day price instead of actually being
+        # managed by the plan. See directional_backtest.py's findings: at the
+        # wider, uncapped distance this used to produce, 80% of backtested
+        # trades ended in an EOD force-close rather than hitting either level.
         if bias == "CALL":
-            stop_loss_underlying = intraday.opening_range_low if intraday.orb_status == "above_range" else spot - atr_stop
+            orb_stop = intraday.opening_range_low if intraday.orb_status == "above_range" else None
+            atr_based_stop = spot - atr_stop
+            stop_loss_underlying = orb_stop if orb_stop is not None and orb_stop >= atr_based_stop else atr_based_stop
             risk = max(spot - stop_loss_underlying, 0.01)
             target_underlying = spot + cfg.reward_risk_ratio * risk
         else:
-            stop_loss_underlying = intraday.opening_range_high if intraday.orb_status == "below_range" else spot + atr_stop
+            orb_stop = intraday.opening_range_high if intraday.orb_status == "below_range" else None
+            atr_based_stop = spot + atr_stop
+            stop_loss_underlying = orb_stop if orb_stop is not None and orb_stop <= atr_based_stop else atr_based_stop
             risk = max(stop_loss_underlying - spot, 0.01)
             target_underlying = spot - cfg.reward_risk_ratio * risk
 

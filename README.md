@@ -339,10 +339,13 @@ Each run:
    0.16 short-strike target) for both a 0DTE and a weekly expiration when
    actionable — near-ATM so the premium is responsive to the move rather
    than mostly extrinsic value.
-6. **Proposes a trade plan**: an underlying stop-loss level (the opening
-   range extreme if the breakout triggered the signal, otherwise
-   `Config.stop_atr_multiple` × ATR14) and a target at
-   `Config.reward_risk_ratio` × the stop distance.
+6. **Proposes a trade plan**: an underlying stop-loss level, and a target
+   at `Config.reward_risk_ratio` × the stop distance. The stop is the
+   opening-range extreme *only when that's at least as tight as*
+   `Config.stop_atr_multiple` × ATR14 (default `0.35`) — otherwise it
+   falls back to the ATR-based distance, so a wide early range can't push
+   the stop (and, scaled off it, the target) so far away that a single
+   session has no realistic room to reach either.
 
 The full report is written to `reports/signals/YYYY-MM-DD-HHMM.md` and,
 when `GITHUB_TOKEN` is available, also posted as a GitHub Issue — but
@@ -417,14 +420,26 @@ useful for diagnosing *why* a run came out the way it did (e.g. does one
 component correlate with the losing trades?) rather than only seeing the
 aggregate.
 
-**Tuning `--score-threshold`:** the live default (0.30) is a starting
-guess, not a validated cutoff. A first backtest run at the default found
-a *negative* expectancy (profit factor 0.44 over a 59-day window),
-concentrated almost entirely in trades that only barely cleared the
-threshold ("Medium" confidence — the single "High" confidence trade in
-that run won). Re-running with a stricter threshold and comparing the two
-reports' by-confidence breakdown is the fastest way to check whether that
-holds, before trusting the default with real size.
+**What backtesting this has already found, and what changed as a result:**
+a first run at the default 0.30 threshold found a *negative* expectancy
+(profit factor 0.44 over a 59-day window). Raising the threshold to 0.50
+narrowed the loss (profit factor 0.90) but didn't flip it positive.
+Exporting and reading the per-trade CSV (see above) found the real
+culprit: **80% of trades never reached their stop or target at all** —
+they drifted to an arbitrary end-of-day price instead of being managed by
+the plan, because the stop/target distance (ATR-scaled) was wide enough
+that a single session rarely had room to reach either. `stop_atr_multiple`
+was tightened from `0.75` to `0.35` as a result (see `direction.py` and
+`config.py`), and the opening-range stop is now only used when it's at
+least as tight as that ATR-based distance. **This hasn't been
+re-validated with a fresh backtest yet** — do that before trusting it:
+
+```bash
+python -m qqq_iron_condor.directional_backtest
+```
+
+and compare the new trade-outcome mix (fewer `eod` exits, ideally) and
+expectancy against the numbers above.
 
 **Why this is a ~60-day check, not a multi-year backtest:** the iron
 condor backtest above only needs daily bars, so it can run over years.
