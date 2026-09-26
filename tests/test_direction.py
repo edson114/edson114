@@ -96,6 +96,39 @@ def _synth_chain(dte: int, spot: float, rate: float) -> OptionChain:
     return OptionChain(expiration=expiration, dte=dte, calls=calls, puts=puts)
 
 
+def test_orb_component_full_strength_at_average_or_above_volume():
+    cfg = Config()
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0)
+    intraday = _intraday(price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range")
+    signal_avg = build_directional_signal(daily, intraday, 0.4, _gate(), {}, cfg, relative_volume=1.0)
+    signal_high = build_directional_signal(daily, intraday, 0.4, _gate(), {}, cfg, relative_volume=2.0)
+    orb_avg = next(c for c in signal_avg.components if c.name == "orb")
+    orb_high = next(c for c in signal_high.components if c.name == "orb")
+    # Both at/above the historical average pace -> full, uncapped strength (identical).
+    assert orb_avg.contribution == pytest.approx(orb_high.contribution)
+    assert orb_avg.contribution > 0
+
+
+def test_orb_component_scaled_down_on_below_average_volume():
+    cfg = Config()
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0)
+    intraday = _intraday(price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range")
+    signal_full = build_directional_signal(daily, intraday, 0.4, _gate(), {}, cfg, relative_volume=1.0)
+    signal_light = build_directional_signal(daily, intraday, 0.4, _gate(), {}, cfg, relative_volume=0.5)
+    orb_full = next(c for c in signal_full.components if c.name == "orb")
+    orb_light = next(c for c in signal_light.components if c.name == "orb")
+    assert 0 < orb_light.contribution < orb_full.contribution
+
+
+def test_orb_component_never_fully_zeroed_by_volume():
+    cfg = Config()
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0)
+    intraday = _intraday(price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range")
+    signal = build_directional_signal(daily, intraday, 0.4, _gate(), {}, cfg, relative_volume=0.01)
+    orb = next(c for c in signal.components if c.name == "orb")
+    assert orb.contribution > 0  # floored at 20% strength, never zero
+
+
 def test_orb_stop_used_when_tighter_than_atr_cap_for_call():
     cfg = Config()  # stop_atr_multiple=0.35, atr14=4.0 -> atr-based stop distance 1.4
     daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0, atr14=4.0)

@@ -377,8 +377,19 @@ Each of the seven components below contributes `weight × value` (value in
 | Daily RSI(14) | 0.10 | Above 50, scaled (extremes noted, not flipped) |
 | VWAP position | 0.20 | Price above VWAP |
 | Intraday EMA9/21 | 0.15 | EMA9 > EMA21 |
-| Opening-range breakout | 0.15 | Price above the opening-range high |
+| Opening-range breakout | 0.15 | Price above the opening-range high, **scaled by relative volume** |
 | QQQ vs. SPY relative strength | 0.10 | QQQ outperforming SPY today |
+
+**Opening-range breakout is volume-scaled, not just a raw breakout read.**
+A backtest found the raw signal anti-correlated with returns (see
+[Backtesting](#backtesting-1)) — a breakout without real participation
+behind it is usually a fakeout. Each session's cumulative volume-so-far is
+compared to the historical average at the same point in the session
+(same bar count elapsed, not clock time) over the trailing
+`Config.volume_profile_period` (default 20 trading days): at or above
+that average pace, the breakout keeps full strength; below it, the
+component is scaled down (floored at 20% strength, never fully zeroed).
+See `intraday.compute_relative_volume` and `direction._orb_component`.
 
 Tune the weights via `Config.component_weights` (always renormalized to
 sum to 1.0 before use, so zeroing one redistributes its share to the rest
@@ -452,22 +463,33 @@ synthetic test):
    signal of any component, in the *wrong* direction) — trades where ORB
    agreed with the trade direction tended to do *worse*. `vwap` showed a
    smaller version of the same pattern; `rsi` and `relative_strength`
-   were mildly positive. This is why `--zero-components` exists — to
-   actually test dropping the weak/harmful ones instead of only
-   re-weighting the threshold.
+   were mildly positive. Zeroing `orb` out entirely nudged profit factor
+   up a little more (0.57 → 0.61) but stayed short of breakeven, and win
+   rate actually dipped slightly — a marginal, inconclusive result on its
+   own, not a fix.
+4. Rather than just drop the component, `orb`'s raw signal is now scaled
+   by relative volume (`intraday.compute_relative_volume`,
+   `direction._orb_component`): a breakout backed by at/above the
+   historical average volume for that point in the session keeps full
+   strength, a breakout on unusually light volume is faded down (floored
+   at 20%, never fully zeroed). This targets the likely *mechanism* behind
+   finding 3 — a fakeout breakout typically lacks participation — rather
+   than discarding the signal outright.
 
-**None of steps 2-3's fixes have been re-validated together with a fresh
-backtest yet** — do that before trusting any of this with size:
+**None of steps 2-4 have been re-validated together with a fresh backtest
+yet** — do that before trusting any of this with size:
 
 ```bash
-python -m qqq_iron_condor.directional_backtest --zero-components orb
+python -m qqq_iron_condor.directional_backtest
 ```
 
 and compare trade-outcome mix, profit factor, and the by-confidence
 breakdown against the numbers above. A single run at n≈20-54 trades is
-still weak evidence either way — the honest conclusion so far is "we
-found and fixed one real bug, and found one more promising lead," not
-"this system now has an edge."
+still weak evidence either way, and this is now the *fourth* consecutive
+change tested against the same ~59-day window — treat any improvement
+with real skepticism until it replicates on a fresh window. The honest
+conclusion so far is "we found and fixed one real bug, and found one
+promising-but-unproven lead," not "this system now has an edge."
 
 **Why this is a ~60-day check, not a multi-year backtest:** the iron
 condor backtest above only needs daily bars, so it can run over years.

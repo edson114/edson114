@@ -30,7 +30,7 @@ from .data import (
 )
 from .direction import DirectionalSignal, build_directional_signal
 from .gates import evaluate_gates
-from .intraday import build_intraday_snapshot, compute_relative_strength, interval_minutes
+from .intraday import build_intraday_snapshot, compute_relative_strength, compute_relative_volume, interval_minutes
 from .news import flag_catalysts
 from .scan import maybe_create_github_issue
 from .signal_report import render_signal_report
@@ -47,12 +47,16 @@ def run_signal(cfg: Config) -> tuple[str, DirectionalSignal]:
     vix_history = get_vix_history(cfg.vix_history_period)
     daily_snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
-    qqq_intraday = get_intraday_history(cfg.symbol, cfg.intraday_interval, cfg.intraday_period)
+    qqq_intraday_all = get_intraday_history(cfg.symbol, cfg.intraday_interval, cfg.volume_profile_period)
+    today = dt.date.today()
+    qqq_intraday = qqq_intraday_all[qqq_intraday_all.index.date == today]
+    qqq_intraday_historical = qqq_intraday_all[qqq_intraday_all.index.date < today]
     spy_intraday = get_intraday_history(cfg.spy_symbol, cfg.intraday_interval, cfg.intraday_period)
     intraday_snapshot = build_intraday_snapshot(
         qqq_intraday, cfg.opening_range_minutes, interval_minutes(cfg.intraday_interval)
     )
     relative_strength_pct = compute_relative_strength(qqq_intraday, spy_intraday)
+    relative_volume = compute_relative_volume(qqq_intraday, qqq_intraday_historical)
 
     chains = pick_expirations_for_targets(cfg.symbol, _directional_targets(cfg))
 
@@ -74,7 +78,9 @@ def run_signal(cfg: Config) -> tuple[str, DirectionalSignal]:
         catalyst_hits=catalyst_hits,
     )
 
-    signal = build_directional_signal(daily_snapshot, intraday_snapshot, relative_strength_pct, gate, chains, cfg)
+    signal = build_directional_signal(
+        daily_snapshot, intraday_snapshot, relative_strength_pct, gate, chains, cfg, relative_volume=relative_volume
+    )
     report_md = render_signal_report(
         cfg.symbol, daily_snapshot, intraday_snapshot, signal, headlines, catalyst_hits, gate
     )
@@ -110,13 +116,13 @@ def _self_test_report() -> tuple[str, DirectionalSignal]:
     spot = float(price_history["Close"].iloc[-1])
     daily_snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
-    def synth_intraday(start_price: float, drift: float, n_bars: int = 60) -> pd.DataFrame:
+    def synth_intraday(start_price: float, drift: float, n_bars: int = 60, end: dt.datetime = None) -> pd.DataFrame:
         steps = rng.normal(drift, 0.15, n_bars)
         close = start_price + np.cumsum(steps)
         open_ = np.concatenate([[start_price], close[:-1]])
         high = np.maximum(open_, close) + rng.uniform(0.01, 0.1, n_bars)
         low = np.minimum(open_, close) - rng.uniform(0.01, 0.1, n_bars)
-        idx = pd.date_range(end=dt.datetime.now(), periods=n_bars, freq="5min")
+        idx = pd.date_range(end=end or dt.datetime.now(), periods=n_bars, freq="5min")
         return pd.DataFrame(
             {"Open": open_, "High": high, "Low": low, "Close": close, "Volume": rng.integers(50_000, 300_000, n_bars)},
             index=idx,
@@ -124,11 +130,15 @@ def _self_test_report() -> tuple[str, DirectionalSignal]:
 
     qqq_intraday = synth_intraday(spot - 1.5, 0.06)
     spy_intraday = synth_intraday(spot / 8.0, 0.01)
+    qqq_intraday_historical = pd.concat(
+        [synth_intraday(spot - 2.0, 0.05, end=dt.datetime.now() - dt.timedelta(days=d)) for d in range(1, 6)]
+    )
 
     intraday_snapshot = build_intraday_snapshot(
         qqq_intraday, cfg.opening_range_minutes, interval_minutes(cfg.intraday_interval)
     )
     relative_strength_pct = compute_relative_strength(qqq_intraday, spy_intraday)
+    relative_volume = compute_relative_volume(qqq_intraday, qqq_intraday_historical)
 
     def synth_chain(label: str, dte: int) -> OptionChain:
         strikes = np.arange(round(spot) - 40, round(spot) + 40, 1.0)
@@ -186,7 +196,9 @@ def _self_test_report() -> tuple[str, DirectionalSignal]:
         catalyst_hits=catalyst_hits,
     )
 
-    signal = build_directional_signal(daily_snapshot, intraday_snapshot, relative_strength_pct, gate, chains, cfg)
+    signal = build_directional_signal(
+        daily_snapshot, intraday_snapshot, relative_strength_pct, gate, chains, cfg, relative_volume=relative_volume
+    )
     report_md = render_signal_report(
         cfg.symbol, daily_snapshot, intraday_snapshot, signal, headlines, catalyst_hits, gate
     )

@@ -145,6 +145,36 @@ def test_simulate_day_force_closes_open_trade_at_end_of_day():
     assert trades[-1].exit_time == qqq_bars.index[-1]
 
 
+def test_simulate_day_scales_down_score_on_below_average_volume():
+    day = START_DATE
+    daily_history = _daily_history(end_date=day - dt.timedelta(days=1))
+    vix_history = _vix_history(end_date=day - dt.timedelta(days=1))
+    closes = [400.0, 401.0, 400.5] + list(np.linspace(402.0, 420.0, 30))
+    qqq_bars = _bars(day, closes)
+    spy_bars = _flat_spy_bars(day, len(closes))
+    cfg = Config()
+
+    # Historical days at heavy volume -> today (default 200k/bar from _bars)
+    # reads as unusually quiet by comparison.
+    heavy_history = _bars(day - dt.timedelta(days=1), closes, start_minute=0)
+    heavy_history["Volume"] = 2_000_000
+    heavy_history.index = heavy_history.index - pd.Timedelta(days=1)
+
+    trades_quiet = db._simulate_day(day, daily_history, vix_history, qqq_bars, spy_bars, cfg, heavy_history)
+    trades_neutral = db._simulate_day(day, daily_history, vix_history, qqq_bars, spy_bars, cfg, None)
+
+    assert len(trades_quiet) >= 1 and len(trades_neutral) >= 1
+    # Individual trades can land on different bars between the two runs
+    # (a scaled-down score can shift exactly when the threshold is
+    # crossed), so compare the aggregate magnitude of the orb component's
+    # contribution across the whole day rather than a specific trade --
+    # that should still come out smaller when today reads as unusually
+    # quiet vs. the neutral (no history) baseline.
+    quiet_orb_total = sum(abs(t.components.get("orb", 0.0)) for t in trades_quiet)
+    neutral_orb_total = sum(abs(t.components.get("orb", 0.0)) for t in trades_neutral)
+    assert quiet_orb_total < neutral_orb_total
+
+
 def test_simulate_day_skips_entries_on_large_gap():
     day = START_DATE
     daily_history = _daily_history(end_date=day - dt.timedelta(days=1))

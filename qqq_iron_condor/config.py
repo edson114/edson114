@@ -157,6 +157,15 @@ class Config:
     intraday_interval: str = "5m"
     intraday_period: str = "1d"
 
+    # QQQ intraday fetch window used to build the relative-volume (RVOL)
+    # profile: how busy today is, bar-for-bar, vs. the historical average
+    # at the same point in the session -- used to scale down the
+    # opening-range-breakout component when a "breakout" isn't backed by
+    # real participation (see direction.py's _orb_component). Longer than
+    # intraday_period so there are prior days to compare against; capped
+    # by yfinance at 60d for a 5m bar size.
+    volume_profile_period: str = "20d"
+
     # Width of the opening range (from the first bar of the session) used
     # for the opening-range-breakout component and, when triggered, as the
     # underlying stop-loss level.

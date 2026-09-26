@@ -52,7 +52,7 @@ from .analysis import build_snapshot
 from .config import Config
 from .direction import build_directional_signal
 from .gates import evaluate_gates
-from .intraday import build_intraday_snapshot, compute_relative_strength, interval_minutes
+from .intraday import build_intraday_snapshot, compute_relative_strength, compute_relative_volume, interval_minutes
 
 MIN_DAILY_HISTORY = 200  # trailing days needed before SMA200/ADX/HV20 stop being NaN
 
@@ -116,6 +116,7 @@ def _simulate_day(
     qqq_day_bars: pd.DataFrame,
     spy_day_bars: pd.DataFrame,
     cfg: Config,
+    qqq_intraday_historical: Optional[pd.DataFrame] = None,
 ) -> list[DirectionalBacktestTrade]:
     if len(prior_daily_history) < MIN_DAILY_HISTORY or prior_vix_history.empty:
         return []
@@ -124,6 +125,9 @@ def _simulate_day(
     spy_aligned = spy_day_bars.reindex(qqq_day_bars.index, method="ffill")
     if spy_aligned["Close"].isna().all():
         return []
+
+    if qqq_intraday_historical is None:
+        qqq_intraday_historical = pd.DataFrame(columns=qqq_day_bars.columns)
 
     prior_close = float(prior_daily_history["Close"].iloc[-1])
     vix_level = float(prior_vix_history["Close"].iloc[-1])
@@ -165,6 +169,7 @@ def _simulate_day(
 
         intraday_snapshot = build_intraday_snapshot(bars_so_far_qqq, cfg.opening_range_minutes, bar_minutes)
         relative_strength_pct = compute_relative_strength(bars_so_far_qqq, bars_so_far_spy)
+        relative_volume = compute_relative_volume(bars_so_far_qqq, qqq_intraday_historical)
 
         gap_pct = (float(partial_row["Close"]) / prior_close - 1.0) * 100.0
         gate = evaluate_gates(
@@ -181,7 +186,9 @@ def _simulate_day(
             catalyst_hits=[],  # historical headlines can't be replayed -- see module docstring
         )
 
-        signal = build_directional_signal(daily_snapshot, intraday_snapshot, relative_strength_pct, gate, {}, cfg)
+        signal = build_directional_signal(
+            daily_snapshot, intraday_snapshot, relative_strength_pct, gate, {}, cfg, relative_volume=relative_volume
+        )
         if signal.bias in ("CALL", "PUT"):
             in_trade = {
                 "entry_time": timestamp,
@@ -243,9 +250,13 @@ def simulate_directional_backtest(
 
         prior_daily_history = daily_history[daily_history.index.date < day]
         prior_vix_history = vix_history[vix_history.index.date < day]
+        qqq_intraday_historical = qqq_intraday[qqq_intraday.index.date < day]
 
         trades.extend(
-            _simulate_day(day, prior_daily_history, prior_vix_history, qqq_day_bars, spy_day_bars, cfg)
+            _simulate_day(
+                day, prior_daily_history, prior_vix_history, qqq_day_bars, spy_day_bars, cfg,
+                qqq_intraday_historical=qqq_intraday_historical,
+            )
         )
 
     return trades

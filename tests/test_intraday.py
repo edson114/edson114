@@ -6,7 +6,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from qqq_iron_condor.intraday import build_intraday_snapshot, compute_relative_strength, interval_minutes
+from qqq_iron_condor.intraday import (
+    build_intraday_snapshot,
+    compute_relative_strength,
+    compute_relative_volume,
+    interval_minutes,
+)
 
 
 def _bars(closes, volume=100_000):
@@ -94,3 +99,54 @@ def test_relative_strength_negative_when_qqq_underperforms():
     spy = _bars([500, 502, 504])
     rel = compute_relative_strength(qqq, spy)
     assert rel < 0
+
+
+def _multi_day_bars(day_offsets_and_volumes, n_bars_per_day=10, volume=100_000):
+    """day_offsets_and_volumes: list of (day_offset, volume) -- distinct
+    calendar dates so compute_relative_volume can group by day."""
+    frames = []
+    for offset, vol in day_offsets_and_volumes:
+        start = dt.datetime(2026, 1, 2, 9, 30) + dt.timedelta(days=offset)
+        idx = pd.date_range(start=start, periods=n_bars_per_day, freq="5min")
+        frames.append(
+            pd.DataFrame(
+                {"Open": 100.0, "High": 100.1, "Low": 99.9, "Close": 100.0, "Volume": vol},
+                index=idx,
+            )
+        )
+    return pd.concat(frames)
+
+
+def test_relative_volume_above_one_when_today_busier_than_average():
+    historical = _multi_day_bars([(0, 1000), (1, 1000), (2, 1000)])
+    today_so_far = _multi_day_bars([(3, 2000)])
+    rel_vol = compute_relative_volume(today_so_far, historical)
+    assert rel_vol == pytest.approx(2.0)
+
+
+def test_relative_volume_below_one_when_today_quieter_than_average():
+    historical = _multi_day_bars([(0, 1000), (1, 1000)])
+    today_so_far = _multi_day_bars([(3, 500)])
+    rel_vol = compute_relative_volume(today_so_far, historical)
+    assert rel_vol == pytest.approx(0.5)
+
+
+def test_relative_volume_only_compares_same_number_of_bars_elapsed():
+    # Historical days have 20 bars; "today so far" only has 5 -- comparison
+    # must use each historical day's first 5 bars' volume, not its full-day total.
+    historical = _multi_day_bars([(0, 100), (1, 100)], n_bars_per_day=20)
+    today_so_far = _multi_day_bars([(3, 100)], n_bars_per_day=5)
+    rel_vol = compute_relative_volume(today_so_far, historical)
+    assert rel_vol == pytest.approx(1.0)
+
+
+def test_relative_volume_defaults_to_neutral_with_no_history():
+    today_so_far = _multi_day_bars([(0, 1000)])
+    rel_vol = compute_relative_volume(today_so_far, pd.DataFrame(columns=today_so_far.columns))
+    assert rel_vol == pytest.approx(1.0)
+
+
+def test_relative_volume_defaults_to_neutral_with_empty_today():
+    empty = pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+    historical = _multi_day_bars([(0, 1000)])
+    assert compute_relative_volume(empty, historical) == pytest.approx(1.0)

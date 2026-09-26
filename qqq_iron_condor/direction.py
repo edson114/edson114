@@ -118,11 +118,32 @@ def _ema_component(intraday: IntradaySnapshot) -> tuple[float, str]:
     return val, f"Intraday EMA9 {rel} EMA21 (${intraday.ema9:.2f} vs ${intraday.ema21:.2f}) -- {intraday.ema_trend}."
 
 
-def _orb_component(intraday: IntradaySnapshot, opening_range_minutes: int) -> tuple[float, str]:
+def _orb_component(intraday: IntradaySnapshot, opening_range_minutes: int, relative_volume: float) -> tuple[float, str]:
+    """A `directional_backtest.py` run found this component's raw signal
+    anti-correlated with realized returns (r ~ -0.3 to -0.4) -- breakouts
+    were, if anything, the wrong side to be on. The classic explanation:
+    a breakout without participation behind it (below-average volume) is
+    a fakeout more often than not. Rather than drop the component
+    entirely, its magnitude is scaled by relative volume -- full strength
+    at/above the historical average pace for this point in the session,
+    faded down to 20% strength (never fully zeroed) as volume gets
+    lighter than that. This hasn't itself been backtested yet; it's a
+    principled hypothesis for *why* raw ORB tested poorly, not a
+    validated fix -- re-run the backtest to check.
+    """
+    volume_factor = _clip(relative_volume, 0.2, 1.0)
+    volume_note = f" Relative volume {relative_volume:.2f}x the historical average pace here -> scaled to {volume_factor * 100:.0f}% strength."
+
     if intraday.orb_status == "above_range":
-        return 1.0, f"Price broke above the opening {opening_range_minutes}-min range high (${intraday.opening_range_high:.2f})."
+        return volume_factor * 1.0, (
+            f"Price broke above the opening {opening_range_minutes}-min range high "
+            f"(${intraday.opening_range_high:.2f}).{volume_note}"
+        )
     if intraday.orb_status == "below_range":
-        return -1.0, f"Price broke below the opening {opening_range_minutes}-min range low (${intraday.opening_range_low:.2f})."
+        return volume_factor * -1.0, (
+            f"Price broke below the opening {opening_range_minutes}-min range low "
+            f"(${intraday.opening_range_low:.2f}).{volume_note}"
+        )
     if intraday.orb_status == "inside_range":
         return 0.0, (
             f"Still inside the opening {opening_range_minutes}-min range "
@@ -203,6 +224,7 @@ def build_directional_signal(
     gate: GateResult,
     chains: dict,
     cfg: Config,
+    relative_volume: float = 1.0,
 ) -> DirectionalSignal:
     raw = {
         "daily_trend": _trend_component(daily),
@@ -210,7 +232,7 @@ def build_directional_signal(
         "rsi": _rsi_component(daily),
         "vwap": _vwap_component(intraday),
         "ema": _ema_component(intraday),
-        "orb": _orb_component(intraday, cfg.opening_range_minutes),
+        "orb": _orb_component(intraday, cfg.opening_range_minutes, relative_volume),
         "relative_strength": _relative_strength_component(relative_strength_pct),
     }
     weights = _normalized_weights(cfg.component_weights)

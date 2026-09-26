@@ -103,3 +103,33 @@ def compute_relative_strength(qqq_intraday: pd.DataFrame, spy_intraday: pd.DataF
         return (last / open_ - 1.0) * 100.0 if open_ else 0.0
 
     return _pct_change(qqq_intraday) - _pct_change(spy_intraday)
+
+
+def compute_relative_volume(today_bars_so_far: pd.DataFrame, historical_bars: pd.DataFrame) -> float:
+    """Ratio of today's cumulative volume-so-far to the historical average
+    cumulative volume through the same number of bars elapsed in the
+    session (not the same clock time -- bar *count*, so a shortened
+    session still compares apples to apples). This is a relative-volume
+    (RVOL) read: >1 means today is busier than normal at this point in
+    the session, <1 means quieter -- a proxy for whether a move (e.g. an
+    opening-range breakout) has real participation behind it or is
+    happening on unusually light volume, which is typically when
+    breakouts fail. Returns 1.0 (neutral, no scaling effect) if there's
+    no historical data to compare against, e.g. early in a backtest
+    window before any prior days have accumulated.
+    """
+    n = len(today_bars_so_far)
+    if n == 0:
+        return 1.0
+    today_cum_volume = float(today_bars_so_far["Volume"].sum())
+
+    cum_volumes = []
+    for day in sorted({ts.date() for ts in historical_bars.index}):
+        day_bars = historical_bars[historical_bars.index.date == day]
+        if len(day_bars) >= n:
+            cum_volumes.append(float(day_bars["Volume"].iloc[:n].sum()))
+
+    if not cum_volumes:
+        return 1.0
+    avg_cum_volume = sum(cum_volumes) / len(cum_volumes)
+    return today_cum_volume / avg_cum_volume if avg_cum_volume > 0 else 1.0
