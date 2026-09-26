@@ -395,18 +395,36 @@ python -m qqq_iron_condor.directional_backtest
 
 # Fewer days, custom output location
 python -m qqq_iron_condor.directional_backtest --lookback-days 30 --output-dir /tmp/bt
+
+# Try a stricter score threshold than the live default (0.30) and compare
+python -m qqq_iron_condor.directional_backtest --score-threshold 0.5
 ```
 
 Or trigger it on a GitHub-hosted runner (useful if you don't have a local
 Python/network setup): `.github/workflows/qqq-directional-backtest.yml`,
-`workflow_dispatch` only — run it manually from the Actions tab.
+`workflow_dispatch` only, with `lookback_days` and `score_threshold`
+inputs — run it manually from the Actions tab.
 
 It reports trades taken (calls vs. puts), win rate, average win/loss,
 expectancy, total return, profit factor, max drawdown, and a breakdown by
 confidence level (High vs. Medium). Trades are scored on the **underlying's**
 stop/target, not simulated option premium — there's no free source of
 historical QQQ option chains, intraday or otherwise. Report saved to
-`reports/backtests/directional-YYYY-MM-DD.md`.
+`reports/backtests/directional-YYYY-MM-DD.md`, and every trade's entry/exit,
+outcome, and each score component's contribution at entry is saved
+alongside it as `reports/backtests/directional-trades-YYYY-MM-DD.csv` —
+useful for diagnosing *why* a run came out the way it did (e.g. does one
+component correlate with the losing trades?) rather than only seeing the
+aggregate.
+
+**Tuning `--score-threshold`:** the live default (0.30) is a starting
+guess, not a validated cutoff. A first backtest run at the default found
+a *negative* expectancy (profit factor 0.44 over a 59-day window),
+concentrated almost entirely in trades that only barely cleared the
+threshold ("Medium" confidence — the single "High" confidence trade in
+that run won). Re-running with a stricter threshold and comparing the two
+reports' by-confidence breakdown is the fastest way to check whether that
+holds, before trusting the default with real size.
 
 **Why this is a ~60-day check, not a multi-year backtest:** the iron
 condor backtest above only needs daily bars, so it can run over years.

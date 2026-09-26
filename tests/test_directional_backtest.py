@@ -225,14 +225,47 @@ def test_summarize_computes_exact_stats_for_known_trades():
 
 
 def test_render_report_handles_zero_trades():
-    report = db.render_directional_backtest_report("QQQ", 59, db.summarize([]))
+    report = db.render_directional_backtest_report("QQQ", 59, db.summarize([]), score_threshold=0.30)
     assert "No trades were generated" in report
 
 
 def test_render_report_includes_stats_for_populated_summary():
     now = pd.Timestamp.now()
     trades = [db.DirectionalBacktestTrade(now, now, "CALL", 100, 110, 95, 110, "target", 10.0, 0.5, "High")]
-    report = db.render_directional_backtest_report("QQQ", 59, db.summarize(trades))
+    report = db.render_directional_backtest_report("QQQ", 59, db.summarize(trades), score_threshold=0.30)
     assert "Win rate" in report
     assert "Expectancy" in report
     assert "High" in report
+    assert "0.30" in report
+
+
+def test_export_trades_csv_includes_component_columns(tmp_path):
+    now = pd.Timestamp.now()
+    trade = db.DirectionalBacktestTrade(
+        now, now, "CALL", 100, 110, 95, 110, "target", 10.0, 0.5, "High",
+        components={"vwap": 0.2, "ema": 0.15},
+    )
+    out_path = tmp_path / "trades.csv"
+    db.export_trades_csv([trade], out_path)
+
+    df = pd.read_csv(out_path)
+    assert len(df) == 1
+    assert df.loc[0, "comp_vwap"] == pytest.approx(0.2)
+    assert df.loc[0, "comp_ema"] == pytest.approx(0.15)
+    assert pd.isna(df.loc[0, "comp_orb"])  # not provided -> NaN, not a crash
+    assert df.loc[0, "direction"] == "CALL"
+    assert df.loc[0, "return_pct"] == pytest.approx(10.0)
+
+
+def test_score_threshold_override_suppresses_weaker_signals():
+    day = START_DATE
+    daily_history = _daily_history(end_date=day - dt.timedelta(days=1))
+    vix_history = _vix_history(end_date=day - dt.timedelta(days=1))
+    closes = [400.0, 401.0, 400.5] + list(np.linspace(402.0, 420.0, 30))
+    qqq_bars = _bars(day, closes)
+    spy_bars = _flat_spy_bars(day, len(closes))
+
+    import dataclasses
+    strict_cfg = dataclasses.replace(Config(), signal_score_threshold=0.95)  # above any real score here
+    trades = db._simulate_day(day, daily_history, vix_history, qqq_bars, spy_bars, strict_cfg)
+    assert trades == []

@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -69,6 +70,7 @@ class DirectionalBacktestTrade:
     return_pct: float  # signed so positive always means a winning trade
     score: float
     confidence: str
+    components: dict = field(default_factory=dict)  # component name -> contribution, at entry
 
 
 @dataclass
@@ -189,6 +191,7 @@ def _simulate_day(
                 "target": signal.target_underlying,
                 "score": signal.score,
                 "confidence": signal.confidence,
+                "components": {c.name: c.contribution for c in signal.components},
             }
 
     if in_trade is not None:
@@ -216,6 +219,7 @@ def _close_trade(in_trade: dict, exit_time: pd.Timestamp, exit_price: float, out
         return_pct=round(return_pct, 4),
         score=in_trade["score"],
         confidence=in_trade["confidence"],
+        components=in_trade.get("components", {}),
     )
 
 
@@ -301,7 +305,41 @@ def _fmt(x: float, decimals: int = 2) -> str:
     return f"{x:.{decimals}f}"
 
 
-def render_directional_backtest_report(symbol: str, lookback_days: int, summary: DirectionalBacktestSummary) -> str:
+COMPONENT_NAMES = ("daily_trend", "macd", "rsi", "vwap", "ema", "orb", "relative_strength")
+
+
+def export_trades_csv(trades: list[DirectionalBacktestTrade], path: str) -> None:
+    """Per-trade detail, including each score component's contribution at
+    entry, for diagnosing *why* a run's win rate/expectancy came out the
+    way it did (e.g. does one component correlate with the losers?)
+    rather than only seeing the aggregate summary."""
+    rows = []
+    for t in trades:
+        row = {
+            "entry_time": t.entry_time,
+            "exit_time": t.exit_time,
+            "direction": t.direction,
+            "entry_price": t.entry_price,
+            "exit_price": t.exit_price,
+            "stop": t.stop,
+            "target": t.target,
+            "outcome": t.outcome,
+            "return_pct": t.return_pct,
+            "score": t.score,
+            "confidence": t.confidence,
+        }
+        for name in COMPONENT_NAMES:
+            row[f"comp_{name}"] = t.components.get(name, float("nan"))
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+
+
+def render_directional_backtest_report(
+    symbol: str, lookback_days: int, summary: DirectionalBacktestSummary, score_threshold: float
+) -> str:
     generated_at = dt.datetime.now()
     parts = [
         f"# {symbol} Directional Signal Backtest -- {generated_at.strftime('%Y-%m-%d %H:%M')}",
@@ -312,6 +350,9 @@ def render_directional_backtest_report(symbol: str, lookback_days: int, summary:
         "simulated option premium. See the module docstring in "
         "`qqq_iron_condor/directional_backtest.py` for exactly what this can and can't capture. "
         "Not financial advice.",
+        "",
+        f"_Score threshold used for CALL/PUT: +-{score_threshold:.2f} (`Config.signal_score_threshold`, "
+        "possibly overridden via `--score-threshold`)._",
         "",
     ]
 
@@ -349,17 +390,23 @@ def render_directional_backtest_report(symbol: str, lookback_days: int, summary:
 
 def main(argv=None) -> int:
     import argparse
+    import dataclasses
     import sys
-    from pathlib import Path
 
     from . import data
 
     parser = argparse.ArgumentParser(description="Backtest the QQQ directional (buy calls/puts) signal")
     parser.add_argument("--lookback-days", type=int, default=59, help="Days of 5-minute history to backtest (yfinance caps this at 60)")
-    parser.add_argument("--output-dir", default="reports/backtests", help="Directory to save the report")
+    parser.add_argument("--output-dir", default="reports/backtests", help="Directory to save the report/trade CSV")
+    parser.add_argument(
+        "--score-threshold", type=float, default=None,
+        help="Override Config.signal_score_threshold (default: whatever Config specifies, currently 0.30)",
+    )
     args = parser.parse_args(argv)
 
     cfg = Config()
+    if args.score_threshold is not None:
+        cfg = dataclasses.replace(cfg, signal_score_threshold=args.score_threshold)
 
     print(f"Fetching {args.lookback_days}d of {cfg.intraday_interval} {cfg.symbol}/{cfg.spy_symbol} history...", file=sys.stderr)
     qqq_intraday = data.get_intraday_history(cfg.symbol, cfg.intraday_interval, f"{args.lookback_days}d")
@@ -371,14 +418,19 @@ def main(argv=None) -> int:
 
     trades = simulate_directional_backtest(daily_history, vix_history, qqq_intraday, spy_intraday, cfg)
     summary = summarize(trades)
-    report_md = render_directional_backtest_report(cfg.symbol, args.lookback_days, summary)
+    report_md = render_directional_backtest_report(cfg.symbol, args.lookback_days, summary, cfg.signal_score_threshold)
     print(report_md)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"directional-{dt.date.today().isoformat()}.md"
+    stamp = dt.date.today().isoformat()
+    out_path = output_dir / f"directional-{stamp}.md"
     out_path.write_text(report_md)
     print(f"\nSaved backtest report to {out_path}", file=sys.stderr)
+
+    csv_path = output_dir / f"directional-trades-{stamp}.csv"
+    export_trades_csv(trades, csv_path)
+    print(f"Saved per-trade detail ({len(trades)} trades) to {csv_path}", file=sys.stderr)
 
     return 0
 

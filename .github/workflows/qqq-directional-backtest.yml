@@ -7,6 +7,10 @@ on:
         description: "Days of 5-minute history to backtest (yfinance caps this at 60)"
         required: false
         default: "59"
+      score_threshold:
+        description: "Override Config.signal_score_threshold (blank = use the default, 0.30)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -28,7 +32,15 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run directional signal backtest
-        run: python -m qqq_iron_condor.directional_backtest --lookback-days "${{ github.event.inputs.lookback_days }}"
+        env:
+          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days }}
+          SCORE_THRESHOLD: ${{ github.event.inputs.score_threshold }}
+        run: |
+          ARGS=(--lookback-days "$LOOKBACK_DAYS")
+          if [ -n "$SCORE_THRESHOLD" ]; then
+            ARGS+=(--score-threshold "$SCORE_THRESHOLD")
+          fi
+          python -m qqq_iron_condor.directional_backtest "${ARGS[@]}"
 
       - name: Commit generated report
         run: |
