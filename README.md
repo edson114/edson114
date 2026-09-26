@@ -201,6 +201,36 @@ soft by default because the catalyst keyword list is broad enough (mentions
 of "earnings", "fed", individual mega-caps, etc.) to fire on most days,
 which would make a hard skip on any hit too aggressive to be useful.
 
+## Trade Journal
+
+The scanner and backtest both recommend/simulate -- neither ever knows
+what you actually traded. `qqq_iron_condor/journal.py` is a lightweight,
+git-diffable record (a CSV at `journal/trades.csv`) of the iron condors
+you actually opened, so realized win rate/expectancy/drawdown can be
+tracked over time against your real fills, not a theoretical strike.
+Nothing is logged automatically -- you (or a chat session helping you)
+add a trade when you place it and close it when you exit it:
+
+```bash
+# Log a trade you just opened (use your actual broker fill numbers)
+python -m qqq_iron_condor.journal add --label Weekly --expiration 2026-10-09 --dte 8 \
+    --short-call 760 --long-call 765 --short-put 720 --long-put 715 \
+    --credit 1.35 --entry-underlying 740.50 --vix 15.2
+
+# Close it out early (paid a debit to buy back the condor)
+python -m qqq_iron_condor.journal close --id 1 --exit-debit 0.35
+
+# ...or let it expire and settle against the underlying's price at expiration
+python -m qqq_iron_condor.journal close --id 1 --settle-underlying 742.10
+
+python -m qqq_iron_condor.journal list      # open positions
+python -m qqq_iron_condor.journal report    # realized win rate / expectancy / drawdown, by label
+```
+
+Realized P&L is computed the same way the backtest settles a simulated
+trade (intrinsic value of each spread at the given price, capped at its
+wing width), so real and simulated performance stay directly comparable.
+
 ## Backtesting
 
 Before scaling size on this rule, it's worth knowing its actual historical
@@ -275,6 +305,9 @@ simplified volatility assumptions, not a prediction of live results.
 - The [backtest](#backtesting) is a Black-Scholes simulation driven by real
   historical underlying/VIX data, not a replay of real historical option
   quotes — see that section for exactly what it can and can't capture.
+- The [trade journal](#trade-journal) only knows what's logged into it —
+  a trade you forget to record or close simply isn't reflected in its
+  realized-performance stats.
 
 ## QQQ Directional Signal (Buy Calls/Puts)
 
@@ -381,6 +414,7 @@ qqq_iron_condor/
   analysis.py             # turns raw data into the daily market snapshot
   strategy.py             # iron condor strike selection & trade math
   backtest.py             # historical backtest: replays the delta-target rule via simulated BS chains
+  journal.py              # trade journal: logs real fills, computes realized performance
   direction.py            # directional (buy calls/puts) scoring & contract selection
   report.py               # iron condor Markdown report rendering
   signal_report.py        # directional signal Markdown report rendering
@@ -395,9 +429,11 @@ tests/
   test_gates.py           # trade gate unit tests
   test_tradier.py         # Tradier response-parsing tests (mocked HTTP)
   test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
+  test_journal.py         # trade journal CSV persistence & realized-performance stats
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here
+journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
