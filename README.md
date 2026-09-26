@@ -367,10 +367,11 @@ python -m qqq_iron_condor.signal --no-issue
 
 ### How the score is built
 
-Each of the seven components below contributes `weight × value` (value in
-`[-1, +1]`) to the composite score; weights sum to 1.0:
+Each of the eight components below contributes `weight × value` (value in
+`[-1, +1]`) to the composite score; weights are renormalized to sum to 1.0
+(raw defaults shown don't need to sum to 1.0 themselves):
 
-| Component | Weight | Bullish when... |
+| Component | Raw weight | Bullish when... |
 |---|---|---|
 | Daily trend | 0.20 | Uptrend (spot > SMA50 > SMA200, MACD hist > 0) |
 | MACD histogram | 0.10 | Positive |
@@ -379,6 +380,22 @@ Each of the seven components below contributes `weight × value` (value in
 | Intraday EMA9/21 | 0.15 | EMA9 > EMA21 |
 | Opening-range breakout | 0.15 | Price above the opening-range high, **scaled by relative volume** |
 | QQQ vs. SPY relative strength | 0.10 | QQQ outperforming SPY today |
+| Options call/put volume skew | 0.15 | More call volume than put volume across the fetched chains |
+
+**Options flow is a real, freely-available proxy — not literal "whale" or
+dark-pool tracking.** Genuine institutional order-flow data (block trades,
+dark-pool prints, sweep detection) is a paid product (Unusual Whales,
+FlowAlgo, and similar); this app has no access to that and doesn't
+pretend to. What it *does* compute is `call_volume - put_volume` divided
+by their sum, summed across every option chain already fetched for
+contract selection (`options_flow.compute_call_put_skew`) — the same
+public per-contract volume those paid services are themselves built
+from, minus their block-trade detection and historical baselining. It's
+one more legitimate input, not a leak into institutional positioning.
+**It cannot be backtested with free data** — yfinance only ever serves a
+current option-chain snapshot, never historical per-contract volume — so
+`directional_backtest.py` always scores it neutral (0.0); only the live
+signal exercises it for real.
 
 **Opening-range breakout is volume-scaled, not just a raw breakout read.**
 A backtest found the raw signal anti-correlated with returns (see
@@ -533,6 +550,11 @@ the full list of what this can and can't capture.
   quotes before acting on it — don't trade a stale signal.
 - Delta/greeks are Black-Scholes approximations from chain IV, not live
   broker greeks.
+- The options-flow component is put/call **volume**, not confirmed
+  institutional positioning — it mixes retail and institutional activity
+  indiscriminately, has no block-trade or dark-pool detection, and can't
+  be backtested with free data (see [How the score is built](#how-the-score-is-built)).
+  Don't read a skewed reading as "the whales are buying."
 - This tool never places trades — it only produces an analysis/report.
 
 ## Project layout
@@ -553,6 +575,7 @@ qqq_iron_condor/
   backtest.py             # historical backtest: replays the delta-target rule via simulated BS chains
   journal.py              # trade journal: logs real fills, computes realized performance
   direction.py            # directional (buy calls/puts) scoring & contract selection
+  options_flow.py         # call/put volume skew read (not backtestable -- live-only)
   directional_backtest.py # replays the directional signal over real 5-min bars (~60d, yfinance's cap)
   report.py               # iron condor Markdown report rendering
   signal_report.py        # directional signal Markdown report rendering
@@ -563,6 +586,7 @@ tests/
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
   test_direction.py       # directional scoring unit tests
   test_intraday.py        # VWAP/opening-range/EMA unit tests
+  test_options_flow.py    # call/put volume skew unit tests
   test_strategy.py        # strike selection, sanity checks, real-vs-BS delta
   test_gates.py           # trade gate unit tests
   test_tradier.py         # Tradier response-parsing tests (mocked HTTP)

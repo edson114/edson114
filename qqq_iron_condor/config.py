@@ -197,7 +197,8 @@ class Config:
     signal_score_threshold: float = 0.30
 
     # Per-component weights for the directional score. Always normalized
-    # to sum to 1.0 before use (direction.py's _normalized_weights), so
+    # to sum to 1.0 before use (direction.py's _normalized_weights) -- the
+    # raw numbers below don't need to sum to exactly 1.0 themselves, so
     # zeroing a component redistributes its share to the rest rather than
     # just shrinking the max possible score -- e.g. for an experiment,
     # override via dataclasses.replace(cfg, component_weights={**cfg.
@@ -207,6 +208,12 @@ class Config:
     # windows) -- i.e. trading the breakout tended to be the wrong side of
     # it -- which is why it's worth being able to zero out and re-test
     # rather than only tuning the score threshold.
+    #
+    # "options_flow" (call-vs-put volume skew from the live option chain)
+    # is NOT backtestable with free data -- yfinance only serves a
+    # current snapshot, not historical per-contract volume -- so it's
+    # always neutral (0.0 contribution) in directional_backtest.py. Only
+    # the live signal exercises it for real.
     component_weights: dict = field(
         default_factory=lambda: {
             "daily_trend": 0.20,
@@ -216,6 +223,7 @@ class Config:
             "ema": 0.15,
             "orb": 0.15,
             "relative_strength": 0.10,
+            "options_flow": 0.15,
         }
     )
 

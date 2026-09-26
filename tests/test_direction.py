@@ -90,10 +90,35 @@ def _synth_chain(dte: int, spot: float, rate: float) -> OptionChain:
     t_years = time_to_expiration_years(dte)
     call_fair = np.array([bs_price(spot, k, t_years, rate, v, "call") for k, v in zip(strikes, iv)])
     put_fair = np.array([bs_price(spot, k, t_years, rate, v, "put") for k, v in zip(strikes, iv)])
-    calls = pd.DataFrame({"strike": strikes, "bid": call_fair - 0.02, "ask": call_fair + 0.02, "lastPrice": call_fair, "impliedVolatility": iv})
-    puts = pd.DataFrame({"strike": strikes, "bid": put_fair - 0.02, "ask": put_fair + 0.02, "lastPrice": put_fair, "impliedVolatility": iv})
+    # Balanced (neutral, zero-skew) volume by default so existing bias
+    # assertions aren't affected by the new options_flow component.
+    calls = pd.DataFrame({"strike": strikes, "bid": call_fair - 0.02, "ask": call_fair + 0.02, "lastPrice": call_fair, "impliedVolatility": iv, "volume": 100})
+    puts = pd.DataFrame({"strike": strikes, "bid": put_fair - 0.02, "ask": put_fair + 0.02, "lastPrice": put_fair, "impliedVolatility": iv, "volume": 100})
     expiration = (dt.date.today() + dt.timedelta(days=dte)).isoformat()
     return OptionChain(expiration=expiration, dte=dte, calls=calls, puts=puts)
+
+
+def test_options_flow_component_reflects_call_skewed_chain():
+    cfg = Config()
+    daily = _daily()  # neutral
+    intraday = _intraday()  # neutral
+    call_heavy_chain = _synth_chain(7, SPOT, cfg.risk_free_rate)
+    call_heavy_chain.calls["volume"] = 500
+    call_heavy_chain.puts["volume"] = 50
+
+    signal = build_directional_signal(daily, intraday, 0.0, _gate(), {"Weekly": call_heavy_chain}, cfg)
+    options_flow = next(c for c in signal.components if c.name == "options_flow")
+    assert options_flow.contribution > 0
+
+
+def test_options_flow_component_neutral_with_no_chains():
+    cfg = Config()
+    daily = _daily()
+    intraday = _intraday()
+    signal = build_directional_signal(daily, intraday, 0.0, _gate(), {}, cfg)
+    options_flow = next(c for c in signal.components if c.name == "options_flow")
+    assert options_flow.contribution == pytest.approx(0.0)
+    assert "no options volume" in options_flow.detail.lower()
 
 
 def test_orb_component_full_strength_at_average_or_above_volume():
@@ -177,8 +202,12 @@ def test_atr_fallback_used_when_orb_stop_is_wider_for_put():
     assert signal.stop_loss_underlying == pytest.approx(SPOT + cfg.stop_atr_multiple * daily.atr14)
 
 
-def test_default_component_weights_sum_to_one():
-    weights = Config().component_weights
+def test_default_component_weights_normalize_to_one():
+    # Raw defaults don't need to sum to exactly 1.0 themselves -- only
+    # the normalized weights actually used for scoring are guaranteed to.
+    from qqq_iron_condor.direction import _normalized_weights
+
+    weights = _normalized_weights(Config().component_weights)
     assert sum(weights.values()) == pytest.approx(1.0)
 
 

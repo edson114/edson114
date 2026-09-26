@@ -154,6 +154,7 @@ def _self_test_report() -> tuple[str, DirectionalSignal]:
                 "ask": call_fair + half_spread,
                 "lastPrice": call_fair,
                 "impliedVolatility": iv,
+                "volume": rng.integers(50, 500, len(strikes)),
             }
         )
         puts = pd.DataFrame(
@@ -163,6 +164,7 @@ def _self_test_report() -> tuple[str, DirectionalSignal]:
                 "ask": put_fair + half_spread,
                 "lastPrice": put_fair,
                 "impliedVolatility": iv,
+                "volume": rng.integers(50, 500, len(strikes)),
             }
         )
         expiration = (dt.date.today() + dt.timedelta(days=dte)).isoformat()

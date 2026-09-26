@@ -22,6 +22,7 @@ from .config import Config
 from .data import OptionChain
 from .gates import GateResult
 from .intraday import IntradaySnapshot
+from .options_flow import compute_call_put_skew
 from .options_math import bs_delta, time_to_expiration_years
 
 
@@ -159,6 +160,19 @@ def _relative_strength_component(rel_strength_pct: float) -> tuple[float, str]:
     return val, f"QQQ is {lean} SPY today by {abs(rel_strength_pct):.2f} pts -- {tag}."
 
 
+def _options_flow_component(call_skew: float, total_call_volume: int, total_put_volume: int) -> tuple[float, str]:
+    """Not literal whale/dark-pool tracking -- see options_flow.py's
+    module docstring for what this can and can't claim to be."""
+    if total_call_volume + total_put_volume <= 0:
+        return 0.0, "No options volume data available yet (chain untraded, unavailable, or not fetched)."
+    lean = "call-skewed (bullish flow)" if call_skew > 0 else ("put-skewed (bearish flow)" if call_skew < 0 else "balanced")
+    return _clip(call_skew), (
+        f"Options volume {total_call_volume:,} calls vs {total_put_volume:,} puts -- {lean} (skew {call_skew:+.2f}). "
+        "Mixes retail and institutional flow -- not literal whale/dark-pool data, but the same public "
+        "per-contract volume those paid flow-tracking services are themselves built from."
+    )
+
+
 def _mid_price(row: pd.Series) -> float:
     bid = float(row.get("bid", 0.0) or 0.0)
     ask = float(row.get("ask", 0.0) or 0.0)
@@ -226,6 +240,7 @@ def build_directional_signal(
     cfg: Config,
     relative_volume: float = 1.0,
 ) -> DirectionalSignal:
+    call_skew, total_call_volume, total_put_volume = compute_call_put_skew(chains)
     raw = {
         "daily_trend": _trend_component(daily),
         "macd": _macd_component(daily),
@@ -234,6 +249,7 @@ def build_directional_signal(
         "ema": _ema_component(intraday),
         "orb": _orb_component(intraday, cfg.opening_range_minutes, relative_volume),
         "relative_strength": _relative_strength_component(relative_strength_pct),
+        "options_flow": _options_flow_component(call_skew, total_call_volume, total_put_volume),
     }
     weights = _normalized_weights(cfg.component_weights)
     components = [
