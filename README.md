@@ -201,6 +201,52 @@ soft by default because the catalyst keyword list is broad enough (mentions
 of "earnings", "fed", individual mega-caps, etc.) to fire on most days,
 which would make a hard skip on any hit too aggressive to be useful.
 
+## Backtesting
+
+Before scaling size on this rule, it's worth knowing its actual historical
+edge rather than trusting the delta-target's textbook ~84% theoretical POP.
+`qqq_iron_condor/backtest.py` runs the exact same `strategy.build_iron_condor`
+the live scanner uses, mechanically, over years of history:
+
+```bash
+# 3 years, all configured expiration labels (0DTE/Weekly/Monthly)
+python -m qqq_iron_condor.backtest --years 3
+
+# One label only, gates disabled (see every mechanical trade, gated or not)
+python -m qqq_iron_condor.backtest --years 2 --labels Weekly --no-gates
+```
+
+It reports, per expiration label: win rate, average win/loss, expectancy
+(average P&L per trade), total P&L, profit factor, max drawdown on the
+resulting equity curve, and a breakdown by VIX-percentile regime (Low/
+Normal/High IV) so you can see whether the edge holds up in calm markets
+and falls apart in stressed ones, or vice versa. The report is printed and
+saved to `reports/backtests/YYYY-MM-DD.md`.
+
+**Why it's a simulation, not a replay:** there is no free source of
+historical QQQ option-chain data (strike-level bid/ask/IV by date) — that
+requires a paid feed (CBOE DataShop, ORATS historical, Polygon.io). Free
+data only covers historical *underlying* prices and VIX. So the backtest
+instead prices a full synthetic chain at every entry/exit with
+Black-Scholes, using VIX as a flat (no skew, no term structure)
+implied-vol proxy — the same technique the app's own `--self-test` uses.
+Concretely, this means:
+- It's a real test of the delta-targeting *mechanics* against real
+  historical price/vol regimes, including real historical gap days and
+  VIX spikes (both hard gates are backtested for real).
+- It does **not** capture bid/ask slippage, commissions, early assignment,
+  or real strike-level liquidity/skew — actual fills will run worse than
+  these simulated mid-price settlements.
+- The scheduled-macro-event hard gate only fires for dates present in
+  `Config.macro_event_dates`, which today only covers 2026 — it won't
+  suppress entries around, say, a 2023 FOMC day.
+- Trades are non-overlapping per label (a new one only opens after the
+  prior one of that label has settled), so drawdown reflects one strategy
+  "slot" run sequentially, not several simultaneously open positions.
+
+Treat the output as a bound on the strategy's mechanical edge under
+simplified volatility assumptions, not a prediction of live results.
+
 ## Limitations & caveats
 
 - Uses free Yahoo Finance data via `yfinance`; option chain liquidity and
@@ -226,6 +272,9 @@ which would make a hard skip on any hit too aggressive to be useful.
 - IV rank is approximated via the VIX's 1-year percentile as a market-wide
   proxy; it is not QQQ-specific historical IV.
 - This tool never places trades — it only produces an analysis/report.
+- The [backtest](#backtesting) is a Black-Scholes simulation driven by real
+  historical underlying/VIX data, not a replay of real historical option
+  quotes — see that section for exactly what it can and can't capture.
 
 ## QQQ Directional Signal (Buy Calls/Puts)
 
@@ -331,6 +380,7 @@ qqq_iron_condor/
   options_math.py         # Black-Scholes delta/price helpers (fallback provider)
   analysis.py             # turns raw data into the daily market snapshot
   strategy.py             # iron condor strike selection & trade math
+  backtest.py             # historical backtest: replays the delta-target rule via simulated BS chains
   direction.py            # directional (buy calls/puts) scoring & contract selection
   report.py               # iron condor Markdown report rendering
   signal_report.py        # directional signal Markdown report rendering
@@ -344,8 +394,10 @@ tests/
   test_strategy.py        # strike selection, sanity checks, real-vs-BS delta
   test_gates.py           # trade gate unit tests
   test_tradier.py         # Tradier response-parsing tests (mocked HTTP)
+  test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
+reports/backtests/        # backtest reports land here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
