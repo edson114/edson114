@@ -476,20 +476,25 @@ synthetic test):
    finding 3 — a fakeout breakout typically lacks participation — rather
    than discarding the signal outright.
 
-**None of steps 2-4 have been re-validated together with a fresh backtest
-yet** — do that before trusting any of this with size:
+5. Re-running the backtest with volume-scaling live: profit factor came
+   out at 0.59 — almost exactly between the raw-`orb` baseline (0.57) and
+   zeroing it entirely (0.61). **No detectable improvement over either.**
+   The fakeout-lacks-volume hypothesis was reasonable and worth testing;
+   the data says it isn't the fix.
 
-```bash
-python -m qqq_iron_condor.directional_backtest
-```
-
-and compare trade-outcome mix, profit factor, and the by-confidence
-breakdown against the numbers above. A single run at n≈20-54 trades is
-still weak evidence either way, and this is now the *fourth* consecutive
-change tested against the same ~59-day window — treat any improvement
-with real skepticism until it replicates on a fresh window. The honest
-conclusion so far is "we found and fixed one real bug, and found one
-promising-but-unproven lead," not "this system now has an edge."
+**Where this leaves the directional signal, honestly:** across five
+consecutive experiments on the same ~59-day window — threshold, stop/target
+sizing, `--zero-components`, and volume-scaling — exactly one produced a
+clear, mechanically-verified improvement (the stop/target fix, since it
+addressed a real bug: trades weren't being managed by their plan at all).
+Everything downstream of that has moved profit factor within a narrow
+0.57–0.61 band, never crossing the 1.0 breakeven line, and the differences
+between those attempts are smaller than you'd expect from noise alone at
+n≈50-54 trades. Further tuning against this same window is likely to keep
+producing similarly inconclusive nudges rather than a real answer — the
+more informative next step is a fresh backtest window once more trading
+days accumulate, or a genuinely different data source (see below), not
+another reweight of these same seven inputs.
 
 **Why this is a ~60-day check, not a multi-year backtest:** the iron
 condor backtest above only needs daily bars, so it can run over years.
