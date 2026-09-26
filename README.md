@@ -380,8 +380,10 @@ Each of the seven components below contributes `weight × value` (value in
 | Opening-range breakout | 0.15 | Price above the opening-range high |
 | QQQ vs. SPY relative strength | 0.10 | QQQ outperforming SPY today |
 
-Tune the weights in `qqq_iron_condor/direction.py`'s `_WEIGHTS` dict, and
-the delta target, stop/target multiples, and score threshold in
+Tune the weights via `Config.component_weights` (always renormalized to
+sum to 1.0 before use, so zeroing one redistributes its share to the rest
+rather than just shrinking the max possible score), and the delta target,
+stop/target multiples, and score threshold, all in
 `qqq_iron_condor/config.py`.
 
 ### Backtesting
@@ -401,12 +403,16 @@ python -m qqq_iron_condor.directional_backtest --lookback-days 30 --output-dir /
 
 # Try a stricter score threshold than the live default (0.30) and compare
 python -m qqq_iron_condor.directional_backtest --score-threshold 0.5
+
+# Zero out one or more components (redistributes their weight to the
+# rest) to test whether dropping them helps
+python -m qqq_iron_condor.directional_backtest --zero-components orb
 ```
 
 Or trigger it on a GitHub-hosted runner (useful if you don't have a local
 Python/network setup): `.github/workflows/qqq-directional-backtest.yml`,
-`workflow_dispatch` only, with `lookback_days` and `score_threshold`
-inputs — run it manually from the Actions tab.
+`workflow_dispatch` only, with `lookback_days`, `score_threshold`, and
+`zero_components` inputs — run it manually from the Actions tab.
 
 It reports trades taken (calls vs. puts), win rate, average win/loss,
 expectancy, total return, profit factor, max drawdown, and a breakdown by
@@ -420,26 +426,48 @@ useful for diagnosing *why* a run came out the way it did (e.g. does one
 component correlate with the losing trades?) rather than only seeing the
 aggregate.
 
-**What backtesting this has already found, and what changed as a result:**
-a first run at the default 0.30 threshold found a *negative* expectancy
-(profit factor 0.44 over a 59-day window). Raising the threshold to 0.50
-narrowed the loss (profit factor 0.90) but didn't flip it positive.
-Exporting and reading the per-trade CSV (see above) found the real
-culprit: **80% of trades never reached their stop or target at all** —
-they drifted to an arbitrary end-of-day price instead of being managed by
-the plan, because the stop/target distance (ATR-scaled) was wide enough
-that a single session rarely had room to reach either. `stop_atr_multiple`
-was tightened from `0.75` to `0.35` as a result (see `direction.py` and
-`config.py`), and the opening-range stop is now only used when it's at
-least as tight as that ATR-based distance. **This hasn't been
-re-validated with a fresh backtest yet** — do that before trusting it:
+**What backtesting this has already found, and what changed as a result**
+(each finding came from a real run over the last available ~59 days, not a
+synthetic test):
+
+1. A first run at the default 0.30 threshold found a *negative*
+   expectancy (profit factor 0.44). Raising the threshold to 0.50
+   narrowed the loss (profit factor 0.90) but didn't flip it positive.
+2. Exporting and reading the per-trade CSV found the real culprit for
+   most of that: **80% of trades never reached their stop or target at
+   all** — they drifted to an arbitrary end-of-day price instead of being
+   managed by the plan, because the ATR-scaled stop/target distance was
+   wide enough that a single session rarely had room to reach either.
+   `stop_atr_multiple` was tightened `0.75` → `0.35`, and the
+   opening-range stop is now capped at that ATR-based distance instead of
+   being used unconditionally. Re-running at the *same* 0.30 threshold
+   after that fix: eod-exits dropped from ~80% to 52%, and profit factor
+   improved 0.44 → 0.57 — a real, verified mechanical fix, but still not
+   a profitable system on its own.
+3. Correlating each component's contribution (sign-flipped for puts, so
+   positive always means "agreed with the trade") against realized
+   returns, pooled across the two backtest runs above (n=74 trades): the
+   **opening-range breakout (`orb`) component came out anti-correlated**
+   with returns (r ≈ -0.3 to -0.4, the strongest and most consistent
+   signal of any component, in the *wrong* direction) — trades where ORB
+   agreed with the trade direction tended to do *worse*. `vwap` showed a
+   smaller version of the same pattern; `rsi` and `relative_strength`
+   were mildly positive. This is why `--zero-components` exists — to
+   actually test dropping the weak/harmful ones instead of only
+   re-weighting the threshold.
+
+**None of steps 2-3's fixes have been re-validated together with a fresh
+backtest yet** — do that before trusting any of this with size:
 
 ```bash
-python -m qqq_iron_condor.directional_backtest
+python -m qqq_iron_condor.directional_backtest --zero-components orb
 ```
 
-and compare the new trade-outcome mix (fewer `eod` exits, ideally) and
-expectancy against the numbers above.
+and compare trade-outcome mix, profit factor, and the by-confidence
+breakdown against the numbers above. A single run at n≈20-54 trades is
+still weak evidence either way — the honest conclusion so far is "we
+found and fixed one real bug, and found one more promising lead," not
+"this system now has an edge."
 
 **Why this is a ~60-day check, not a multi-year backtest:** the iron
 condor backtest above only needs daily bars, so it can run over years.

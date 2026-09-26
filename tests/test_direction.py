@@ -144,6 +144,46 @@ def test_atr_fallback_used_when_orb_stop_is_wider_for_put():
     assert signal.stop_loss_underlying == pytest.approx(SPOT + cfg.stop_atr_multiple * daily.atr14)
 
 
+def test_default_component_weights_sum_to_one():
+    weights = Config().component_weights
+    assert sum(weights.values()) == pytest.approx(1.0)
+
+
+def test_zeroing_a_component_removes_its_contribution_and_redistributes():
+    import dataclasses
+
+    base_cfg = Config()
+    zeroed_weights = {**base_cfg.component_weights, "orb": 0.0}
+    cfg = dataclasses.replace(base_cfg, component_weights=zeroed_weights)
+
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0)
+    intraday = _intraday(price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range")
+    gate = _gate()
+
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=0.4, gate=gate, chains={}, cfg=cfg)
+
+    orb_component = next(c for c in signal.components if c.name == "orb")
+    assert orb_component.weight == pytest.approx(0.0)
+    assert orb_component.contribution == pytest.approx(0.0)
+    # Weights still sum to 1.0 -- orb's share went to the other six, not just vanished.
+    assert sum(c.weight for c in signal.components) == pytest.approx(1.0)
+    non_orb_weight = sum(w for name, w in cfg.component_weights.items() if name != "orb")
+    vwap_component = next(c for c in signal.components if c.name == "vwap")
+    expected_vwap_weight = base_cfg.component_weights["vwap"] / non_orb_weight
+    assert vwap_component.weight == pytest.approx(expected_vwap_weight)
+
+
+def test_all_zero_weights_yield_zero_score_without_crashing():
+    import dataclasses
+
+    cfg = dataclasses.replace(Config(), component_weights={k: 0.0 for k in Config().component_weights})
+    daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0)
+    intraday = _intraday(price_vs_vwap_pct=0.4, ema_trend="bullish", orb_status="above_range")
+    signal = build_directional_signal(daily, intraday, relative_strength_pct=0.4, gate=_gate(), chains={}, cfg=cfg)
+    assert signal.score == 0.0
+    assert signal.bias == "NO TRADE"
+
+
 def test_all_bullish_signals_produce_call_bias():
     cfg = Config()
     daily = _daily(trend_label="Uptrend", macd_hist=0.8, rsi14=62.0)

@@ -187,4 +187,27 @@ class Config:
     # CALL/PUT bias; anything smaller is reported as NO TRADE (no edge).
     signal_score_threshold: float = 0.30
 
+    # Per-component weights for the directional score. Always normalized
+    # to sum to 1.0 before use (direction.py's _normalized_weights), so
+    # zeroing a component redistributes its share to the rest rather than
+    # just shrinking the max possible score -- e.g. for an experiment,
+    # override via dataclasses.replace(cfg, component_weights={**cfg.
+    # component_weights, "orb": 0.0}). A `directional_backtest.py` run
+    # found the "orb" (opening-range breakout) component's contribution
+    # anti-correlated with trade returns (r ~ -0.3 to -0.4 across two
+    # windows) -- i.e. trading the breakout tended to be the wrong side of
+    # it -- which is why it's worth being able to zero out and re-test
+    # rather than only tuning the score threshold.
+    component_weights: dict = field(
+        default_factory=lambda: {
+            "daily_trend": 0.20,
+            "macd": 0.10,
+            "rsi": 0.10,
+            "vwap": 0.20,
+            "ema": 0.15,
+            "orb": 0.15,
+            "relative_strength": 0.10,
+        }
+    )
+
     signals_output_dir: str = "reports/signals"

@@ -241,6 +241,15 @@ def test_render_report_includes_stats_for_populated_summary():
     assert "0.30" in report
 
 
+def test_render_report_notes_zeroed_components():
+    now = pd.Timestamp.now()
+    trades = [db.DirectionalBacktestTrade(now, now, "CALL", 100, 110, 95, 110, "target", 10.0, 0.5, "High")]
+    weights = {**Config().component_weights, "orb": 0.0}
+    report = db.render_directional_backtest_report("QQQ", 59, db.summarize(trades), 0.30, weights)
+    assert "zeroed" in report.lower()
+    assert "orb" in report
+
+
 def test_export_trades_csv_includes_component_columns(tmp_path):
     now = pd.Timestamp.now()
     trade = db.DirectionalBacktestTrade(

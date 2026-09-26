@@ -62,15 +62,15 @@ class DirectionalSignal:
     contracts: dict = field(default_factory=dict)  # label -> Optional[SuggestedContract]
 
 
-_WEIGHTS = {
-    "daily_trend": 0.20,
-    "macd": 0.10,
-    "rsi": 0.10,
-    "vwap": 0.20,
-    "ema": 0.15,
-    "orb": 0.15,
-    "relative_strength": 0.10,
-}
+def _normalized_weights(weights: dict) -> dict:
+    """Rescale to sum to 1.0 so zeroing/reweighting a component (e.g. to
+    test dropping it) redistributes its share to the rest, rather than
+    just shrinking the max possible |score| and silently changing what
+    `signal_score_threshold` effectively means."""
+    total = sum(weights.values())
+    if total <= 0:
+        return {name: 0.0 for name in weights}
+    return {name: w / total for name, w in weights.items()}
 
 
 def _trend_component(daily: MarketSnapshot) -> tuple[float, str]:
@@ -213,8 +213,9 @@ def build_directional_signal(
         "orb": _orb_component(intraday, cfg.opening_range_minutes),
         "relative_strength": _relative_strength_component(relative_strength_pct),
     }
+    weights = _normalized_weights(cfg.component_weights)
     components = [
-        ScoreComponent(name=name, weight=_WEIGHTS[name], contribution=round(_WEIGHTS[name] * val, 4), detail=detail)
+        ScoreComponent(name=name, weight=weights[name], contribution=round(weights[name] * val, 4), detail=detail)
         for name, (val, detail) in raw.items()
     ]
     score = round(sum(c.contribution for c in components), 3)

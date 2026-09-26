@@ -338,7 +338,11 @@ def export_trades_csv(trades: list[DirectionalBacktestTrade], path: str) -> None
 
 
 def render_directional_backtest_report(
-    symbol: str, lookback_days: int, summary: DirectionalBacktestSummary, score_threshold: float
+    symbol: str,
+    lookback_days: int,
+    summary: DirectionalBacktestSummary,
+    score_threshold: float,
+    component_weights: Optional[dict] = None,
 ) -> str:
     generated_at = dt.datetime.now()
     parts = [
@@ -355,6 +359,12 @@ def render_directional_backtest_report(
         "possibly overridden via `--score-threshold`)._",
         "",
     ]
+
+    if component_weights:
+        zeroed = [name for name, w in component_weights.items() if w == 0.0]
+        if zeroed:
+            parts.append(f"_Component(s) zeroed out for this run (via `--zero-components`): {', '.join(zeroed)}._")
+            parts.append("")
 
     if summary.num_trades == 0:
         parts.append("_No trades were generated over this backtest window._")
@@ -402,11 +412,25 @@ def main(argv=None) -> int:
         "--score-threshold", type=float, default=None,
         help="Override Config.signal_score_threshold (default: whatever Config specifies, currently 0.30)",
     )
+    parser.add_argument(
+        "--zero-components", default=None,
+        help="Comma-separated component names to zero out of the score (e.g. 'orb' or 'orb,vwap'), "
+        "redistributing their weight to the rest -- for testing whether dropping a component "
+        "that's backtested as anti-correlated with returns actually helps.",
+    )
     args = parser.parse_args(argv)
 
     cfg = Config()
     if args.score_threshold is not None:
         cfg = dataclasses.replace(cfg, signal_score_threshold=args.score_threshold)
+    if args.zero_components:
+        names = [n.strip() for n in args.zero_components.split(",") if n.strip()]
+        unknown = [n for n in names if n not in cfg.component_weights]
+        if unknown:
+            print(f"Unknown component name(s): {unknown}. Valid: {list(cfg.component_weights)}", file=sys.stderr)
+            return 1
+        new_weights = {**cfg.component_weights, **{n: 0.0 for n in names}}
+        cfg = dataclasses.replace(cfg, component_weights=new_weights)
 
     print(f"Fetching {args.lookback_days}d of {cfg.intraday_interval} {cfg.symbol}/{cfg.spy_symbol} history...", file=sys.stderr)
     qqq_intraday = data.get_intraday_history(cfg.symbol, cfg.intraday_interval, f"{args.lookback_days}d")
@@ -418,7 +442,9 @@ def main(argv=None) -> int:
 
     trades = simulate_directional_backtest(daily_history, vix_history, qqq_intraday, spy_intraday, cfg)
     summary = summarize(trades)
-    report_md = render_directional_backtest_report(cfg.symbol, args.lookback_days, summary, cfg.signal_score_threshold)
+    report_md = render_directional_backtest_report(
+        cfg.symbol, args.lookback_days, summary, cfg.signal_score_threshold, cfg.component_weights
+    )
     print(report_md)
 
     output_dir = Path(args.output_dir)

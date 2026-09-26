@@ -11,6 +11,10 @@ on:
         description: "Override Config.signal_score_threshold (blank = use the default, 0.30)"
         required: false
         default: ""
+      zero_components:
+        description: "Comma-separated component names to zero out (e.g. 'orb' or 'orb,vwap'); blank = none"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -35,10 +39,14 @@ jobs:
         env:
           LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days }}
           SCORE_THRESHOLD: ${{ github.event.inputs.score_threshold }}
+          ZERO_COMPONENTS: ${{ github.event.inputs.zero_components }}
         run: |
           ARGS=(--lookback-days "$LOOKBACK_DAYS")
           if [ -n "$SCORE_THRESHOLD" ]; then
             ARGS+=(--score-threshold "$SCORE_THRESHOLD")
+          fi
+          if [ -n "$ZERO_COMPONENTS" ]; then
+            ARGS+=(--zero-components "$ZERO_COMPONENTS")
           fi
           python -m qqq_iron_condor.directional_backtest "${ARGS[@]}"
 
