@@ -381,12 +381,61 @@ Tune the weights in `qqq_iron_condor/direction.py`'s `_WEIGHTS` dict, and
 the delta target, stop/target multiples, and score threshold in
 `qqq_iron_condor/config.py`.
 
+### Backtesting
+
+`qqq_iron_condor/directional_backtest.py` replays the exact, unmodified
+`direction.build_directional_signal` (and `analysis.build_snapshot`,
+`intraday.build_intraday_snapshot`, `gates.evaluate_gates`) over real
+historical bars, so this is not a separate re-implementation of the rule
+that could silently drift from what the live signal does:
+
+```bash
+# Backtest the last 59 days of real 5-minute QQQ/SPY bars (yfinance's cap)
+python -m qqq_iron_condor.directional_backtest
+
+# Fewer days, custom output location
+python -m qqq_iron_condor.directional_backtest --lookback-days 30 --output-dir /tmp/bt
+```
+
+Or trigger it on a GitHub-hosted runner (useful if you don't have a local
+Python/network setup): `.github/workflows/qqq-directional-backtest.yml`,
+`workflow_dispatch` only — run it manually from the Actions tab.
+
+It reports trades taken (calls vs. puts), win rate, average win/loss,
+expectancy, total return, profit factor, max drawdown, and a breakdown by
+confidence level (High vs. Medium). Trades are scored on the **underlying's**
+stop/target, not simulated option premium — there's no free source of
+historical QQQ option chains, intraday or otherwise. Report saved to
+`reports/backtests/directional-YYYY-MM-DD.md`.
+
+**Why this is a ~60-day check, not a multi-year backtest:** the iron
+condor backtest above only needs daily bars, so it can run over years.
+This signal is fundamentally intraday (VWAP, opening range, a 5-minute
+EMA9/21), and free intraday history from yfinance is capped at the last
+~60 days for 5-minute bars — there's no way around that with free data.
+Concretely:
+- A positive expectancy/profit-factor here is weak evidence of an edge
+  over one short window in one volatility regime — not proof. Re-run
+  periodically and look for consistency across several independent
+  windows before trusting it with size.
+- The soft catalyst/news flag can't be backtested (historical RSS content
+  can't be replayed), so it's always empty here — only the hard gates
+  (scheduled macro event, gap, VIX spike) are tested for real.
+- VIX is daily-resolution only, so the gate's "current" VIX level at any
+  intraday timestamp is the prior day's close, not a live intraday print.
+- A bar whose range spans both the stop and the target is conservatively
+  resolved as the stop hitting first — real intrabar order is unknown.
+
+See the module docstring in `qqq_iron_condor/directional_backtest.py` for
+the full list of what this can and can't capture.
+
 ### Limitations & caveats
 
 - This is a **rules-based checklist**, not a backtested-for-edge or
   machine-learned model. The score is not a probability of profit — treat
   it the way you'd treat a discretionary trader's structured opinion, one
-  input among several.
+  input among several. See [Backtesting](#backtesting-1) for a first,
+  honest read on whether it has any measured edge at all.
 - Same caveats as the iron condor scan apply: free `yfinance` data can be
   stale/illiquid (especially right after the open), the macro calendar is
   a user-maintained snapshot (not a live paid feed), and news/catalyst
@@ -416,6 +465,7 @@ qqq_iron_condor/
   backtest.py             # historical backtest: replays the delta-target rule via simulated BS chains
   journal.py              # trade journal: logs real fills, computes realized performance
   direction.py            # directional (buy calls/puts) scoring & contract selection
+  directional_backtest.py # replays the directional signal over real 5-min bars (~60d, yfinance's cap)
   report.py               # iron condor Markdown report rendering
   signal_report.py        # directional signal Markdown report rendering
   scan.py                 # iron condor CLI entrypoint / orchestration
@@ -429,10 +479,11 @@ tests/
   test_gates.py           # trade gate unit tests
   test_tradier.py         # Tradier response-parsing tests (mocked HTTP)
   test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
+  test_directional_backtest.py  # directional backtest mechanics (touch detection, gating, aggregation)
   test_journal.py         # trade journal CSV persistence & realized-performance stats
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
-reports/backtests/        # backtest reports land here
+reports/backtests/        # backtest reports land here (iron condor + directional)
 journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
   qqq-iron-condor-scan.yml
