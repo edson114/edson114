@@ -1,0 +1,46 @@
+name: Small-Cap Momentum Options Scan
+
+on:
+  schedule:
+    # 14:05 UTC = 10:05am ET during EDT (Mar-Nov) / 9:05am ET during EST
+    # (Nov-Mar). Deliberately after the open (unlike the QQQ scan) -- this
+    # style needs the first chunk of the session to actually show up as
+    # relative volume, a real gap hold/fade, and an intraday VWAP read.
+    - cron: "5 14 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run small-cap momentum options scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: always include these tickers regardless of what the
+          # free screener returns, e.g. "ABCD,WXYZ".
+          SMALLCAP_SYMBOLS: ${{ vars.SMALLCAP_SYMBOLS }}
+        run: python -m smallcap_options.scan
+
+      - name: Commit generated report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/
+          git diff --cached --quiet || git commit -m "Daily small-cap momentum options scan report"
+          git push
