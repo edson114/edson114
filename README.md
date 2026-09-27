@@ -1,15 +1,18 @@
 # QQQ Trading Tools
 
-Two automated, decision-support tools for trading **QQQ options** off the
-same market data pipeline:
+Automated, decision-support tools for trading **QQQ options** off the
+same market data pipeline, plus a classic trend-following system:
 
 1. **[Iron Condor Scanner](#qqq-iron-condor-scanner)** — a daily,
    range-bound premium-selling scan.
 2. **[Directional Signal](#qqq-directional-signal-buy-callsputs)** — an
    on-demand (re-runnable through the session) CALL/PUT/NO-TRADE signal
    for buying calls or puts.
+3. **[Turtle Trading](#turtle-trading-richard-denniss-rules)** — Richard
+   Dennis's Turtle breakout system: a multi-market daily backtest plus the
+   entry/stop/add levels for the next session.
 
-> **Not financial advice.** Both are decision-support tools, not
+> **Not financial advice.** All are decision-support tools, not
 > auto-traders — neither ever places orders. Always verify strikes, prices,
 > and greeks against your broker's live quotes before trading, and see each
 > tool's own limitations section below. **No signal in this repo is, or
@@ -557,6 +560,72 @@ the full list of what this can and can't capture.
   Don't read a skewed reading as "the whales are buying."
 - This tool never places trades — it only produces an analysis/report.
 
+## Turtle Trading (Richard Dennis's rules)
+
+In 1983 Richard Dennis bet William Eckhardt that trading could be taught,
+recruited the "Turtles", and gave them a fully mechanical breakout system.
+`qqq_iron_condor/turtle.py` implements those original rules (as later
+published by Curtis Faith) on daily ETF bars:
+
+| Rule | System 1 | System 2 |
+|---|---|---|
+| Entry | 20-day high/low breakout | 55-day high/low breakout |
+| Filter | Skip if the last S1 breakout in that market would have been a winner (taken or not); still enter at the 55-day "failsafe" breakout | None -- every breakout taken |
+| Exit | 10-day low (longs) / high (shorts) | 20-day low / high |
+
+Shared by both systems:
+
+- **N** = 20-day Wilder average true range (the market's daily volatility).
+- **Unit** = `floor(1% of equity / N)` shares, so a 1 N move is a 1% equity swing.
+- **Stop** = 2 N from the most recent unit's fill (a 2% equity risk per unit);
+  every pyramided unit moves the stop on the *whole* position.
+- **Pyramiding**: add a unit every ½ N of favorable movement, max 4 units per market.
+- **Portfolio limit**: max 12 units long and 12 short across all markets.
+
+```bash
+# Default: 10 years, both systems, a diversified 14-ETF universe
+python -m qqq_iron_condor.turtle
+
+# QQQ only, System 2, long only, sized for a $25k account
+python -m qqq_iron_condor.turtle --symbols QQQ --system 2 --long-only --equity 25000
+
+# Offline smoke test with synthetic data (no network needed)
+python -m qqq_iron_condor.turtle --self-test
+```
+
+The report (saved to `reports/turtle/YYYY-MM-DD.md`, with a per-trade CSV per
+system) has two parts:
+
+1. **Levels for the next session**, per symbol and system: N, unit size for
+   your account, the buy-stop/sell-stop entry levels (or "skip; failsafe X"
+   when the S1 filter is active), and -- if the mechanical system would be
+   in a position right now -- its units, stop, next add level, and channel
+   exit.
+2. **Backtest**: trades, win rate, average win/loss, profit factor, total
+   return, CAGR, mark-to-market max drawdown, and net P&L by symbol.
+
+`.github/workflows/turtle-trading.yml` runs it every weekday after the close
+(and on demand, with symbol/years/equity/long-only inputs) and commits the report.
+
+**Why the default universe isn't just QQQ:** the Turtles traded ~20 futures
+markets across bonds, currencies, metals, energies, grains and stock
+indices. The system wins on well under half its trades and lives on a few
+large trends in *some* market; one equity index alone is a much weaker
+test of it. The default universe (QQQ, SPY, IWM, EFA, EEM, TLT, IEF, GLD,
+SLV, USO, DBA, UUP, FXE, FXY) is the closest free-data stand-in.
+
+**What it doesn't model** (details in the module docstring):
+- Daily bars only: fills are at the breakout/stop level, or the open if
+  price gapped through it. A bar that spans both a fill and the stop is
+  resolved as stopped out; a bar that breaks out both ways is skipped.
+- The original "cut notional equity 20% per 10% drawdown" rule -- sizing
+  uses mark-to-market equity at the prior close instead.
+- A 2x gross leverage cap (`--max-leverage`) the futures-trading Turtles
+  never had: 4 units of a low-volatility ETF at 1% risk each can otherwise
+  exceed what a margin account can hold.
+- Short borrow costs and dividends; costs are a flat `--cost-bps` per side
+  (default 2).
+
 ## Project layout
 
 ```
@@ -581,6 +650,7 @@ qqq_iron_condor/
   signal_report.py        # directional signal Markdown report rendering
   scan.py                 # iron condor CLI entrypoint / orchestration
   signal.py               # directional signal CLI entrypoint / orchestration
+  turtle.py               # Turtle Trading: multi-market breakout backtest + next-session levels
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
@@ -593,11 +663,14 @@ tests/
   test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
   test_directional_backtest.py  # directional backtest mechanics (touch detection, gating, aggregation)
   test_journal.py         # trade journal CSV persistence & realized-performance stats
+  test_turtle.py          # Turtle fills, stops, pyramiding, S1 filter/failsafe, portfolio limits
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
+reports/turtle/           # Turtle Trading reports + per-trade CSVs land here
 journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
+  turtle-trading.yml
 ```

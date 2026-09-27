@@ -1,0 +1,69 @@
+name: Turtle Trading Report
+
+on:
+  schedule:
+    # Weekdays after the US close (21:40 UTC = 5:40pm EDT / 4:40pm EST),
+    # so the report carries the levels for the next session.
+    - cron: "40 21 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated tickers (blank = the default diversified ETF universe)"
+        required: false
+        default: ""
+      years:
+        description: "Years of daily history to backtest"
+        required: false
+        default: "10"
+      equity:
+        description: "Account size used for the backtest and unit sizing"
+        required: false
+        default: "100000"
+      long_only:
+        description: "Ignore short breakouts"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  turtle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Turtle backtest and next-session levels
+        env:
+          SYMBOLS: ${{ github.event.inputs.symbols }}
+          YEARS: ${{ github.event.inputs.years || '10' }}
+          EQUITY: ${{ github.event.inputs.equity || '100000' }}
+          LONG_ONLY: ${{ github.event.inputs.long_only }}
+        run: |
+          ARGS=(--years "$YEARS" --equity "$EQUITY")
+          if [ -n "$SYMBOLS" ]; then
+            ARGS+=(--symbols "$SYMBOLS")
+          fi
+          if [ "$LONG_ONLY" = "true" ]; then
+            ARGS+=(--long-only)
+          fi
+          python -m qqq_iron_condor.turtle "${ARGS[@]}"
+
+      - name: Commit generated report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/turtle/
+          git diff --cached --quiet || git commit -m "Turtle trading report"
+          git push
