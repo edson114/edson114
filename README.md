@@ -1,21 +1,24 @@
-# QQQ Trading Tools
+# Trading Tools
 
-Two automated, decision-support tools for trading **QQQ options** off the
-same market data pipeline:
+Automated, decision-support tools for options trading, off free market
+data:
 
-1. **[Iron Condor Scanner](#qqq-iron-condor-scanner)** — a daily,
+1. **[QQQ Iron Condor Scanner](#qqq-iron-condor-scanner)** — a daily,
    range-bound premium-selling scan.
-2. **[Directional Signal](#qqq-directional-signal-buy-callsputs)** — an
+2. **[QQQ Directional Signal](#qqq-directional-signal-buy-callsputs)** — an
    on-demand (re-runnable through the session) CALL/PUT/NO-TRADE signal
    for buying calls or puts.
+3. **[Small-Cap Momentum Options Scanner](#small-cap-momentum-options-scanner-buy-callsputs)**
+   — a daily scan of low-float, high-relative-volume small caps, scored
+   CALL/PUT/NO-TRADE with a suggested short-dated contract.
 
-> **Not financial advice.** Both are decision-support tools, not
-> auto-traders — neither ever places orders. Always verify strikes, prices,
-> and greeks against your broker's live quotes before trading, and see each
-> tool's own limitations section below. **No signal in this repo is, or
-> claims to be, close to "99% profitable" — no legitimate day-trading
-> system is.** These structure the same inputs a discretionary trader would
-> check, consistently; they don't promise a win rate.
+> **Not financial advice.** All three are decision-support tools, not
+> auto-traders — none of them ever places orders. Always verify strikes,
+> prices, and greeks against your broker's live quotes before trading, and
+> see each tool's own limitations section below. **No signal in this repo
+> is, or claims to be, close to "99% profitable" — no legitimate
+> day-trading system is.** These structure the same inputs a discretionary
+> trader would check, consistently; they don't promise a win rate.
 
 ## QQQ Iron Condor Scanner
 
@@ -557,6 +560,108 @@ the full list of what this can and can't capture.
   Don't read a skewed reading as "the whales are buying."
 - This tool never places trades — it only produces an analysis/report.
 
+## Small-Cap Momentum Options Scanner (Buy Calls/Puts)
+
+A daily scan that formalizes a *style* of small-cap options trading
+publicly associated with traders like Alex Temiz — low-float, low-to-mid
+priced stocks that gap or spike on a catalyst with unusually heavy volume,
+traded with cheap, short-dated (weekly) OTM calls on continuation or puts
+on a failed breakout/fade — into an objective checklist over free data.
+
+> **This is not a reproduction of any specific trader's actual rules, risk
+> management, or track record** — those aren't publicly documented in
+> enough detail to replicate. It structures the same *kind* of inputs
+> (float, relative volume, gap size, VWAP position, news catalyst) a
+> discretionary small-cap momentum trader would look at, consistently, and
+> nothing more. Low-float small caps are extremely volatile and often
+> illiquid; short-dated OTM options on them routinely lose their entire
+> premium in minutes and can be hard to exit at a fair price. This tool
+> never places orders.
+
+### What it does
+
+Each run:
+
+1. **Universe** — pulls Yahoo Finance's free screener (`small_cap_gainers`,
+   `aggressive_small_caps`, `most_shorted_stocks` by default), plus any
+   tickers listed in the `SMALLCAP_SYMBOLS` env var (comma-separated),
+   always included regardless of what the screener returns.
+2. **Cheap prefilter** — price band ($1–$20 by default), market cap cap,
+   minimum day volume, minimum relative volume vs. the 3-month average,
+   and a minimum absolute %-move — all from fields the screener already
+   returned, no extra network calls.
+3. **Deep scan** (capped to a bounded number of symbols per run) — pulls
+   float shares and 20-day average dollar volume per surviving candidate,
+   filtering out large-float or illiquid names.
+4. **Directional score** — blends today's move, position vs. intraday
+   VWAP, whether the move is still extending or fading off the session
+   high/low, relative volume, and a news catalyst hit into a single
+   -1..+1 score → CALL / PUT / NO TRADE. Critically, the *sign* of the
+   gap/relative-volume/catalyst components follows the current
+   extension/VWAP lean, not the raw day's %change — so a stock that's
+   still up 40% on the day but visibly rolling over scores as a PUT setup,
+   not a CALL.
+5. **Contract selection** — the nearest listed expiration at/under
+   `Config.max_dte` (short-dated, weekly-style), nearest strike to a
+   target ~7% out-of-the-money, skipped if nothing in the chain clears a
+   minimum open-interest and maximum bid/ask-spread bar.
+6. **Per-candidate gates** — hard-skips a CALL/PUT score with no tradable
+   contract; soft-flags unknown float, earnings within 5 days (IV
+   crush/gap risk on a short-dated contract), and no catalyst found.
+7. **Report** — ranked candidate table, detailed score breakdown and
+   suggested contract for the top setups, and risk-management notes
+   (position sizing as a small, defined-risk bet; planning the exit/taking
+   profit quickly; respecting bid/ask spread as a real cost).
+
+### Running it
+
+```bash
+pip install -r requirements.txt
+
+# Live scan (requires internet access to Yahoo Finance / RSS feeds)
+python -m smallcap_options.scan
+
+# Offline smoke test with synthetic data (no network needed)
+python -m smallcap_options.scan --self-test
+
+# Skip GitHub issue creation
+python -m smallcap_options.scan --no-issue
+
+# Always include specific tickers regardless of the screener
+SMALLCAP_SYMBOLS=ABCD,WXYZ python -m smallcap_options.scan
+```
+
+`.github/workflows/smallcap-options-scan.yml` runs this on a cron schedule
+(weekdays, ~10:05am ET — deliberately after the QQQ scan's open-time slot,
+since this style needs the first chunk of the session to show real
+relative volume and a gap hold/fade before it's worth scoring), commits
+the generated report into `reports/smallcap/`, and opens a GitHub Issue
+(labeled `smallcap-scan`) the same way the other two scans do. An optional
+repository variable, `SMALLCAP_SYMBOLS`, is passed through the same way.
+
+### Limitations & caveats
+
+- The universe comes from Yahoo Finance's free, unofficial screener
+  endpoint — it can rate-limit, change shape, or simply miss a name a
+  paid real-time scanner (Trade Ideas, Benzinga Pro, etc.) would have
+  caught. This is not a substitute for a real-time Level 2/scanner feed,
+  which is what this style of trading is normally built around.
+  Individual per-symbol calls in the deep scan are similarly best-effort;
+  a symbol that fails any one of them is dropped from that run rather
+  than aborting the whole scan.
+- Float shares and news catalysts come from free, best-effort sources and
+  are frequently stale, missing, or wrong for thinly-covered small caps —
+  always verify float manually before trading.
+- The directional score is a rules-based checklist, not backtested
+  against real historical fills (unlike the QQQ directional signal, which
+  has a `directional_backtest.py` — see [Backtesting](#backtesting-1));
+  it does not claim a win rate.
+- Contract selection is entirely mechanical (nearest strike to a target %
+  OTM, nearest expiration under a DTE cap) — it does not try to identify
+  the "best" contract, and IV/greeks are Black-Scholes approximations
+  from the chain's own quoted IV, not live broker greeks.
+- This tool never places trades — it only produces an analysis/report.
+
 ## Project layout
 
 ```
@@ -593,11 +698,31 @@ tests/
   test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
   test_directional_backtest.py  # directional backtest mechanics (touch detection, gating, aggregation)
   test_journal.py         # trade journal CSV persistence & realized-performance stats
+smallcap_options/
+  config.py               # all tunable parameters (universe filters, score weights, contract selection)
+  data.py                 # yfinance-backed screener, price/intraday history, option chains, float, news
+  universe.py             # cheap prefilter + deep (float/liquidity) scan over the screener universe
+  news.py                 # per-symbol + keyword-matched catalyst detection
+  intraday.py             # VWAP, session high/low, extension-off-high/low
+  direction.py            # CALL/PUT/NO-TRADE scoring (gap, VWAP, extension, relative volume, catalyst)
+  strategy.py             # short-dated OTM contract selection with a liquidity/spread gate
+  gates.py                # per-candidate trade gate (no tradable contract, float unknown, earnings-soon, no catalyst)
+  options_math.py         # Black-Scholes delta/price helpers
+  report.py               # Markdown report rendering
+  scan.py                 # CLI entrypoint / orchestration
+tests/
+  test_smallcap_universe.py  # cheap prefilter/dedup/ranking unit tests
+  test_smallcap_direction.py # directional scoring unit tests (incl. the "faded gapper" PUT case)
+  test_smallcap_strategy.py # contract selection unit tests
+  test_smallcap_gates.py    # per-candidate gate unit tests
+  test_smallcap_scan.py     # offline smoke test (synthetic data) + GitHub issue error handling
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
+reports/smallcap/         # daily small-cap momentum options scan reports land here
 journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
+  smallcap-options-scan.yml
 ```
