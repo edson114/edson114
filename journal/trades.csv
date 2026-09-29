@@ -1,0 +1,2 @@
+id,status,opened_at,closed_at,label,symbol,expiration,dte_at_entry,short_call,long_call,short_put,long_put,contracts,credit,max_profit,max_loss,call_width,put_width,entry_underlying,vix_at_entry,exit_underlying,exit_value,realized_pnl,notes
+1,CLOSED,2026-09-29,2026-09-29,0DTE,QQQ,2026-09-29,0,741.0,743.0,735.0,733.0,2,0.75,0.75,1.25,2.0,2.0,738.78,15.9,,0.465,57.0,Closed at 38% of max profit
