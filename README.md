@@ -11,8 +11,10 @@ data:
 3. **[Small-Cap Momentum Options Scanner](#small-cap-momentum-options-scanner-buy-callsputs)**
    — a daily scan of low-float, high-relative-volume small caps, scored
    CALL/PUT/NO-TRADE with a suggested short-dated contract.
+4. **[Kotegawa-Style 25-Day MA Reversion](#kotegawa-style-25-day-ma-reversion-stocks)**
+   — a stock (not options) buy-the-panic scanner plus a portfolio backtester.
 
-> **Not financial advice.** All three are decision-support tools, not
+> **Not financial advice.** All four are decision-support tools, not
 > auto-traders — none of them ever places orders. Always verify strikes,
 > prices, and greeks against your broker's live quotes before trading, and
 > see each tool's own limitations section below. **No signal in this repo
@@ -662,6 +664,77 @@ repository variable, `SMALLCAP_SYMBOLS`, is passed through the same way.
   from the chain's own quoted IV, not live broker greeks.
 - This tool never places trades — it only produces an analysis/report.
 
+## Kotegawa-Style 25-Day MA Reversion (Stocks)
+
+Takashi Kotegawa ("BNF") is publicly known for one idea: buy stocks that
+panic-sell far below their **25-day moving average** (a big negative
+*kairi*, or deviation rate), sell fast on the rebound toward that average,
+and cut anything that keeps falling without hesitation. This tool turns
+that idea into fixed rules over free daily bars. It is a reconstruction of
+a publicly described *style*, not his actual trades or thresholds.
+
+**Rules (all in `kotegawa_reversion/config.py`):**
+
+| | Default |
+|---|---|
+| Entry | close ≤ **-12%** vs 25-day MA, green candle (close > open), not below -45% (likely a fundamental break), price ≥ $5, 20d avg $ volume ≥ $50M |
+| Fill | next day's open (no look-ahead), deepest deviation first |
+| Take profit | close back within 4% of the MA |
+| Stop loss | 7% below the fill (gap-downs fill at the open) |
+| Time stop | exit at the close after 7 trading days |
+| Sizing | 5 slots × 20% of equity, 10 bps cost per side |
+
+The daily scan also reports **market breadth**, the share of the universe
+at or below the entry deviation. Kotegawa's biggest wins came in
+market-wide panics, when many names were oversold at the same time.
+
+### Running it
+
+```bash
+# Today's buy list (default: 72 liquid US large caps)
+python -m kotegawa_reversion.scan
+
+# Portfolio backtest vs SPY buy & hold
+python -m kotegawa_reversion.scan --backtest --period 10y
+
+# Your own universe / thresholds
+python -m kotegawa_reversion.scan --symbols AAPL,NVDA,TSLA --entry-deviation 0.15 --stop-loss 0.10
+
+# Offline smoke test with synthetic data (results are meaningless)
+python -m kotegawa_reversion.scan --self-test
+```
+
+Reports are written to `reports/kotegawa/`. Set `KOTEGAWA_SYMBOLS` to
+replace the default universe.
+
+### What the backtest actually shows (read this)
+
+On the default 72-stock universe (as of 2026-10-01):
+
+| Period | Strategy (defaults) | Max DD | SPY buy & hold | SPY max DD |
+|---|---:|---:|---:|---:|
+| 5y | +13.2% | -27.8% | +87.8% | -24.5% |
+| 10y | +12.7% | -36.3% | +313.9% | -33.7% |
+
+Across a sweep of 96 parameter combinations over 10 years, **none beat
+holding SPY**. The best combination (-10% entry, no stop, 15-day hold, no
+green-candle filter) made +252% with a -60% drawdown, against SPY's +314%
+and -34%. That best result is also cherry-picked after the fact. The
+defaults were deliberately **not** re-tuned to fit this history.
+
+Why it struggles here:
+
+- **Different market.** Kotegawa traded early-2000s Japanese stocks with
+  retail-driven panics and much less algorithmic competition. US large-cap
+  mean reversion at this horizon is heavily arbitraged.
+- **Survivorship bias flatters even these numbers.** The universe is
+  *today's* winners, which by definition recovered from every past drop.
+- **Cash drag.** The strategy is usually flat, waiting for a panic, while
+  the index compounds.
+
+Use it as a disciplined watchlist for panic dips with built-in exits, not
+as a replacement for an index fund.
+
 ## Project layout
 
 ```
@@ -716,6 +789,15 @@ tests/
   test_smallcap_strategy.py # contract selection unit tests
   test_smallcap_gates.py    # per-candidate gate unit tests
   test_smallcap_scan.py     # offline smoke test (synthetic data) + GitHub issue error handling
+kotegawa_reversion/
+  config.py               # rules, thresholds, default universe
+  data.py                 # yfinance daily bars + synthetic data for --self-test
+  signals.py              # 25-day MA deviation and entry rule
+  backtest.py             # portfolio backtest (next-open fills, stop/target/time exits)
+  report.py               # Markdown scan and backtest reports
+  scan.py                 # CLI entrypoint
+tests/
+  test_kotegawa_reversion.py # signal rules, fill mechanics, offline smoke test
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
