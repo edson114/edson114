@@ -9,14 +9,18 @@ typically several times that, the target is usually *reachable* in a
 session -- the hard part is being on the right side of it, which is what
 the direction call (and the stop) are for.
 
-Direction comes from the existing directional signal (signal.py); this
-module only adds contract selection at the deeper delta/longer expiry, the
-$-based exit levels, a one-position-at-a-time rule, and a position check.
-It never places orders.
+Direction comes from first-hour momentum by default (calls if QQQ is
+above its open at 10:30 ET, puts if below -- see `first_hour_read`), or
+from the existing directional signal (signal.py) with
+`--direction-source signal`. The signal's hard skip-day gates apply either
+way. This module adds contract selection at the deeper delta/longer
+expiry, the $-based exit levels, a one-position-at-a-time rule, and a
+position check. It never places orders.
 
 Usage:
     python -m qqq_iron_condor.daily_target                    # today's plan
-    python -m qqq_iron_condor.daily_target --direction call   # override the signal
+    python -m qqq_iron_condor.daily_target --direction call   # override the direction
+    python -m qqq_iron_condor.daily_target --direction-source signal  # use signal.py's score
     python -m qqq_iron_condor.daily_target --check --side call --strike 700 \\
         --expiration 2026-12-04 --entry 58.40 --opened 2026-10-05
     python -m qqq_iron_condor.daily_target --self-test        # offline, synthetic data
@@ -107,14 +111,77 @@ class LegPlan:
 
 
 @dataclass
+class FirstHourRead:
+    ready: bool
+    side: Optional[str]  # "call", "put", or None (flat / not ready)
+    open_price: Optional[float]
+    end_price: Optional[float]
+    move: Optional[float]
+    detail: str
+
+
+def first_hour_read(bars, minutes: int = 60) -> FirstHourRead:
+    """Today's first-hour momentum from intraday bars (index = ET wall
+    time, today's session only). Ready only once a bar has started at or
+    after open + `minutes`, so the last first-hour bar is complete -- an
+    in-progress bar's close isn't the 10:30 price yet."""
+    if bars is None or len(bars) == 0:
+        return FirstHourRead(False, None, None, None, None, "No intraday bars for today yet.")
+    cutoff = bars.index[0] + dt.timedelta(minutes=minutes)
+    window = bars[bars.index < cutoff]
+    if not (bars.index >= cutoff).any():
+        return FirstHourRead(
+            False, None, None, None, None,
+            f"First hour not finished yet (ends {cutoff:%H:%M} ET) -- re-run after it.",
+        )
+    open_px = float(window["Open"].iloc[0])
+    end_px = float(window["Close"].iloc[-1])
+    move = end_px - open_px
+    side = "call" if move > 0 else ("put" if move < 0 else None)
+    direction = {"call": "up", "put": "down"}.get(side, "flat")
+    return FirstHourRead(
+        True, side, round(open_px, 2), round(end_px, 2), round(move, 2),
+        f"QQQ {direction} {move:+.2f} in the first hour (${open_px:,.2f} open -> ${end_px:,.2f} at {cutoff:%H:%M}).",
+    )
+
+
+def choose_bias(
+    source: str,
+    override: Optional[str],
+    forced_no_trade: list,
+    signal_bias: Optional[str],
+    first_hour: Optional[FirstHourRead],
+) -> tuple[str, str]:
+    """(bias, description of where it came from). Bias is CALL / PUT /
+    NO TRADE / WAIT (first hour not finished) / UNKNOWN (no data)."""
+    if override:
+        return override.upper(), "manual override (--direction)"
+    if forced_no_trade:
+        return "NO TRADE", "hard skip-day gate"
+    if source == "signal":
+        if signal_bias is None:
+            return "UNKNOWN", "directional signal unavailable"
+        return signal_bias, "directional signal (signal.py)"
+    if first_hour is None:
+        return "UNKNOWN", "first-hour momentum unavailable"
+    if not first_hour.ready:
+        return "WAIT", "first-hour momentum (not ready yet)"
+    if first_hour.side is None:
+        return "NO TRADE", "first-hour momentum (flat first hour)"
+    return first_hour.side.upper(), "first-hour momentum"
+
+
+@dataclass
 class DailyTargetPlan:
-    bias: str  # "CALL", "PUT", "NO TRADE", or "UNKNOWN" (signal couldn't run)
+    bias: str  # "CALL", "PUT", "NO TRADE", "WAIT", or "UNKNOWN" (no data)
     bias_source: str
     signal_score: Optional[float]
     spot: float
     atr14: float
     legs: dict = field(default_factory=dict)  # "call"/"put" -> Optional[LegPlan]
     notes: list = field(default_factory=list)
+    signal_bias: Optional[str] = None
+    first_hour: Optional[FirstHourRead] = None
 
     @property
     def chosen(self) -> Optional[LegPlan]:
@@ -185,6 +252,8 @@ def build_plan(
     signal_score: Optional[float] = None,
     reference_hv: Optional[float] = None,
     notes: Optional[list] = None,
+    signal_bias: Optional[str] = None,
+    first_hour: Optional[FirstHourRead] = None,
 ) -> DailyTargetPlan:
     notes = list(notes or [])
     legs: dict = {"call": None, "put": None}
@@ -197,7 +266,8 @@ def build_plan(
         for option_type in ("call", "put"):
             legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv)
     return DailyTargetPlan(
-        bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs, notes=notes
+        bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs,
+        notes=notes, signal_bias=signal_bias, first_hour=first_hour,
     )
 
 
@@ -292,12 +362,33 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
         "",
     ]
 
-    icon = {"CALL": "🟢", "PUT": "🔴"}.get(plan.bias, "⚪")
-    score = f" (score {plan.signal_score:+.2f})" if plan.signal_score is not None else ""
-    lines.append(f"## {icon} Today: {plan.bias}{score}")
+    icon = {"CALL": "🟢", "PUT": "🔴", "WAIT": "⏳"}.get(plan.bias, "⚪")
+    lines.append(f"## {icon} Today: {plan.bias}")
     lines.append("")
     lines.append(f"_Direction source: {plan.bias_source}_")
     lines.append("")
+    lines += ["| Read | Says |", "|---|---|"]
+    if plan.first_hour is not None:
+        fh = plan.first_hour
+        says = (fh.side or "flat").upper() if fh.ready else "not ready"
+        lines.append(f"| First-hour momentum | **{says}** -- {fh.detail} |")
+    if plan.signal_bias is not None:
+        score = f" (score {plan.signal_score:+.2f})" if plan.signal_score is not None else ""
+        lines.append(f"| Directional signal | **{plan.signal_bias}**{score} |")
+    lines.append("")
+    if plan.first_hour is not None and plan.signal_bias in ("CALL", "PUT") and plan.first_hour.side:
+        agree = plan.first_hour.side.upper() == plan.signal_bias
+        lines.append(
+            "Both reads agree." if agree else "⚠️ The two reads disagree -- consider sitting this one out or sizing down."
+        )
+        lines.append("")
+    if "first-hour" in plan.bias_source:
+        lines.append(
+            "_First-hour momentum is a **paper-trade-only** rule: it made +$30k over 455 backtested trades at "
+            "$0.05/share slippage, but lost money at $0.10/share or with worst-case scoring "
+            "(`reports/backtests/daily-target-experiments-2026-10-04.md`). Log real fills before risking money._"
+        )
+        lines.append("")
     for note in plan.notes:
         lines.append(f"- {note}")
     if plan.notes:
@@ -319,6 +410,9 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
     elif plan.bias == "NO TRADE":
         lines.append("**No entry today.** Sitting out a gated / no-edge day is part of the plan, not a missed $1,000.")
         lines.append("")
+    elif plan.bias == "WAIT":
+        lines.append("**Not yet.** Re-run after the first hour closes (10:30 ET) to get today's direction.")
+        lines.append("")
 
     other_label = "Both setups" if chosen is None else "The other side (for reference)"
     others = [leg for key, leg in plan.legs.items() if leg is not None and leg is not chosen]
@@ -336,16 +430,17 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
         "run `--check` on it instead. Ten more contracts every day would stack risk fast.",
         f"2. **Exit on whichever comes first:** +{_usd(cfg.daily_target_profit_usd)}, "
         f"-{_usd(cfg.daily_target_stop_usd)}, or the end of session {cfg.daily_target_max_hold_days}.",
-        "3. **Don't enter on hard-gate days** (FOMC/CPI, a big opening gap, VIX spike) -- the signal returns NO TRADE.",
-        "4. **Enter after the opening range settles** (~10:00 ET), with a limit at or near the mid -- "
-        "deep-ITM spreads can be wide; paying $0.30 over mid is 30% of the day's target.",
+        "3. **Don't enter on hard-gate days** (FOMC/CPI, a big opening gap, VIX spike) -- the plan returns NO TRADE.",
+        "4. **Enter at ~10:30 ET** (after the first hour), with a limit at or near the mid -- "
+        "deep-ITM spreads can be wide; paying $0.30 over mid is 30% of the day's target, and the "
+        "backtested edge disappears at $0.10/share.",
         "5. **Check buying power:** a 0.80-delta 60 DTE QQQ contract costs tens of dollars per share, "
         "so 10 of them is tens of thousands of dollars of premium.",
         "",
         "## Limitations",
         "",
-        "- Direction is the same rules-based score as the directional signal -- not a proven edge. "
-        "See `daily_target_backtest.py` for how these exact exit rules have done historically.",
+        "- Neither direction read is a proven edge. See `daily_target_backtest.py` and "
+        "`daily_target_experiments.py` for how these exact rules have done historically.",
         "- Levels are Black-Scholes estimates from the chain's own IV at a fixed IV; a volatility "
         "move shifts the option price independently of QQQ.",
         "- Free quotes can be delayed or stale; re-pull before acting.",
@@ -371,38 +466,50 @@ def render_status(status: PositionStatus, side: str, strike: float, expiration: 
 
 # --- Live orchestration -----------------------------------------------------
 
-def run_plan(cfg: Config, direction: Optional[str] = None) -> tuple[str, DailyTargetPlan]:
+def _today_intraday(cfg: Config):
+    from .data import get_intraday_history
+
+    bars = get_intraday_history(cfg.symbol, cfg.intraday_interval, cfg.intraday_period)
+    return bars[bars.index.date == dt.date.today()]
+
+
+def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str] = None) -> tuple[str, DailyTargetPlan]:
     from . import providers
     from .analysis import build_snapshot
 
+    source = source or cfg.daily_target_direction_source
     price_history = providers.get_price_history(cfg.symbol, cfg.price_history_period)
     vix_history = providers.get_vix_history(cfg.vix_history_period, cfg.vix_symbol, cfg.tradier_vix_symbol)
     daily = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
     notes: list = []
-    score = None
-    if direction:
-        bias, source = direction.upper(), "manual override (--direction)"
-    else:
-        try:
-            from .signal import run_signal
+    score = signal_bias = None
+    forced: list = []
+    # The signal always runs: its hard skip-day gates apply to both sources.
+    try:
+        from .signal import run_signal
 
-            _, signal = run_signal(cfg)
-            bias, score, source = signal.bias, signal.score, "directional signal (signal.py)"
-            notes += [f"⛔ {r}" for r in signal.forced_no_trade_reasons]
-            notes += [f"⚠️ {r}" for r in signal.advisory_notes]
-        except Exception as exc:
-            bias, source = "UNKNOWN", "directional signal unavailable"
-            notes.append(
-                f"Directional signal could not run ({exc}). Re-run during market hours, or pass "
-                "--direction call|put to use your own read."
-            )
+        _, signal = run_signal(cfg)
+        signal_bias, score, forced = signal.bias, signal.score, list(signal.forced_no_trade_reasons)
+        notes += [f"⛔ {r}" for r in forced]
+        notes += [f"⚠️ {r}" for r in signal.advisory_notes]
+    except Exception as exc:
+        notes.append(
+            f"Directional signal could not run ({exc}). Re-run during market hours, or pass "
+            "--direction call|put to use your own read."
+        )
 
+    try:
+        first_hour = first_hour_read(_today_intraday(cfg), cfg.daily_target_first_hour_minutes)
+    except Exception as exc:
+        first_hour = FirstHourRead(False, None, None, None, None, f"Intraday bars unavailable ({exc}).")
+
+    bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour)
     chains = providers.pick_expirations_for_targets(cfg.symbol, (cfg.daily_target_expiration,))
     reference_hv = daily.hv20_pct / 100.0 if daily.hv20_pct == daily.hv20_pct else None
     plan = build_plan(
-        daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, source, cfg,
-        signal_score=score, reference_hv=reference_hv, notes=notes,
+        daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, bias_source, cfg,
+        signal_score=score, reference_hv=reference_hv, notes=notes, signal_bias=signal_bias, first_hour=first_hour,
     )
     return render_plan(plan, cfg), plan
 
@@ -433,7 +540,17 @@ def _synthetic_chain(spot: float, dte: int, cfg: Config, iv: float = 0.20) -> Op
 def _self_test_report() -> tuple[str, DailyTargetPlan]:
     cfg = Config()
     spot = 750.0
-    plan = build_plan(spot, 9.5, _synthetic_chain(spot, 60, cfg), "CALL", "synthetic self-test", cfg, signal_score=0.42)
+    import pandas as pd
+
+    idx = pd.date_range(dt.datetime.combine(dt.date.today(), dt.time(9, 30)), periods=14, freq="5min")
+    closes = np.linspace(spot - 2.0, spot, len(idx))
+    bars = pd.DataFrame({"Open": closes - 0.1, "High": closes + 0.2, "Low": closes - 0.3, "Close": closes}, index=idx)
+    first_hour = first_hour_read(bars, cfg.daily_target_first_hour_minutes)
+    bias, source = choose_bias("first_hour", None, [], "CALL", first_hour)
+    plan = build_plan(
+        spot, 9.5, _synthetic_chain(spot, 60, cfg), bias, f"{source} (synthetic self-test)", cfg,
+        signal_score=0.42, signal_bias="CALL", first_hour=first_hour,
+    )
     return render_plan(plan, cfg), plan
 
 
@@ -450,7 +567,12 @@ def _quote_mid(cfg: Config, side: str, strike: float, expiration: str) -> float:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="QQQ daily $ target plan (0.80-delta ~60 DTE calls/puts)")
-    parser.add_argument("--direction", choices=["call", "put"], help="Override the directional signal")
+    parser.add_argument("--direction", choices=["call", "put"], help="Override the direction entirely")
+    parser.add_argument(
+        "--direction-source",
+        choices=["first-hour", "signal"],
+        help="Which read picks CALL/PUT (default: Config.daily_target_direction_source)",
+    )
     parser.add_argument("--check", action="store_true", help="Check an open position against the exit rules")
     parser.add_argument("--side", choices=["call", "put"])
     parser.add_argument("--strike", type=float)
@@ -479,7 +601,8 @@ def main(argv=None) -> int:
         return 0
 
     try:
-        report_md, _ = _self_test_report() if args.self_test else run_plan(cfg, args.direction)
+        source = args.direction_source.replace("-", "_") if args.direction_source else None
+        report_md, _ = _self_test_report() if args.self_test else run_plan(cfg, args.direction, source)
     except Exception as exc:
         print(f"Plan failed: {exc}", file=sys.stderr)
         return 1
