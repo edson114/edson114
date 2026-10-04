@@ -1,0 +1,39 @@
+name: QQQ Daily $ Target Plan
+
+on:
+  schedule:
+    # ~10:00am ET on weekdays (14:00 UTC during EDT; shifts to 9:00am ET
+    # during EST -- GitHub Actions cron can't follow DST, same caveat as
+    # the other scans). 10:00 lets the opening range settle first.
+    - cron: "0 14 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build today's daily $ target plan
+        run: python -m qqq_iron_condor.daily_target
+
+      - name: Commit generated report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/daily_target/
+          git diff --cached --quiet || git commit -m "QQQ daily target plan"
+          git push

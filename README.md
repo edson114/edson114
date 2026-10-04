@@ -11,8 +11,12 @@ data:
 3. **[Small-Cap Momentum Options Scanner](#small-cap-momentum-options-scanner-buy-callsputs)**
    — a daily scan of low-float, high-relative-volume small caps, scored
    CALL/PUT/NO-TRADE with a suggested short-dated contract.
+4. **[QQQ Daily $ Target Plan](#qqq-daily--target-plan-080-delta-60-dte)**
+   — a daily plan to buy 10 deep-ITM (0.80 delta, ~60 DTE) QQQ calls or
+   puts and close at +$1,000, with a stop, a time stop, a position
+   checker, and a backtest of those exact rules.
 
-> **Not financial advice.** All three are decision-support tools, not
+> **Not financial advice.** All four are decision-support tools, not
 > auto-traders — none of them ever places orders. Always verify strikes,
 > prices, and greeks against your broker's live quotes before trading, and
 > see each tool's own limitations section below. **No signal in this repo
@@ -662,6 +666,94 @@ repository variable, `SMALLCAP_SYMBOLS`, is passed through the same way.
   from the chain's own quoted IV, not live broker greeks.
 - This tool never places trades — it only produces an analysis/report.
 
+## QQQ Daily $ Target Plan (0.80 delta, ~60 DTE)
+
+Goal: **+$1,000 a day** from **10 contracts** of a deep in-the-money QQQ
+call or put, **~0.80 delta**, **~60 days to expiration**.
+
+**The math:** 10 contracts x 100 shares = 1,000 shares of exposure, so
++$1,000 means the option has to gain **$1.00/share**. At 0.80 delta that
+takes roughly a **$1.25 QQQ move** your way. QQQ's daily range (ATR) is
+usually $8-10, so the target is reachable most days. The hard part is
+being on the right side. A $1.25 move *against* you costs the same
+$1,000, which is why the plan always has a stop.
+
+Each run (`python -m qqq_iron_condor.daily_target`):
+
+1. **Direction:** runs the existing [directional signal](#qqq-directional-signal-buy-callsputs)
+   (CALL / PUT / NO TRADE, including its hard skip-day gate). You can
+   override it with `--direction call|put`.
+2. **Contract:** picks the listed expiration 50-70 days out and the
+   strike closest to 0.80 |delta|, for both a call and a put.
+3. **Order ticket:** 10 contracts at the mid, the take-profit price
+   (fill + $1.00), the stop price (fill − $1.00), the QQQ levels those
+   correspond to, the total premium, and the daily theta.
+4. **Rules:** only one position open at a time (no stacking 10 more
+   contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
+   session, whichever comes first.
+
+Reports land in `reports/daily_target/`. A weekday ~10:00 ET workflow
+(`qqq-daily-target.yml`) runs it automatically.
+
+```bash
+python -m qqq_iron_condor.daily_target                     # today's plan
+python -m qqq_iron_condor.daily_target --direction put     # your own direction
+python -m qqq_iron_condor.daily_target --self-test         # offline, synthetic data
+
+# Check an open position: HOLD / CLOSE -- TARGET HIT / STOP HIT / TIME STOP
+python -m qqq_iron_condor.daily_target --check --side call --strike 684 \
+    --expiration 2026-11-30 --entry 75.20 --opened 2026-10-01
+
+# Backtest these exact rules (~730 sessions of real hourly QQQ bars)
+python -m qqq_iron_condor.daily_target_backtest
+```
+
+All of it lives in `Config` (`daily_target_*` fields in
+`qqq_iron_condor/config.py`): delta, expiration window, contracts, $
+target, $ stop, time stop.
+
+**Practical execution:** right after you're filled, place a GTC limit
+*sell to close* at fill + $1.00. That's what closes the day at +$1,000
+without watching the screen. Use a QQQ price alert at the stop level
+rather than an option stop order, since deep-ITM spreads are wide. Ten
+contracts at 0.80 delta is tens of thousands of dollars of premium (about
+$53k-$76k at QQQ ~$750), so check buying power first.
+
+### What the backtest says
+
+`daily_target_backtest.py` replays the rules over Nov 2023 to Oct 2026
+(`reports/backtests/daily-target-2026-10-04.md`). Results:
+
+- **About a coin flip.** With the daily-trend signal, 46% of trades hit
+  +$1,000 first and 54% hit −$1,000 first. The total was **−$40k** over
+  467 trades after $0.05/share slippage each way. Always-call and
+  always-put came out about the same, so the direction call added little
+  over a coin.
+- **The $1,000 day happened on 211 of 730 sessions** (~29%). On the
+  other days the trade was either open or stopped out.
+- **A wider stop, or none, doesn't fix it.** With no stop (time stop
+  only), the win rate rises to **87%**, but the average loss grows to
+  about **−$9,650**, and the total is still negative. That's the classic
+  shape of "high win rate, rare large losses".
+- Option prices are Black-Scholes from VIX, not real historical quotes
+  (none are free). The live signal's intraday half (VWAP, opening range)
+  can't be replayed over years, so the backtest uses only its daily half.
+
+The honest takeaway: the $1,000 exit is mechanically easy to hit, and
+the plan sizes and manages it consistently. But nothing here shows an
+edge in *which way* QQQ moves $1.25 first. Paper-trade it, or trade a
+smaller size, before committing $50k+ of premium a day.
+
+### Limitations & caveats
+
+- The exit levels are Black-Scholes estimates at constant IV. An IV move
+  shifts the option price independently of QQQ.
+- Weekend and pre-market quotes for deep-ITM contracts are often stale
+  (wide spreads, odd IVs). Re-run during market hours.
+- The backtest assumes fills at the level. Real fills on a fast move, or
+  on a gap, can be worse.
+- This tool never places trades.
+
 ## Project layout
 
 ```
@@ -686,6 +778,8 @@ qqq_iron_condor/
   signal_report.py        # directional signal Markdown report rendering
   scan.py                 # iron condor CLI entrypoint / orchestration
   signal.py               # directional signal CLI entrypoint / orchestration
+  daily_target.py         # daily $ target plan (0.80-delta ~60 DTE, +$1,000 exit) + position check
+  daily_target_backtest.py # replays the daily $ target rules over ~730 sessions of hourly bars
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
@@ -698,6 +792,7 @@ tests/
   test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
   test_directional_backtest.py  # directional backtest mechanics (touch detection, gating, aggregation)
   test_journal.py         # trade journal CSV persistence & realized-performance stats
+  test_daily_target.py    # daily $ target levels, exit rules, and backtest mechanics
 smallcap_options/
   config.py               # all tunable parameters (universe filters, score weights, contract selection)
   data.py                 # yfinance-backed screener, price/intraday history, option chains, float, news
@@ -720,9 +815,11 @@ reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
 reports/smallcap/         # daily small-cap momentum options scan reports land here
+reports/daily_target/     # daily $ target plans land here
 journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
   smallcap-options-scan.yml
+  qqq-daily-target.yml
 ```
