@@ -228,3 +228,32 @@ class Config:
     )
 
     signals_output_dir: str = "reports/signals"
+
+    # --- Daily $ target (0.80-delta ~60 DTE calls/puts, daily_target.py) ---
+    # Deep-ITM single-leg buy: at 0.80 delta the option moves ~$0.80 per $1
+    # QQQ move, with far less theta/IV sensitivity than near-ATM short-dated
+    # contracts. ~60 DTE keeps daily theta small relative to the target.
+    daily_target_delta: float = 0.80
+    daily_target_expiration: ExpirationTarget = ExpirationTarget("60DTE", 50, 70)
+    daily_target_contracts: int = 10
+
+    # Close the whole position as soon as it is up this much (10 contracts x
+    # $100 = $1,000 means the option has to gain $1.00/share)...
+    daily_target_profit_usd: float = 1000.0
+    # ...or down this much. 1:1 with the target by default -- with a
+    # coin-flip direction call that's a negative-expectancy game once
+    # spreads are paid, so check `daily_target_backtest.py` before
+    # loosening it. There is deliberately no "no stop" option.
+    daily_target_stop_usd: float = 1000.0
+    # Time stop: close at the end of this many trading sessions if neither
+    # level was hit. Only one position is open at a time -- no new daily
+    # entry is suggested while one is still open, so positions can't stack.
+    daily_target_max_hold_days: int = 5
+
+    # Backtest-only assumptions (no free historical option chains exist):
+    # QQQ IV is approximated as VIX x this multiple, and every fill pays
+    # this much per share vs. the Black-Scholes mid on each side.
+    daily_target_iv_vix_multiple: float = 1.15
+    daily_target_slippage: float = 0.05
+
+    daily_target_output_dir: str = "reports/daily_target"
