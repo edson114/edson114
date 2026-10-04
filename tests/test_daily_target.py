@@ -274,3 +274,74 @@ def test_experiments_report_renders():
     report = ex.render_report(results, first, mid, last, CFG)
     for text in ("### Baseline", "### Direction", "### Hold period", "## Verdict"):
         assert text in report
+
+
+# --- first-hour momentum direction ------------------------------------------
+
+def _session_bars(n_bars: int, start_px: float = 750.0, step: float = 0.1):
+    idx = pd.date_range("2026-10-05 09:30", periods=n_bars, freq="5min")
+    close = start_px + step * np.arange(1, n_bars + 1)
+    return pd.DataFrame({"Open": close - step, "High": close + 0.05, "Low": close - step - 0.05, "Close": close}, index=idx)
+
+
+def test_first_hour_read_waits_until_hour_is_complete():
+    # 12 bars = 9:30..10:25; the 10:25 bar may still be in progress until a 10:30 bar exists.
+    fh = dtg.first_hour_read(_session_bars(12))
+    assert not fh.ready and fh.side is None
+    assert "10:30" in fh.detail
+
+
+@pytest.mark.parametrize("step, side", [(0.1, "call"), (-0.1, "put"), (0.0, None)])
+def test_first_hour_read_direction(step, side):
+    bars = _session_bars(20, step=step)
+    fh = dtg.first_hour_read(bars)
+    assert fh.ready and fh.side == side
+    # Move is the 10:25 bar's close vs. the 9:30 open -- later bars are ignored.
+    assert fh.move == pytest.approx(12 * step)
+    assert fh.open_price == pytest.approx(750.0)
+
+
+def test_first_hour_read_no_bars():
+    assert not dtg.first_hour_read(_session_bars(0)).ready
+
+
+READY_UP = dtg.FirstHourRead(True, "call", 750.0, 751.0, 1.0, "up")
+NOT_READY = dtg.FirstHourRead(False, None, None, None, None, "not yet")
+FLAT = dtg.FirstHourRead(True, None, 750.0, 750.0, 0.0, "flat")
+
+
+@pytest.mark.parametrize(
+    "source, override, forced, signal_bias, fh, expected",
+    [
+        ("first_hour", None, [], "PUT", READY_UP, "CALL"),  # first hour wins over the signal
+        ("signal", None, [], "PUT", READY_UP, "PUT"),
+        ("first_hour", None, ["FOMC day"], "CALL", READY_UP, "NO TRADE"),  # gates apply to both
+        ("signal", None, ["gap"], "CALL", READY_UP, "NO TRADE"),
+        ("first_hour", None, [], None, NOT_READY, "WAIT"),
+        ("first_hour", None, [], None, FLAT, "NO TRADE"),
+        ("first_hour", None, [], None, None, "UNKNOWN"),
+        ("signal", None, [], None, READY_UP, "UNKNOWN"),
+        ("first_hour", "put", ["FOMC day"], "CALL", READY_UP, "PUT"),  # manual override is final
+    ],
+)
+def test_choose_bias(source, override, forced, signal_bias, fh, expected):
+    assert dtg.choose_bias(source, override, forced, signal_bias, fh)[0] == expected
+
+
+def test_report_flags_disagreement_and_paper_trade_note():
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    plan = dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", CFG, signal_bias="PUT", first_hour=READY_UP)
+    report = dtg.render_plan(plan, CFG)
+    assert "disagree" in report
+    assert "paper-trade-only" in report
+
+
+def test_report_wait_message():
+    plan = dtg.build_plan(750.0, 9.5, dtg._synthetic_chain(750.0, 60, CFG), "WAIT", "first-hour momentum (not ready yet)", CFG, first_hour=NOT_READY)
+    assert plan.chosen is None
+    assert "Re-run after the first hour" in dtg.render_plan(plan, CFG)
+
+
+def test_cli_rejects_unknown_direction_source():
+    with pytest.raises(SystemExit):
+        dtg.main(["--direction-source", "magic"])

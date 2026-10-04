@@ -680,9 +680,16 @@ $1,000, which is why the plan always has a stop.
 
 Each run (`python -m qqq_iron_condor.daily_target`):
 
-1. **Direction:** runs the existing [directional signal](#qqq-directional-signal-buy-callsputs)
-   (CALL / PUT / NO TRADE, including its hard skip-day gate). You can
-   override it with `--direction call|put`.
+1. **Direction:** by default, **first-hour momentum**. After the first
+   hour closes (10:30 ET), buy calls if QQQ is above its 9:30 open, puts
+   if it's below. Before 10:30 the plan says **WAIT**. It was the only
+   rule that made money in the [experiments](#experiments-can-a-variant-fix-it),
+   and it lost money at $0.10/share slippage, so treat it as
+   **paper-trade only**. `--direction-source signal` uses the existing
+   [directional signal](#qqq-directional-signal-buy-callsputs) instead.
+   The report shows both reads and flags when they disagree. The
+   signal's hard skip-day gate (FOMC/CPI, big gap, VIX spike) forces NO
+   TRADE either way. `--direction call|put` overrides everything.
 2. **Contract:** picks the listed expiration 50-70 days out and the
    strike closest to 0.80 |delta|, for both a call and a put.
 3. **Order ticket:** 10 contracts at the mid, the take-profit price
@@ -692,12 +699,15 @@ Each run (`python -m qqq_iron_condor.daily_target`):
    contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
    session, whichever comes first.
 
-Reports land in `reports/daily_target/`. A weekday ~10:00 ET workflow
-(`qqq-daily-target.yml`) runs it automatically.
+Reports land in `reports/daily_target/`. A weekday 10:35 ET workflow
+(`qqq-daily-target.yml`) runs it automatically, just after the first
+hour closes. It's scheduled at both the EDT and EST UTC times, and skips
+whichever one doesn't fall at 10:30-11:29 in New York.
 
 ```bash
 python -m qqq_iron_condor.daily_target                     # today's plan
 python -m qqq_iron_condor.daily_target --direction put     # your own direction
+python -m qqq_iron_condor.daily_target --direction-source signal  # signal.py instead of first hour
 python -m qqq_iron_condor.daily_target --self-test         # offline, synthetic data
 
 # Check an open position: HOLD / CLOSE -- TARGET HIT / STOP HIT / TIME STOP
@@ -709,8 +719,8 @@ python -m qqq_iron_condor.daily_target_backtest
 ```
 
 All of it lives in `Config` (`daily_target_*` fields in
-`qqq_iron_condor/config.py`): delta, expiration window, contracts, $
-target, $ stop, time stop.
+`qqq_iron_condor/config.py`): direction source, first-hour length,
+delta, expiration window, contracts, $ target, $ stop, time stop.
 
 **Practical execution:** right after you're filled, place a GTC limit
 *sell to close* at fill + $1.00. That's what closes the day at +$1,000

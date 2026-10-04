@@ -237,6 +237,14 @@ class Config:
     daily_target_expiration: ExpirationTarget = ExpirationTarget("60DTE", 50, 70)
     daily_target_contracts: int = 10
 
+    # Which read picks CALL vs PUT: "first_hour" (buy calls if QQQ is above
+    # its open after the first `daily_target_first_hour_minutes`, puts if
+    # below -- the only rule that made money in daily_target_experiments.py,
+    # and fragile: negative at 2x slippage, so paper-trade it) or "signal"
+    # (the directional signal's score). Hard skip-day gates apply to both.
+    daily_target_direction_source: str = "first_hour"
+    daily_target_first_hour_minutes: int = 60
+
     # Close the whole position as soon as it is up this much (10 contracts x
     # $100 = $1,000 means the option has to gain $1.00/share)...
     daily_target_profit_usd: float = 1000.0

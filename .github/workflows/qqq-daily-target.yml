@@ -2,10 +2,13 @@ name: QQQ Daily $ Target Plan
 
 on:
   schedule:
-    # ~10:00am ET on weekdays (14:00 UTC during EDT; shifts to 9:00am ET
-    # during EST -- GitHub Actions cron can't follow DST, same caveat as
-    # the other scans). 10:00 lets the opening range settle first.
-    - cron: "0 14 * * 1-5"
+    # 10:35am ET on weekdays, just after the first hour closes so the
+    # first-hour momentum read is ready. GitHub Actions cron is UTC-only,
+    # so both the EDT (14:35 UTC) and EST (15:35 UTC) times are scheduled
+    # and the "Check market time" step below skips whichever one isn't
+    # 10:30-11:29 in New York.
+    - cron: "35 14 * * 1-5"
+    - cron: "35 15 * * 1-5"
   workflow_dispatch: {}
 
 permissions:
@@ -19,18 +22,33 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check market time
+        id: clock
+        run: |
+          now=$(TZ=America/New_York date +%H%M)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$now" -ge 1030 ] && [ "$now" -lt 1130 ]; }; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping: $now ET is outside the 10:30-11:29 window."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
+        if: steps.clock.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.clock.outputs.run == 'true'
         run: pip install -r requirements.txt
 
       - name: Build today's daily $ target plan
+        if: steps.clock.outputs.run == 'true'
         run: python -m qqq_iron_condor.daily_target
 
       - name: Commit generated report
+        if: steps.clock.outputs.run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
