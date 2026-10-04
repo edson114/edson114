@@ -198,3 +198,79 @@ def test_backtest_report_renders():
     report = bt.run(daily, vix, CFG)
     for text in ("| signal |", "| call |", "| put |", "Stop size", "Not captured"):
         assert text in report
+
+
+# --- experiment knobs -------------------------------------------------------
+
+def test_backtest_entry_bar_skips_first_hour():
+    daily, vix = _daily(1)
+    # The first hour spikes through both levels; entering at bar 1 must ignore it.
+    bars = [(PRICE, PRICE + 5, PRICE - 5, PRICE), (PRICE, PRICE + 3, PRICE - 0.2, PRICE + 2.5)]
+    trades = bt.simulate(daily, vix, CFG, "call", _intraday([START], [bars]), entry_bar=1)
+    assert [t.outcome for t in trades] == ["target"]
+
+
+def test_backtest_direction_callable_sees_only_bars_before_entry():
+    daily, vix = _daily(1)
+    seen = []
+
+    def direction(i, bars):
+        seen.append(len(bars))
+        return "put" if bars["Close"].iloc[-1] < bars["Open"].iloc[0] else "call"
+
+    bars = [(PRICE, PRICE + 0.2, PRICE - 1, PRICE - 1), (PRICE - 1, PRICE - 1, PRICE - 4, PRICE - 4)]
+    trades = bt.simulate(daily, vix, CFG, intraday=_intraday([START], [bars]), entry_bar=1, direction=direction)
+    assert seen == [1]
+    assert trades[0].side == "put" and trades[0].outcome == "target"
+
+
+def test_backtest_atr_exits_use_fixed_levels():
+    daily, vix = _daily(1)  # flat daily bars: ATR14 = 1.0
+    # Target 2 x ATR = +$2.00 QQQ: a +$1.50 bar must not hit it, +$2.50 must.
+    path = [(PRICE, PRICE + 1.5, PRICE - 0.2, PRICE + 1.0), (PRICE + 1.0, PRICE + 2.5, PRICE + 0.9, PRICE + 2.4)]
+    trades = bt.simulate(daily, vix, CFG, "call", _intraday([START], [path]), atr_exits=(2.0, 1.0))
+    assert [t.outcome for t in trades] == ["target"]
+    # ~0.8+ delta x $2 x 1,000 shares, minus slippage both sides.
+    assert 1400 < trades[0].pnl_usd < 2100
+
+
+@pytest.mark.parametrize("hold", ["overnight", "intraday"])
+def test_simulate_hold_flat_market_loses_costs(hold):
+    daily, vix = _daily(5)
+    trades = bt.simulate_hold(daily, vix, CFG, "call", hold)
+    assert len(trades) == (4 if hold == "overnight" else 5)
+    assert all(t.pnl_usd < 0 for t in trades)  # no move: only slippage (and overnight theta)
+
+
+def test_simulate_hold_overnight_gain():
+    daily, vix = _daily(2)
+    i = bt.MIN_DAILY_HISTORY
+    daily.iloc[i + 1, daily.columns.get_loc("Open")] = PRICE + 2.0
+    trades = bt.simulate_hold(daily, vix, CFG, "call", "overnight")
+    assert trades[0].pnl_usd > 1000  # +$2 gap x ~0.8 delta x 1,000 shares, less costs
+
+
+def test_score_variant_splits_halves():
+    from qqq_iron_condor.daily_target_experiments import score_variant
+
+    mk = lambda d, pnl: bt.TargetTrade(d, d, "call", 1.0, 1.0, 1.0, pnl, "target" if pnl > 0 else "stop", 1, 1.0)  # noqa: E731
+    trades = [mk(dt.date(2025, 1, 2), 1000.0), mk(dt.date(2025, 1, 3), -500.0), mk(dt.date(2025, 6, 2), 1000.0)]
+    r = score_variant("g", "n", trades, dt.date(2025, 3, 1), True)
+    assert (r.first_half_pnl, r.second_half_pnl, r.total_pnl) == (500.0, 1000.0, 1500.0)
+    assert r.both_halves_positive and r.goal_days == 2
+    assert r.max_drawdown == 500.0
+
+
+def test_experiments_report_renders():
+    from qqq_iron_condor import daily_target_experiments as ex
+
+    rng = np.random.default_rng(2)
+    daily, vix = _daily(40)
+    walk = PRICE + np.cumsum(rng.normal(0, 2, len(daily)))
+    daily = daily.assign(Open=walk, Close=walk, High=walk + 3, Low=walk - 3)
+    days = daily.index[bt.MIN_DAILY_HISTORY:]
+    paths = [[(w, w + 1.5, w - 1.5, w + rng.normal(0, 1)) for _ in range(7)] for w in walk[bt.MIN_DAILY_HISTORY:]]
+    results, first, mid, last = ex.run_experiments(daily, vix, _intraday([d.date() for d in days], paths), CFG)
+    report = ex.render_report(results, first, mid, last, CFG)
+    for text in ("### Baseline", "### Direction", "### Hold period", "## Verdict"):
+        assert text in report
