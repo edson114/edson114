@@ -744,6 +744,44 @@ the plan sizes and manages it consistently. But nothing here shows an
 edge in *which way* QQQ moves $1.25 first. Paper-trade it, or trade a
 smaller size, before committing $50k+ of premium a day.
 
+### Experiments: can a variant fix it?
+
+`python -m qqq_iron_condor.daily_target_experiments` tests about 20
+variants over the same window, with the same option model
+(`reports/backtests/daily-target-experiments-2026-10-04.md`):
+
+- **Entry timing:** 9:30 vs. 10:30.
+- **Direction rules:** strong signal only, first-hour momentum, first-hour
+  fade, daily signal and first hour agreeing.
+- **Target / stop sizes**, and exits scaled to ATR.
+- **Hold periods:** overnight (close to next open) vs. intraday (open to
+  close).
+
+Trying 20 variants and keeping the best one is how backtests lie. So each
+variant is also scored on each half of the window separately. A variant
+counts as a candidate only if it made money in **both** halves. Every
+candidate is then re-run with ties inside one hour scored as stops, and
+with 2x and 3x slippage.
+
+Results:
+
+- **Only one candidate:** buy calls at 10:30 if QQQ rose in the first
+  hour, puts if it fell. It made **+$30k**, about $66 per trade, and was
+  positive in both halves.
+- **It's fragile.** It turns negative with worst-case tie scoring
+  (−$12k) or with $0.10/share slippage (−$11k). Real spreads on deep-ITM
+  QQQ options are often at least that wide. Its edge is smaller than
+  realistic trading costs.
+- **Different stop sizes and ATR-scaled exits** all lost money.
+- **Overnight vs. intraday:** most of QQQ's gains in this window came
+  overnight. Holding calls from close to next open made +$73k, but that's
+  simply QQQ going up ($365 to $750). It lost money in the first half and
+  had an $87k drawdown. Overnight puts lost $340k.
+
+Conclusion: nothing tested here shows a reliable edge after costs.
+First-hour momentum is the only lead worth paper-trading, with real fills
+tracked, before any money goes on it.
+
 ### Limitations & caveats
 
 - The exit levels are Black-Scholes estimates at constant IV. An IV move
@@ -780,6 +818,7 @@ qqq_iron_condor/
   signal.py               # directional signal CLI entrypoint / orchestration
   daily_target.py         # daily $ target plan (0.80-delta ~60 DTE, +$1,000 exit) + position check
   daily_target_backtest.py # replays the daily $ target rules over ~730 sessions of hourly bars
+  daily_target_experiments.py # entry/direction/exit/hold variants, half-split + stress tests
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)

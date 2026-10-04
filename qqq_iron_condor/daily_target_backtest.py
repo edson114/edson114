@@ -36,10 +36,11 @@ import datetime as dt
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import pandas as pd
 
+from . import indicators as ind
 from .analysis import build_snapshot
 from .config import Config
 from .daily_target import per_share, strike_for_delta, underlying_for_option_price
@@ -87,16 +88,21 @@ class TargetSummary:
     worst_case_win_rate: Optional[float] = None
 
 
-def daily_bias(history: pd.DataFrame, vix: pd.DataFrame, cfg: Config) -> Optional[str]:
+def daily_score(history: pd.DataFrame, vix: pd.DataFrame, cfg: Config) -> float:
     """Daily-only half of the directional score (trend/MACD/RSI) from
-    completed sessions only."""
+    completed sessions only. Raw (not renormalized) weights, so with the
+    defaults it spans -0.4..+0.4."""
     snap = build_snapshot(history.tail(260), vix.tail(260), cfg.adx_trend_threshold)
     w = cfg.component_weights
-    score = (
+    return (
         w["daily_trend"] * _trend_component(snap)[0]
         + w["macd"] * _macd_component(snap)[0]
         + w["rsi"] * _rsi_component(snap)[0]
     )
+
+
+def daily_bias(history: pd.DataFrame, vix: pd.DataFrame, cfg: Config) -> Optional[str]:
+    score = daily_score(history, vix, cfg)
     if score > 0:
         return "call"
     if score < 0:
@@ -125,6 +131,9 @@ def simulate(
     intraday: Optional[pd.DataFrame] = None,
     tie_rule: str = "path",
     bias_cache: Optional[dict] = None,
+    entry_bar: int = 0,
+    direction: Optional[Callable[[int, pd.DataFrame], Optional[str]]] = None,
+    atr_exits: Optional[tuple] = None,
 ) -> list[TargetTrade]:
     """Replay the rules. With `intraday` bars (e.g. hourly), each session
     is walked bar by bar so the order of the target and stop touches is
@@ -134,9 +143,19 @@ def simulate(
     `tie_rule` decides a bar that spans both levels: "stop" always assumes
     the stop came first (worst case); "path" uses the usual OHLC path
     convention -- an up bar (close >= open) went open->low->high->close, a
-    down bar open->high->low->close -- which favours neither side."""
+    down bar open->high->low->close -- which favours neither side.
+
+    Experiment knobs (defaults reproduce the live rules):
+      - `entry_bar`: enter at the open of this bar of the session (0 = the
+        open, 1 = after the first hourly bar). Bars before it are skipped
+        on the entry day.
+      - `direction`: `f(day_index, bars_before_entry) -> "call"/"put"/None`
+        replaces `mode`'s direction (None = no trade that day).
+      - `atr_exits`: `(target_atr, stop_atr)` fixes the exits as QQQ levels
+        at entry +/- that many ATR14s instead of the $ target/stop."""
     df = price_history[["Open", "High", "Low", "Close", "Volume"]].copy()
     vix = vix_history["Close"].reindex(df.index).ffill()
+    atr = ind.atr(df["High"], df["Low"], df["Close"], 14)
     day_bars = _bars_by_day(intraday)
     n_contracts = cfg.daily_target_contracts
     gain = per_share(cfg.daily_target_profit_usd, n_contracts)
@@ -165,7 +184,11 @@ def simulate(
         if pos is None:
             if _skip_day(date, day_open, float(df["Close"].iloc[i - 1]), cfg) or prev_vix >= cfg.vix_spike_threshold:
                 continue
-            if mode in ("call", "put"):
+            if len(bars) <= entry_bar:
+                continue
+            if direction is not None:
+                side = direction(i, bars.iloc[:entry_bar])
+            elif mode in ("call", "put"):
                 side = mode
             elif bias_cache is not None and date in bias_cache:
                 side = bias_cache[date]
@@ -175,11 +198,18 @@ def simulate(
                     bias_cache[date] = side
             if side is None:
                 continue
+            entry_px = float(bars["Open"].iloc[entry_bar])
+            bars = bars.iloc[entry_bar:]
             expiry = date + dt.timedelta(days=DTE)
             t = DTE / 365.0
-            strike = strike_for_delta(day_open, t, r, iv, side, cfg.daily_target_delta)
-            fill = bs_price(day_open, strike, t, r, iv, side) + slip
+            strike = strike_for_delta(entry_px, t, r, iv, side, cfg.daily_target_delta)
+            fill = bs_price(entry_px, strike, t, r, iv, side) + slip
             pos = {"side": side, "strike": strike, "expiry": expiry, "fill": fill, "date": date, "sessions": 0}
+            if atr_exits is not None:
+                sign = 1.0 if side == "call" else -1.0
+                prev_atr = float(atr.iloc[i - 1])
+                pos["target_u"] = entry_px + sign * atr_exits[0] * prev_atr
+                pos["stop_u"] = entry_px - sign * atr_exits[1] * prev_atr
             entry_day = True
 
         pos["sessions"] += 1
@@ -187,8 +217,12 @@ def simulate(
         t = max((pos["expiry"] - date).days, 1) / 365.0
         value = lambda s: bs_price(s, strike, t, r, iv, side)  # noqa: E731
         # Exits sell at model mid - slip, so the mid has to clear the level by `slip`.
-        target_u = underlying_for_option_price(fill + gain + slip, strike, t, r, iv, side)
-        stop_u = underlying_for_option_price(max(fill - loss + slip, 0.01), strike, t, r, iv, side)
+        fixed_levels = "target_u" in pos
+        if fixed_levels:
+            target_u, stop_u = pos["target_u"], pos["stop_u"]
+        else:
+            target_u = underlying_for_option_price(fill + gain + slip, strike, t, r, iv, side)
+            stop_u = underlying_for_option_price(max(fill - loss + slip, 0.01), strike, t, r, iv, side)
 
         up = side == "call"
         beyond = lambda px, lvl, favourable: lvl is not None and ((px >= lvl) == (up == favourable))  # noqa: E731
@@ -207,10 +241,10 @@ def simulate(
                     stop_first = tie_rule == "stop" or (low_first == up)
                     hit_target, hit_stop = not stop_first, stop_first
                 if hit_stop:
-                    outcome, exit_fill = "stop", fill - loss
+                    outcome, exit_fill = "stop", (value(stop_u) - slip) if fixed_levels else fill - loss
                     break
                 if hit_target:
-                    outcome, exit_fill = "target", fill + gain
+                    outcome, exit_fill = "target", (value(target_u) - slip) if fixed_levels else fill + gain
                     break
             if outcome is None and pos["sessions"] >= cfg.daily_target_max_hold_days:
                 outcome, exit_fill = "time", value(float(bars["Close"].iloc[-1])) - slip
@@ -232,6 +266,60 @@ def simulate(
             )
             pos = None
 
+    return trades
+
+
+def simulate_hold(
+    price_history: pd.DataFrame,
+    vix_history: pd.DataFrame,
+    cfg: Config,
+    side: str,
+    hold: str,
+    start: int = MIN_DAILY_HISTORY,
+) -> list[TargetTrade]:
+    """No target/stop: buy the same 0.80-delta ~60 DTE option and sell at a
+    fixed time, every day. `hold="overnight"` buys at the close and sells
+    at the next session's open; `hold="intraday"` buys at the open and
+    sells at the close. Splits QQQ's move into the two halves of the day.
+    IV is held at the entry day's VIX on both legs so the result is the
+    price move and theta, not a vega bet."""
+    df = price_history[["Open", "Close"]]
+    vix = vix_history["Close"].reindex(df.index).ffill()
+    n = cfg.daily_target_contracts
+    slip, r = cfg.daily_target_slippage, cfg.risk_free_rate
+    trades: list[TargetTrade] = []
+    last = len(df) - (1 if hold == "overnight" else 0)
+    for i in range(start, last):
+        iv = float(vix.iloc[i - 1 if hold == "intraday" else i]) / 100.0 * cfg.daily_target_iv_vix_multiple
+        if iv != iv:
+            continue
+        date = df.index[i].date()
+        if hold == "overnight":
+            entry_px, exit_px = float(df["Close"].iloc[i]), float(df["Open"].iloc[i + 1])
+            exit_date = df.index[i + 1].date()
+        else:
+            entry_px, exit_px = float(df["Open"].iloc[i]), float(df["Close"].iloc[i])
+            exit_date = date
+        t_entry = DTE / 365.0
+        t_exit = max(DTE - (exit_date - date).days, 1) / 365.0
+        strike = strike_for_delta(entry_px, t_entry, r, iv, side, cfg.daily_target_delta)
+        fill = bs_price(entry_px, strike, t_entry, r, iv, side) + slip
+        exit_fill = bs_price(exit_px, strike, t_exit, r, iv, side) - slip
+        pnl = (exit_fill - fill) * 100 * n
+        trades.append(
+            TargetTrade(
+                entry_date=date,
+                exit_date=exit_date,
+                side=side,
+                strike=strike,
+                entry_fill=round(fill, 2),
+                exit_fill=round(exit_fill, 2),
+                pnl_usd=round(pnl, 2),
+                outcome="time",
+                sessions=1,
+                capital_usd=round(fill * 100 * n, 2),
+            )
+        )
     return trades
 
 
