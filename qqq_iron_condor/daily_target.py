@@ -39,7 +39,7 @@ import numpy as np
 
 from .config import Config
 from .data import OptionChain
-from .direction import SuggestedContract, _mid_price, _select_contract
+from .direction import SuggestedContract, _mid_price
 from .options_math import bs_delta, bs_price, time_to_expiration_years
 
 DISCLAIMER = (
@@ -98,7 +98,7 @@ class LegPlan:
     contract: SuggestedContract
     contracts: int
     spot: float
-    entry_price: float  # per share (chain mid)
+    entry_price: float  # per share: the ask when quotes are live, else the mid / last trade
     cost_usd: float
     target_option_price: float
     stop_option_price: float
@@ -108,6 +108,10 @@ class LegPlan:
     move_to_stop: Optional[float]
     move_to_target_atr: Optional[float]  # as a fraction of ATR14
     theta_per_day_usd: float  # whole position, negative = cost of holding a day
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    spread: Optional[float] = None  # ask - bid per share; None = no live quote
+    tradeable: Optional[bool] = None  # spread within cap; None = unknown (no live quotes)
 
 
 @dataclass
@@ -235,6 +239,78 @@ def _model_contract(chain: OptionChain, spot: float, option_type: str, cfg: Conf
     )
 
 
+def _live_rows(chain: OptionChain, option_type: str):
+    df = chain.calls if option_type == "call" else chain.puts
+    bid = df["bid"].fillna(0.0)
+    ask = df["ask"].fillna(0.0)
+    return df[(bid > 0) & (ask >= bid)]
+
+
+def _select_tradeable_contract(
+    chain: OptionChain, spot: float, option_type: str, cfg: Config, model_iv: float
+) -> Optional[tuple]:
+    """(contract, bid, ask, tradeable) from live quotes, or None if the chain
+    has too few live quotes to choose from.
+
+    Among strikes with |delta| in [min_delta, max_delta] and a spread within
+    `daily_target_max_spread`, picks the one closest to the target delta. If
+    none pass the spread cap, returns the one needing the smallest QQQ move to
+    net the target after the spread ((target + spread) / |delta|), flagged as
+    not tradeable. Each row's own IV is used for its delta when it looks
+    plausible (it carries the real skew); otherwise the VIX-based `model_iv`."""
+    live = _live_rows(chain, option_type)
+    if len(live) < 5:
+        return None
+    t_years = time_to_expiration_years(chain.dte)
+    gain = per_share(cfg.daily_target_profit_usd, cfg.daily_target_contracts)
+    rows = []
+    for _, row in live.iterrows():
+        strike = float(row["strike"])
+        bid, ask = float(row["bid"]), float(row["ask"])
+        row_iv = float(row.get("impliedVolatility", 0.0) or 0.0)
+        iv = row_iv if 0.5 * model_iv <= row_iv <= 3.0 else model_iv
+        delta = bs_delta(spot, strike, t_years, cfg.risk_free_rate, iv, option_type)
+        spread = ask - bid
+        rows.append((strike, bid, ask, iv, delta, spread, (gain + spread) / max(abs(delta), 1e-6)))
+
+    in_band = [r for r in rows if cfg.daily_target_min_delta <= abs(r[4]) <= cfg.daily_target_max_delta]
+    tight = [r for r in in_band if r[5] <= cfg.daily_target_max_spread + 1e-9]
+    if tight:
+        # Tradeable: stay as close to the target delta as the spreads allow.
+        pick = min(tight, key=lambda r: (abs(abs(r[4]) - cfg.daily_target_delta), r[6]))
+    else:
+        # Nothing tradeable: show the least-bad one, by QQQ move needed after the spread.
+        pick = min(in_band or rows, key=lambda r: r[6])
+    strike, bid, ask, iv, delta, spread, cost_move = pick
+    tradeable = bool(tight)
+
+    warning = None
+    if not tradeable:
+        warning = (
+            f"⛔ No {option_type} between {cfg.daily_target_min_delta:.2f} and {cfg.daily_target_max_delta:.2f} "
+            f"delta has a bid-ask spread of ${cfg.daily_target_max_spread:.2f} or less right now. This is the "
+            f"cheapest one, but its ${spread:.2f} spread costs ${spread * 100 * cfg.daily_target_contracts:,.0f} "
+            "to get in and out -- skip today or re-check the quotes later."
+        )
+    elif abs(delta) < cfg.daily_target_delta - 0.05:
+        warning = (
+            f"Delta is {abs(delta):.2f}, below the {cfg.daily_target_delta:.2f} target: deeper strikes are quoted "
+            f"wider than ${cfg.daily_target_max_spread:.2f} today, so this is the closest tradeable one. It needs "
+            f"~${cost_move:.2f} of QQQ to net the target after the spread."
+        )
+    contract = SuggestedContract(
+        option_type=option_type,
+        expiration=chain.expiration,
+        dte=chain.dte,
+        strike=strike,
+        mid_price=round((bid + ask) / 2.0, 2),
+        delta=round(delta, 3),
+        implied_vol=round(iv * 100, 1),
+        warning=warning,
+    )
+    return contract, bid, ask, tradeable
+
+
 def build_leg_plan(
     chain: OptionChain,
     spot: float,
@@ -244,30 +320,39 @@ def build_leg_plan(
     reference_hv: Optional[float] = None,
     model_iv: Optional[float] = None,
 ) -> Optional[LegPlan]:
-    contract = _select_contract(chain, spot, cfg.risk_free_rate, option_type, cfg.daily_target_delta, reference_hv)
-    # Distrust the chain's pick if _select_contract flagged its IV/delta, or the
-    # strike it landed on has no live bid/ask: fall back to a model strike.
-    if contract is None or contract.warning or not _has_live_quote(chain, option_type, contract.strike):
-        contract = _model_contract(chain, spot, option_type, cfg, model_iv or reference_hv or 0.20)
-    if contract is None or contract.mid_price <= 0:
+    model_iv = model_iv or reference_hv or 0.20
+    picked = _select_tradeable_contract(chain, spot, option_type, cfg, model_iv)
+    if picked is not None:
+        contract, bid, ask, tradeable = picked
+        spread = ask - bid
+        entry = ask  # plan as if paying the ask; a limit at the mid may do better
+    else:
+        # No live quotes (e.g. right after the open): model strike, stale price.
+        contract = _model_contract(chain, spot, option_type, cfg, model_iv)
+        bid = ask = None
+        spread, tradeable = 0.0, None
+        entry = contract.mid_price if contract is not None else 0.0
+    if contract is None or entry <= 0:
         return None
 
     n = cfg.daily_target_contracts
-    entry = contract.mid_price
-    target_px = entry + per_share(cfg.daily_target_profit_usd, n)
-    stop_px = max(entry - per_share(cfg.daily_target_stop_usd, n), 0.01)
+    gain = per_share(cfg.daily_target_profit_usd, n)
+    loss = per_share(cfg.daily_target_stop_usd, n)
+    target_px = entry + gain
+    stop_px = max(entry - loss, 0.01)
 
     t_years = time_to_expiration_years(contract.dte)
     iv = contract.implied_vol / 100.0
-    # Solve against the model value +/- the required change rather than the
-    # quoted mid +/- it, so a mid that sits off the Black-Scholes value
-    # (wide spread, stale IV) doesn't distort the QQQ move needed.
+    # Bought at the ask, sold at the bid: the mid has to rise by gain + spread
+    # to net the target, and the stop trips after the mid falls loss - spread.
+    # Solved against the model value so a mid off Black-Scholes doesn't
+    # distort the QQQ move needed.
     model_now = bs_price(spot, contract.strike, t_years, cfg.risk_free_rate, iv, option_type)
     target_u = underlying_for_option_price(
-        model_now + (target_px - entry), contract.strike, t_years, cfg.risk_free_rate, iv, option_type
+        model_now + gain + spread, contract.strike, t_years, cfg.risk_free_rate, iv, option_type
     )
     stop_u = underlying_for_option_price(
-        model_now - (entry - stop_px), contract.strike, t_years, cfg.risk_free_rate, iv, option_type
+        max(model_now - (loss - spread), 0.01), contract.strike, t_years, cfg.risk_free_rate, iv, option_type
     )
 
     move_t = abs(target_u - spot) if target_u is not None else None
@@ -283,7 +368,7 @@ def build_leg_plan(
         contracts=n,
         spot=spot,
         entry_price=round(entry, 2),
-        cost_usd=round(entry * 100 * n, 2),
+        cost_usd=round(round(entry, 2) * 100 * n, 2),
         target_option_price=round(target_px, 2),
         stop_option_price=round(stop_px, 2),
         target_underlying=round(target_u, 2) if target_u is not None else None,
@@ -292,6 +377,10 @@ def build_leg_plan(
         move_to_stop=round(move_s, 2) if move_s is not None else None,
         move_to_target_atr=round(move_t / atr14, 2) if move_t is not None and atr14 > 0 else None,
         theta_per_day_usd=round(theta_share * 100 * n, 2),
+        bid=round(bid, 2) if bid is not None else None,
+        ask=round(ask, 2) if ask is not None else None,
+        spread=round(spread, 2) if bid is not None else None,
+        tradeable=tradeable,
     )
 
 
@@ -382,9 +471,24 @@ def _leg_table(leg: LegPlan, cfg: Config) -> list[str]:
         f"|---|---|",
         f"| **Contract** | QQQ {c.expiration} ${c.strike:g} {side} ({c.dte} DTE) |",
         f"| **Delta / IV** | {c.delta:+.2f} / {c.implied_vol:.1f}% |",
-        f"| **Buy** | {leg.contracts} contracts, limit ~{_usd(leg.entry_price)} (mid) -- cost {_usd(leg.cost_usd)} |",
+    ]
+    if leg.spread is not None:
+        ok = "✅ within" if leg.tradeable else "⛔ over"
+        lines.append(
+            f"| **Bid / Ask** | {_usd(leg.bid)} / {_usd(leg.ask)} -- spread {_usd(leg.spread)} ({ok} the "
+            f"{_usd(cfg.daily_target_max_spread)} limit; costs ~{_usd(leg.spread * 100 * leg.contracts)} "
+            "to get in and out) |"
+        )
+        buy = (
+            f"{leg.contracts} contracts, limit at the mid ~{_usd(c.mid_price)}; planned at the ask "
+            f"{_usd(leg.entry_price)} -- cost {_usd(leg.cost_usd)}"
+        )
+    else:
+        buy = f"{leg.contracts} contracts, ~{_usd(leg.entry_price)} (no live quote) -- cost {_usd(leg.cost_usd)}"
+    lines += [
+        f"| **Buy** | {buy} |",
         f"| **Take profit** | sell all at {_usd(leg.target_option_price)} = **+{_usd(cfg.daily_target_profit_usd)}** "
-        f"(QQQ ~{_usd(leg.target_underlying)}, a {_usd(leg.move_to_target)} move"
+        f"(QQQ ~{_usd(leg.target_underlying)}, a {_usd(leg.move_to_target)} move after the spread"
         + (f", {leg.move_to_target_atr:.2f}x ATR" if leg.move_to_target_atr is not None else "")
         + ") |",
         f"| **Stop** | sell all at {_usd(leg.stop_option_price)} = **-{_usd(cfg.daily_target_stop_usd)}** "
@@ -449,6 +553,12 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
         lines.append("")
 
     chosen = plan.chosen
+    if chosen is not None and chosen.tradeable is False:
+        lines.append(
+            f"**⛔ Skip today:** no {chosen.contract.option_type} near the target delta has a bid-ask spread "
+            f"within {_usd(cfg.daily_target_max_spread)}. The cheapest one is shown below for reference only."
+        )
+        lines.append("")
     if chosen is not None:
         lines.append("### Order ticket")
         lines.append("")

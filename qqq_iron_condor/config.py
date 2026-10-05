@@ -234,6 +234,17 @@ class Config:
     # QQQ move, with far less theta/IV sensitivity than near-ATM short-dated
     # contracts. ~60 DTE keeps daily theta small relative to the target.
     daily_target_delta: float = 0.80
+    # Contract selection with live quotes: among strikes whose |delta| is in
+    # [min, max] and whose bid-ask spread is at most daily_target_max_spread
+    # (per share), pick the one closest to daily_target_delta. Deep-ITM QQQ
+    # strikes often quote $2+ wide while slightly shallower ones are
+    # $0.15-0.40 wide, so the pick is often a bit below 0.80 delta. If
+    # nothing passes the spread cap, the plan flags the day as not tradeable
+    # (showing the strike needing the smallest QQQ move to net the target
+    # after the spread) instead of quietly suggesting an expensive contract.
+    daily_target_min_delta: float = 0.65
+    daily_target_max_delta: float = 0.90
+    daily_target_max_spread: float = 0.20
     daily_target_expiration: ExpirationTarget = ExpirationTarget("60DTE", 50, 70)
     daily_target_contracts: int = 10
 
