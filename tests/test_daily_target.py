@@ -345,3 +345,24 @@ def test_report_wait_message():
 def test_cli_rejects_unknown_direction_source():
     with pytest.raises(SystemExit):
         dtg.main(["--direction-source", "magic"])
+
+
+def test_leg_plan_falls_back_to_model_strike_when_chain_quotes_are_junk():
+    # What Yahoo serves right after the open: $0 bid/ask and near-zero IVs.
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    for df in (chain.calls, chain.puts):
+        df["bid"] = 0.0
+        df["ask"] = 0.0
+        df["impliedVolatility"] = 0.031
+    for option_type in ("call", "put"):
+        leg = dtg.build_leg_plan(chain, 750.0, 9.5, option_type, CFG, reference_hv=0.15, model_iv=0.20)
+        assert abs(leg.contract.delta) == pytest.approx(0.80, abs=0.02)
+        assert leg.contract.implied_vol == pytest.approx(20.0)
+        assert "no live bid/ask" in leg.contract.warning
+        assert 1.1 < leg.move_to_target < 1.4
+
+
+def test_leg_plan_keeps_chain_pick_when_quotes_are_live():
+    leg = dtg.build_leg_plan(dtg._synthetic_chain(750.0, 60, CFG), 750.0, 9.5, "call", CFG, reference_hv=0.15, model_iv=0.35)
+    assert leg.contract.warning is None
+    assert leg.contract.implied_vol == pytest.approx(20.0)  # chain IV, not the 35% model IV
