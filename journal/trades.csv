@@ -2,3 +2,4 @@ id,status,opened_at,closed_at,label,symbol,expiration,dte_at_entry,short_call,lo
 1,CLOSED,2026-09-29,2026-09-29,0DTE,QQQ,2026-09-29,0,741.0,743.0,735.0,733.0,2,0.75,0.75,1.25,2.0,2.0,738.78,15.9,,0.465,57.0,Closed at 38% of max profit
 2,CLOSED,2026-09-30,2026-09-30,0DTE,QQQ,2026-09-30,0,742.0,743.0,733.0,732.0,3,0.16,0.16,0.84,1.0,1.0,739.1,,,0.064,28.8,"0.10 call / 0.08 put delta, $1 wings, sized down from 25 to 3 contracts | Closed at 60% of max profit"
 3,CLOSED,2026-10-01,2026-10-01,0DTE,QQQ,2026-10-01,0,744.0,746.0,735.0,733.0,10,0.68,0.68,1.32,2.0,2.0,738.6,,,0.34,340.0,10 contracts -- flagged as oversized (~11% of $12K account max loss) | Closed at 50% of max profit
+4,OPEN,2026-10-05,,0DTE,QQQ,2026-10-05,0,755.0,757.0,751.0,749.0,15,0.67,0.67,1.33,2.0,2.0,753.73,,,,,"15 contracts -- new high size (~16.6% of $12K account max loss, above the standing ~10-contract size)"
