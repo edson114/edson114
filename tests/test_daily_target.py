@@ -53,9 +53,13 @@ def test_leg_plan_levels(option_type):
     assert leg.target_option_price == pytest.approx(leg.entry_price + 1.00)
     assert leg.stop_option_price == pytest.approx(leg.entry_price - 1.00)
     assert leg.cost_usd == pytest.approx(leg.entry_price * 1000)
-    # ~$1 / 0.80 delta = ~$1.25 QQQ move, in the right direction.
-    assert 1.1 < leg.move_to_target < 1.4
-    assert 1.1 < leg.move_to_stop < 1.4
+    # Synthetic quotes are $0.20 wide (bought at the ask, sold at the bid):
+    # target needs ~($1.00 + $0.20) / 0.80 = $1.50 of QQQ, the stop ~($1.00 - $0.20) / 0.80 = $1.00.
+    assert leg.spread == pytest.approx(0.20)
+    assert leg.tradeable is True
+    assert leg.entry_price == leg.ask
+    assert 1.35 < leg.move_to_target < 1.65
+    assert 0.85 < leg.move_to_stop < 1.15
     if option_type == "call":
         assert leg.stop_underlying < 750.0 < leg.target_underlying
     else:
@@ -366,3 +370,54 @@ def test_leg_plan_keeps_chain_pick_when_quotes_are_live():
     leg = dtg.build_leg_plan(dtg._synthetic_chain(750.0, 60, CFG), 750.0, 9.5, "call", CFG, reference_hv=0.15, model_iv=0.35)
     assert leg.contract.warning is None
     assert leg.contract.implied_vol == pytest.approx(20.0)  # chain IV, not the 35% model IV
+
+
+# --- spread-aware contract selection -----------------------------------------
+
+def _widen(chain, option_type, predicate, half_spread):
+    df = chain.calls if option_type == "call" else chain.puts
+    fair = (df["bid"] + df["ask"]) / 2.0
+    mask = df["strike"].apply(predicate)
+    df.loc[mask, "bid"] = fair[mask] - half_spread
+    df.loc[mask, "ask"] = fair[mask] + half_spread
+
+
+def _tighten(chain, half_spread=0.05):
+    for df in (chain.calls, chain.puts):
+        fair = (df["bid"] + df["ask"]) / 2.0
+        df["bid"] = fair - half_spread
+        df["ask"] = fair + half_spread
+
+
+def test_picks_tight_strike_when_deep_itm_is_quoted_wide():
+    # Like Oct 5: calls below $725 quote $2+ wide, shallower ones $0.10 wide.
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    _tighten(chain)
+    _widen(chain, "call", lambda k: k < 725, 1.15)
+    leg = dtg.build_leg_plan(chain, 750.0, 9.5, "call", CFG, model_iv=0.20)
+    assert leg.tradeable is True
+    assert leg.contract.strike >= 725
+    assert leg.spread == pytest.approx(0.10)
+    # The closest-to-0.80 tight strike is the deepest one that's still tight.
+    assert leg.contract.strike == 725
+    assert "below the 0.80 target" in leg.contract.warning
+
+
+def test_prefers_target_delta_when_tight_quotes_exist_there():
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    _tighten(chain)
+    leg = dtg.build_leg_plan(chain, 750.0, 9.5, "put", CFG, model_iv=0.20)
+    assert abs(leg.contract.delta) == pytest.approx(0.80, abs=0.02)
+    assert leg.contract.warning is None
+
+
+def test_flags_not_tradeable_when_every_spread_is_wide():
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    _widen(chain, "call", lambda k: True, 1.20)
+    leg = dtg.build_leg_plan(chain, 750.0, 9.5, "call", CFG, model_iv=0.20)
+    assert leg.tradeable is False
+    assert "⛔" in leg.contract.warning
+    plan = dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", CFG, model_iv=0.20)
+    report = dtg.render_plan(plan, CFG)
+    assert "Skip today" in report
+    assert "over the $0.20 limit" in report

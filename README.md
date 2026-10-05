@@ -690,11 +690,19 @@ Each run (`python -m qqq_iron_condor.daily_target`):
    The report shows both reads and flags when they disagree. The
    signal's hard skip-day gate (FOMC/CPI, big gap, VIX spike) forces NO
    TRADE either way. `--direction call|put` overrides everything.
-2. **Contract:** picks the listed expiration 50-70 days out and the
-   strike closest to 0.80 |delta|, for both a call and a put.
-3. **Order ticket:** 10 contracts at the mid, the take-profit price
-   (fill + $1.00), the stop price (fill − $1.00), the QQQ levels those
-   correspond to, the total premium, and the daily theta.
+2. **Contract:** picks the listed expiration 50-70 days out. Among
+   strikes between 0.65 and 0.90 |delta| whose bid-ask spread is
+   **$0.20 or less**, it takes the one closest to 0.80 delta, for both a
+   call and a put. Deep in-the-money QQQ strikes often quote $2+ wide,
+   which costs more than the whole $1,000 goal to get in and out, so the
+   pick is often a bit below 0.80 delta. If no strike passes, the plan
+   says **Skip today** and shows the least-bad one for reference. Right
+   after the open, when there are no live quotes at all, it falls back to
+   a model strike and labels the price as stale.
+3. **Order ticket:** bid/ask and spread cost, 10 contracts (limit at the
+   mid, planned at the ask), the take-profit price (fill + $1.00), the
+   stop price (fill − $1.00), the QQQ levels those correspond to *after*
+   paying the spread, the total premium, and the daily theta.
 4. **Rules:** only one position open at a time (no stacking 10 more
    contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
    session, whichever comes first.
@@ -720,7 +728,8 @@ python -m qqq_iron_condor.daily_target_backtest
 
 All of it lives in `Config` (`daily_target_*` fields in
 `qqq_iron_condor/config.py`): direction source, first-hour length,
-delta, expiration window, contracts, $ target, $ stop, time stop.
+target delta and allowed delta range, max spread, expiration window,
+contracts, $ target, $ stop, time stop.
 
 **Practical execution:** right after you're filled, place a GTC limit
 *sell to close* at fill + $1.00. That's what closes the day at +$1,000
