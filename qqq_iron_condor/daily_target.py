@@ -192,10 +192,63 @@ class DailyTargetPlan:
         return None
 
 
+def _has_live_quote(chain: OptionChain, option_type: str, strike: float) -> bool:
+    df = chain.calls if option_type == "call" else chain.puts
+    rows = df[(df["strike"] - strike).abs() < 1e-6]
+    if rows.empty:
+        return False
+    bid = float(rows.iloc[0].get("bid", 0.0) or 0.0)
+    ask = float(rows.iloc[0].get("ask", 0.0) or 0.0)
+    return bid > 0 and ask > 0
+
+
+def _model_contract(chain: OptionChain, spot: float, option_type: str, cfg: Config, model_iv: float) -> Optional[SuggestedContract]:
+    """Pick the strike from Black-Scholes at `model_iv` instead of the
+    chain's own IV. Used when the chain has no usable quotes -- right
+    after the open Yahoo often serves $0 bid/ask and junk IVs (0.001-6%),
+    which makes every chain-IV delta near 0 or 1 and picks the wrong strike."""
+    df = chain.calls if option_type == "call" else chain.puts
+    if df.empty:
+        return None
+    t_years = time_to_expiration_years(chain.dte)
+    k_model = strike_for_delta(spot, t_years, cfg.risk_free_rate, model_iv, option_type, cfg.daily_target_delta)
+    row = df.loc[(df["strike"] - k_model).abs().idxmin()]
+    price = _mid_price(row)
+    if price <= 0:
+        return None
+    strike = float(row["strike"])
+    live = _has_live_quote(chain, option_type, strike)
+    return SuggestedContract(
+        option_type=option_type,
+        expiration=chain.expiration,
+        dte=chain.dte,
+        strike=strike,
+        mid_price=round(price, 2),
+        delta=round(bs_delta(spot, strike, t_years, cfg.risk_free_rate, model_iv, option_type), 3),
+        implied_vol=round(model_iv * 100, 1),
+        warning=(
+            f"The chain's own IVs aren't usable yet, so this strike was picked from Black-Scholes at "
+            f"{model_iv * 100:.1f}% IV (VIX-based)."
+            + ("" if live else " There's no live bid/ask either -- the price shown is the last trade and may be stale.")
+            + " Re-run once quotes populate (usually within the first 15-30 minutes)."
+        ),
+    )
+
+
 def build_leg_plan(
-    chain: OptionChain, spot: float, atr14: float, option_type: str, cfg: Config, reference_hv: Optional[float] = None
+    chain: OptionChain,
+    spot: float,
+    atr14: float,
+    option_type: str,
+    cfg: Config,
+    reference_hv: Optional[float] = None,
+    model_iv: Optional[float] = None,
 ) -> Optional[LegPlan]:
     contract = _select_contract(chain, spot, cfg.risk_free_rate, option_type, cfg.daily_target_delta, reference_hv)
+    # Distrust the chain's pick if _select_contract flagged its IV/delta, or the
+    # strike it landed on has no live bid/ask: fall back to a model strike.
+    if contract is None or contract.warning or not _has_live_quote(chain, option_type, contract.strike):
+        contract = _model_contract(chain, spot, option_type, cfg, model_iv or reference_hv or 0.20)
     if contract is None or contract.mid_price <= 0:
         return None
 
@@ -252,6 +305,7 @@ def build_plan(
     signal_score: Optional[float] = None,
     reference_hv: Optional[float] = None,
     notes: Optional[list] = None,
+    model_iv: Optional[float] = None,
     signal_bias: Optional[str] = None,
     first_hour: Optional[FirstHourRead] = None,
 ) -> DailyTargetPlan:
@@ -264,7 +318,7 @@ def build_plan(
         )
     else:
         for option_type in ("call", "put"):
-            legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv)
+            legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv, model_iv)
     return DailyTargetPlan(
         bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs,
         notes=notes, signal_bias=signal_bias, first_hour=first_hour,
@@ -507,9 +561,11 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour)
     chains = providers.pick_expirations_for_targets(cfg.symbol, (cfg.daily_target_expiration,))
     reference_hv = daily.hv20_pct / 100.0 if daily.hv20_pct == daily.hv20_pct else None
+    vix = daily.vix_level
+    model_iv = vix / 100.0 * cfg.daily_target_iv_vix_multiple if vix == vix and vix > 0 else reference_hv
     plan = build_plan(
         daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, bias_source, cfg,
-        signal_score=score, reference_hv=reference_hv, notes=notes, signal_bias=signal_bias, first_hour=first_hour,
+        signal_score=score, reference_hv=reference_hv, notes=notes, model_iv=model_iv, signal_bias=signal_bias, first_hour=first_hour,
     )
     return render_plan(plan, cfg), plan
 
