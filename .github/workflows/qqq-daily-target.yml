@@ -45,6 +45,13 @@ jobs:
 
       - name: Build today's daily $ target plan
         if: steps.clock.outputs.run == 'true'
+        env:
+          # Optional: the TRADIER_TOKEN repo secret switches price history and
+          # option chains to Tradier (real bid/ask, broker-computed delta).
+          # Empty when unset, which the app treats as "not configured" and
+          # falls back to free Yahoo Finance data.
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+          TRADIER_BASE_URL: ${{ secrets.TRADIER_BASE_URL }}
         run: python -m qqq_iron_condor.daily_target
 
       - name: Commit generated report
