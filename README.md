@@ -707,6 +707,14 @@ Each run (`python -m qqq_iron_condor.daily_target`):
    contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
    session, whichever comes first.
 
+**Better data (optional):** set the `TRADIER_TOKEN` repo secret (plus
+`TRADIER_BASE_URL=https://sandbox.tradier.com/v1` for a sandbox token,
+see [Data providers](#data-providers)). The plan then takes price
+history and option chains from Tradier, with real bid/ask and the
+broker's own delta, instead of Yahoo's sometimes-stale quotes. If
+Tradier's VIX request fails, VIX falls back to Yahoo and the report
+says so.
+
 Reports land in `reports/daily_target/`. A weekday 10:35 ET workflow
 (`qqq-daily-target.yml`) runs it automatically, just after the first
 hour closes. It's scheduled at both the EDT and EST UTC times, and skips

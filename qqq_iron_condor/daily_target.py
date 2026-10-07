@@ -256,8 +256,9 @@ def _select_tradeable_contract(
     `daily_target_max_spread`, picks the one closest to the target delta. If
     none pass the spread cap, returns the one needing the smallest QQQ move to
     net the target after the spread ((target + spread) / |delta|), flagged as
-    not tradeable. Each row's own IV is used for its delta when it looks
-    plausible (it carries the real skew); otherwise the VIX-based `model_iv`."""
+    not tradeable. Delta is the broker's when the chain has one (Tradier);
+    otherwise Black-Scholes from the row's own IV when it looks plausible
+    (it carries the real skew), else from the VIX-based `model_iv`."""
     live = _live_rows(chain, option_type)
     if len(live) < 5:
         return None
@@ -269,7 +270,11 @@ def _select_tradeable_contract(
         bid, ask = float(row["bid"]), float(row["ask"])
         row_iv = float(row.get("impliedVolatility", 0.0) or 0.0)
         iv = row_iv if 0.5 * model_iv <= row_iv <= 3.0 else model_iv
-        delta = bs_delta(spot, strike, t_years, cfg.risk_free_rate, iv, option_type)
+        broker_delta = row.get("delta")  # Tradier chains carry a broker-computed delta
+        if broker_delta is not None and broker_delta == broker_delta:
+            delta = float(broker_delta)
+        else:
+            delta = bs_delta(spot, strike, t_years, cfg.risk_free_rate, iv, option_type)
         spread = ask - bid
         rows.append((strike, bid, ask, iv, delta, spread, (gain + spread) / max(abs(delta), 1e-6)))
 
@@ -643,10 +648,18 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
 
     source = source or cfg.daily_target_direction_source
     price_history = providers.get_price_history(cfg.symbol, cfg.price_history_period)
-    vix_history = providers.get_vix_history(cfg.vix_history_period, cfg.vix_symbol, cfg.tradier_vix_symbol)
+    notes: list = []
+    try:
+        vix_history = providers.get_vix_history(cfg.vix_history_period, cfg.vix_symbol, cfg.tradier_vix_symbol)
+    except Exception as exc:
+        # Tradier's VIX symbol isn't verified for every account/data plan;
+        # VIX only feeds the skip-day gate and the model IV, so fall back.
+        from .data import get_vix_history
+
+        vix_history = get_vix_history(cfg.vix_history_period)
+        notes.append(f"VIX came from Yahoo Finance: the {providers.active_provider_name()} VIX request failed ({exc}).")
     daily = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
-    notes: list = []
     score = signal_bias = None
     forced: list = []
     # The signal always runs: its hard skip-day gates apply to both sources.

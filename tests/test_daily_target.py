@@ -421,3 +421,15 @@ def test_flags_not_tradeable_when_every_spread_is_wide():
     report = dtg.render_plan(plan, CFG)
     assert "Skip today" in report
     assert "over the $0.20 limit" in report
+
+
+def test_uses_broker_delta_when_chain_has_one():
+    # Tradier chains carry a broker-computed "delta" column; it should drive
+    # the pick instead of a Black-Scholes delta re-derived from IV.
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    _tighten(chain)
+    chain.calls["delta"] = 0.10
+    chain.calls.loc[chain.calls["strike"] == 740.0, "delta"] = 0.80
+    leg = dtg.build_leg_plan(chain, 750.0, 9.5, "call", CFG, model_iv=0.20)
+    assert leg.contract.strike == 740.0
+    assert leg.contract.delta == pytest.approx(0.80)
