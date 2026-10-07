@@ -191,6 +191,15 @@ def render_report(
             "the close rather than letting contracts expire, and size these smaller than "
             "weekly/monthly positions.\n"
         )
+    data_source_note = (
+        "- Real broker-computed greeks (delta/gamma/theta/vega) and bid/ask via Tradier for "
+        "this scan -- still confirm strikes/prices in your broker platform before submitting "
+        "an order, since conditions can move between when this ran and when you act on it."
+        if data_provider == "tradier"
+        else "- This scan uses a Black-Scholes delta approximation from option-chain implied "
+        "volatility, not live broker greeks -- always confirm strikes/greeks/prices in your "
+        "broker platform before submitting an order."
+    )
     parts.append(
         "- Size each trade so **max loss ≤ 1-3% of account equity**; this is a defined-risk "
         "structure but max loss can still be substantial relative to credit received.\n"
@@ -201,9 +210,7 @@ def render_report(
         "- Avoid opening new positions within 1-2 days of major catalysts flagged above "
         "(FOMC/CPI/NFP/mega-cap earnings) unless the position is explicitly sized for the "
         "expected volatility expansion.\n"
-        "- This scan uses a Black-Scholes delta approximation from option-chain implied "
-        "volatility, not live broker greeks -- always confirm strikes/greeks/prices in your "
-        "broker platform before submitting an order."
+        f"{data_source_note}"
     )
     parts.append("")
 
