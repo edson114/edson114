@@ -17,11 +17,11 @@ def _fmt(x: float, decimals: int = 2) -> str:
     return f"{x:.{decimals}f}"
 
 
-def _condor_section(trade: IronCondorTrade) -> str:
+def _condor_section(trade: IronCondorTrade, symbol: str) -> str:
     if trade is None:
         return (
-            "_No valid iron condor could be constructed for this expiration -- "
-            "either QQQ has no matching listed expiration today (e.g. no same-day "
+            f"_No valid iron condor could be constructed for this expiration -- "
+            f"either {symbol} has no matching listed expiration today (e.g. no same-day "
             "0DTE listing), or the chain data was illiquid/missing quotes._\n"
         )
 
@@ -29,7 +29,7 @@ def _condor_section(trade: IronCondorTrade) -> str:
     lines = [
         f"### {trade.label} Iron Condor -- expires {trade.expiration} ({trade.dte} DTE)",
         "",
-        f"- **Spot (QQQ):** ${_fmt(trade.spot)}",
+        f"- **Spot ({symbol}):** ${_fmt(trade.spot)}",
         f"- **ATM IV (approx):** {_fmt(trade.atm_iv, 1)}%",
         f"- **IV-implied expected move to expiration:** ±${_fmt(trade.expected_move_iv)}",
         "",
@@ -117,6 +117,11 @@ def render_report(
     data_provider: str = None,
 ) -> str:
     generated_at = generated_at or dt.datetime.now()
+    # yfinance index tickers are caret-prefixed (e.g. "^SPX") for data
+    # fetching; strip it for display purposes only -- nothing below this
+    # point uses symbol to fetch data, it's already been fetched by the
+    # caller.
+    symbol = symbol.lstrip("^")
 
     parts = []
     parts.append(f"# {symbol} Iron Condor Daily Scan -- {generated_at.strftime('%Y-%m-%d %H:%M %Z').strip()}")
@@ -177,7 +182,7 @@ def render_report(
     parts.append("## Recommended Iron Condor Structures")
     parts.append("")
     for label, trade in condors.items():
-        parts.append(_condor_section(trade))
+        parts.append(_condor_section(trade, symbol))
 
     parts.append("## Risk Management")
     parts.append("")

@@ -1,6 +1,6 @@
 """Historical backtest of the delta-targeted iron condor rule.
 
-Data constraint: there is no free source of historical QQQ option-chain
+Data constraint: there is no free source of historical option-chain
 data (strike-level bid/ask/IV by date -- that requires a paid feed like
 CBOE DataShop, ORATS historical, or Polygon.io). What's freely available
 is historical *underlying* prices and VIX. This backtest bridges that gap
@@ -15,8 +15,8 @@ re-implementation that could silently drift from it.
 What this can and can't tell you:
   - It CAN show the mechanical edge (win rate, expectancy, drawdown) of
     "sell the 0.16-delta condor, hold to expiration" against real
-    historical QQQ/VIX moves, including real historical vol regimes and
-    real gap days.
+    historical underlying/VIX moves, including real historical vol
+    regimes and real gap days.
   - It CANNOT capture bid/ask slippage, commissions, early assignment,
     intraday IV skew/smile, or the actual liquidity of any specific
     strike -- real fills will be worse than these simulated mid-price
@@ -48,6 +48,13 @@ from .options_math import bs_price, time_to_expiration_years
 from .strategy import IronCondorTrade, build_iron_condor
 
 MIN_HISTORY_DAYS = 252  # need a trailing year for HV/VIX-percentile inputs before the first entry
+
+
+def infer_strike_step(spot: float) -> float:
+    """A simple price-level heuristic for the synthetic chain's strike
+    spacing: $5 above $1000/share (SPX-style), $1 below (QQQ-style). Used
+    as the CLI's default when --strike-step isn't passed explicitly."""
+    return 5.0 if spot > 1000.0 else 1.0
 
 
 def simulate_chain(spot: float, iv: float, dte: int, rate: float, expiration: str,
@@ -150,6 +157,7 @@ def run_backtest(
     target: ExpirationTarget,
     cfg: Config,
     apply_gates: bool = True,
+    strike_step: float = 1.0,
 ) -> list[BacktestTrade]:
     dates = price_history.index
     close = price_history["Close"]
@@ -191,7 +199,7 @@ def run_backtest(
 
         exit_spot = float(close.iloc[j])
         expiration = dates[j].date().isoformat()
-        chain = simulate_chain(spot_entry, iv, rep_dte, cfg.risk_free_rate, expiration)
+        chain = simulate_chain(spot_entry, iv, rep_dte, cfg.risk_free_rate, expiration, strike_step=strike_step)
 
         trade = build_iron_condor(
             target.label, chain, spot_entry, cfg.risk_free_rate, target_delta, wing_width, reference_hv=hv_ref,
@@ -286,6 +294,7 @@ def _fmt(x: float, decimals: int = 2) -> str:
 
 def render_backtest_report(symbol: str, years: float, summaries: list[BacktestSummary], apply_gates: bool) -> str:
     generated_at = dt.datetime.now()
+    symbol = symbol.lstrip("^")  # yfinance index tickers are caret-prefixed; display cleanly
     parts = [
         f"# {symbol} Iron Condor Backtest -- {generated_at.strftime('%Y-%m-%d %H:%M')}",
         "",
@@ -333,11 +342,16 @@ def main(argv=None) -> int:
 
     from . import data
 
-    parser = argparse.ArgumentParser(description="Backtest the QQQ iron condor delta-targeting rule")
+    parser = argparse.ArgumentParser(description="Backtest the iron condor delta-targeting rule")
     parser.add_argument("--years", type=float, default=3.0, help="Years of history to backtest (default 3)")
     parser.add_argument("--labels", nargs="*", default=None, help="Subset of expiration labels to run (default: all configured)")
     parser.add_argument("--no-gates", action="store_true", help="Disable the hard skip-day gates (gap/VIX-spike/macro)")
     parser.add_argument("--output-dir", default="reports/backtests", help="Directory to save the report")
+    parser.add_argument(
+        "--strike-step", type=float, default=None,
+        help="Synthetic chain strike spacing (default: inferred from the underlying's price level -- "
+        "$5 above $1000/share, $1 below, matching SPX vs. QQQ-style strike spacing)",
+    )
     args = parser.parse_args(argv)
 
     cfg = Config()
@@ -347,11 +361,15 @@ def main(argv=None) -> int:
     price_history = data.get_price_history(cfg.symbol, period)
     vix_history = data.get_vix_history(period)
 
+    strike_step = args.strike_step
+    if strike_step is None:
+        strike_step = infer_strike_step(float(price_history["Close"].iloc[-1]))
+
     targets = [t for t in cfg.expiration_targets if not args.labels or t.label in args.labels]
 
     summaries = []
     for target in targets:
-        trades = run_backtest(price_history, vix_history, target, cfg, apply_gates=not args.no_gates)
+        trades = run_backtest(price_history, vix_history, target, cfg, apply_gates=not args.no_gates, strike_step=strike_step)
         summaries.append(summarize(target.label, trades))
 
     report_md = render_backtest_report(cfg.symbol, args.years, summaries, apply_gates=not args.no_gates)

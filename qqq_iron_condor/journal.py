@@ -288,13 +288,13 @@ def render_journal_report(df: pd.DataFrame) -> str:
 def main(argv=None) -> int:
     import argparse
 
-    parser = argparse.ArgumentParser(description="QQQ iron condor trade journal")
+    parser = argparse.ArgumentParser(description="Iron condor trade journal")
     parser.add_argument("--path", default=DEFAULT_JOURNAL_PATH, help="Journal CSV path")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_add = sub.add_parser("add", help="Log a newly opened trade")
     p_add.add_argument("--label", required=True)
-    p_add.add_argument("--symbol", default="QQQ")
+    p_add.add_argument("--symbol", default="SPX")
     p_add.add_argument("--expiration", required=True)
     p_add.add_argument("--dte", type=int, required=True)
     p_add.add_argument("--short-call", type=float, required=True)
