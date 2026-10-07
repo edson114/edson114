@@ -150,17 +150,14 @@ Getting a token:
 Every report states which provider produced it. The Tradier integration
 (`qqq_iron_condor/tradier.py`) is built from Tradier's documented response
 shapes, covered by parsing tests, and has been exercised live against a
-real account for price/quote/VIX-history calls (which is how the
-`TRADIER_BASE_URL` empty-string-fallback bug below was caught and fixed).
-The SPX **option chain** endpoint specifically has not yet been verified
-live -- `Config.symbol` defaults to `"^SPX"` for yfinance, and
+real account -- including the SPX **option chain** endpoint specifically
+(`Config.symbol` defaults to `"^SPX"` for yfinance;
 `providers._tradier_symbol()` strips the leading caret to `"SPX"` before
-calling Tradier, matching Tradier's documented no-caret convention, but
-this hasn't been confirmed against a live SPX chain response from this
-codebase. If `get_option_chain_for_expiration()` fails for SPX, that
-symbol (or account permissions -- SPX index options require separate
-options-approval from equity/ETF options) is the first thing to check. If
-`get_vix_history()` fails, the VIX symbol convention
+calling Tradier, confirmed live to match Tradier's no-caret convention).
+If `get_option_chain_for_expiration()` ever fails for SPX, account
+permissions are the first thing to check -- SPX index options require
+separate options-approval from equity/ETF options. If `get_vix_history()`
+fails, the VIX symbol convention
 (`Config.tradier_vix_symbol`, default `"VIX"`) is the first thing to check.
 
 ## How strikes are chosen
