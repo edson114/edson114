@@ -46,7 +46,13 @@ def is_available() -> bool:
 
 
 def _base_url() -> str:
-    return os.environ.get("TRADIER_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+    # GitHub Actions always defines the env var for a referenced secret, even
+    # an unset one -- as an empty string, not an absent key. The two-arg
+    # os.environ.get only falls back to the default when the key is
+    # genuinely missing, so an empty TRADIER_BASE_URL would otherwise
+    # silently become the base URL itself ("") instead of the production
+    # default.
+    return (os.environ.get("TRADIER_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 
 
 def _headers() -> dict:

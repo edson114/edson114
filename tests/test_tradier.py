@@ -30,6 +30,27 @@ def test_is_available_reflects_env_var(monkeypatch):
     assert tradier.is_available() is True
 
 
+def test_base_url_defaults_to_production_when_unset(monkeypatch):
+    monkeypatch.delenv("TRADIER_BASE_URL", raising=False)
+    assert tradier._base_url() == tradier.DEFAULT_BASE_URL
+
+
+def test_base_url_defaults_to_production_when_set_but_empty(monkeypatch):
+    # GitHub Actions always defines an env var for a referenced secret, even
+    # an unset one -- as an empty string, not an absent key. A naive
+    # os.environ.get(key, default) only falls back when the key is missing
+    # entirely, so this empty-but-present case has to be handled explicitly
+    # (this reproduces the "Invalid URL '/markets/history'" failure seen
+    # live when TRADIER_TOKEN was set without TRADIER_BASE_URL).
+    monkeypatch.setenv("TRADIER_BASE_URL", "")
+    assert tradier._base_url() == tradier.DEFAULT_BASE_URL
+
+
+def test_base_url_honors_explicit_override(monkeypatch):
+    monkeypatch.setenv("TRADIER_BASE_URL", "https://sandbox.tradier.com/v1/")
+    assert tradier._base_url() == "https://sandbox.tradier.com/v1"
+
+
 def test_as_list_normalizes_singleton_and_none():
     assert tradier._as_list(None) == []
     assert tradier._as_list("2026-10-02") == ["2026-10-02"]
