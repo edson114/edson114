@@ -3,7 +3,7 @@
 Automated, decision-support tools for options trading, off free market
 data:
 
-1. **[QQQ Iron Condor Scanner](#qqq-iron-condor-scanner)** — a daily,
+1. **[SPX Iron Condor Scanner](#spx-iron-condor-scanner)** — a daily,
    range-bound premium-selling scan.
 2. **[QQQ Directional Signal](#qqq-directional-signal-buy-callsputs)** — an
    on-demand (re-runnable through the session) CALL/PUT/NO-TRADE signal
@@ -24,18 +24,22 @@ data:
 > day-trading system is.** These structure the same inputs a discretionary
 > trader would check, consistently; they don't promise a win rate.
 
-## QQQ Iron Condor Scanner
+## SPX Iron Condor Scanner
 
-An automated daily scanner for trading **QQQ iron condors**. Every trading
-day (scheduled around market open), it pulls price action, technical
-indicators, volatility data, and news, then proposes concrete iron condor
-strikes for a same-day (0DTE), a weekly, and a monthly expiration.
+An automated daily scanner for trading **SPX iron condors** (full-size
+S&P 500 index options -- cash-settled, European-style, Section 1256 tax
+treatment). Every trading day (scheduled around market open), it pulls
+price action, technical indicators, volatility data, and news, then
+proposes concrete iron condor strikes for a same-day (0DTE), a weekly, and
+a monthly expiration. The underlying is a single `Config.symbol` field
+(default `"^SPX"`) -- swap it back to `"QQQ"` (and rescale `wing_width`,
+see below) to run the original ETF-based version instead.
 
 ## What it does
 
 Each run:
 
-1. **Market snapshot** — QQQ price action, trend classification (trend vs.
+1. **Market snapshot** — SPX price action, trend classification (trend vs.
    range via ADX), RSI(14), SMA20/50/200, EMA9/21, MACD, Bollinger Bands,
    ATR(14), 20-day historical volatility, and 20/50-day support & resistance.
 2. **Volatility regime** — VIX level and its percentile rank over the
@@ -47,10 +51,12 @@ Each run:
 4. **Iron condor construction** — for a same-day (0DTE), weekly (~5-10 DTE),
    and monthly (~28-45 DTE) expiration, it selects short strikes closest to
    a target delta (default ~0.16 for weekly/monthly, ~0.10 for 0DTE),
-   adds protective long strikes ($5 wide for weekly/monthly, $2 wide for
-   0DTE), and reports net credit, max profit/loss, breakevens, return on
-   risk, and an approximate probability of profit. 0DTE only appears if
-   QQQ actually lists a same-day expiration when the scan runs; it is
+   adds protective long strikes ($50 wide for weekly/monthly, $20 wide for
+   0DTE -- scaled for SPX's ~$5 near-the-money strike spacing, confirmed
+   live; QQQ's original defaults were $5/$2 for its $1 spacing), and
+   reports net credit, max profit/loss, breakevens, return on risk, and an
+   approximate probability of profit. 0DTE only appears if the underlying
+   actually lists a same-day expiration when the scan runs; it is
    never approximated with a later expiration under the "0DTE" label.
    Delta comes from a real broker-computed greek when `TRADIER_TOKEN` is
    set (see [Data providers](#data-providers) below), otherwise from a
@@ -143,10 +149,19 @@ Getting a token:
 
 Every report states which provider produced it. The Tradier integration
 (`qqq_iron_condor/tradier.py`) is built from Tradier's documented response
-shapes and covered by parsing tests, but hasn't been exercised against a
-live account from this codebase -- if `get_vix_history()` fails, the VIX
-symbol convention (`Config.tradier_vix_symbol`, default `"VIX"`) is the
-first thing to check.
+shapes, covered by parsing tests, and has been exercised live against a
+real account for price/quote/VIX-history calls (which is how the
+`TRADIER_BASE_URL` empty-string-fallback bug below was caught and fixed).
+The SPX **option chain** endpoint specifically has not yet been verified
+live -- `Config.symbol` defaults to `"^SPX"` for yfinance, and
+`providers._tradier_symbol()` strips the leading caret to `"SPX"` before
+calling Tradier, matching Tradier's documented no-caret convention, but
+this hasn't been confirmed against a live SPX chain response from this
+codebase. If `get_option_chain_for_expiration()` fails for SPX, that
+symbol (or account permissions -- SPX index options require separate
+options-approval from equity/ETF options) is the first thing to check. If
+`get_vix_history()` fails, the VIX symbol convention
+(`Config.tradier_vix_symbol`, default `"VIX"`) is the first thing to check.
 
 ## How strikes are chosen
 
@@ -154,9 +169,9 @@ first thing to check.
   (`Config.short_delta_target`, default `0.16`) on each side -- a real
   broker-computed delta when Tradier is active, otherwise a Black-Scholes
   approximation from the option chain's own implied volatility.
-- **Long strikes**: `Config.wing_width` (default `$5`) beyond each short
-  strike, snapped to the nearest listed strike — this caps max loss
-  (defined risk).
+- **Long strikes**: `Config.wing_width` (default `$50`, scaled for SPX;
+  was `$5` for QQQ) beyond each short strike, snapped to the nearest
+  listed strike — this caps max loss (defined risk).
 - **Credit / max loss / max profit / breakevens**: computed from mid
   prices (`(bid+ask)/2`, falling back to last price) of all four legs.
 - **Probability of profit**: approximated as `1 - (|short put delta| +
@@ -219,16 +234,17 @@ Nothing is logged automatically -- you (or a chat session helping you)
 add a trade when you place it and close it when you exit it:
 
 ```bash
-# Log a trade you just opened (use your actual broker fill numbers)
+# Log a trade you just opened (use your actual broker fill numbers --
+# strikes/credit below are SPX-scaled to match the $50 default wing width)
 python -m qqq_iron_condor.journal add --label Weekly --expiration 2026-10-09 --dte 8 \
-    --short-call 760 --long-call 765 --short-put 720 --long-put 715 \
-    --credit 1.35 --entry-underlying 740.50 --vix 15.2
+    --short-call 7900 --long-call 7950 --short-put 7600 --long-put 7550 \
+    --credit 13.50 --entry-underlying 7750.50 --vix 15.2
 
 # Close it out early (paid a debit to buy back the condor)
-python -m qqq_iron_condor.journal close --id 1 --exit-debit 0.35
+python -m qqq_iron_condor.journal close --id 1 --exit-debit 3.50
 
 # ...or let it expire and settle against the underlying's price at expiration
-python -m qqq_iron_condor.journal close --id 1 --settle-underlying 742.10
+python -m qqq_iron_condor.journal close --id 1 --settle-underlying 7762.10
 
 python -m qqq_iron_condor.journal list      # open positions
 python -m qqq_iron_condor.journal report    # realized win rate / expectancy / drawdown, by label
@@ -261,7 +277,7 @@ and falls apart in stressed ones, or vice versa. The report is printed and
 saved to `reports/backtests/YYYY-MM-DD.md`.
 
 **Why it's a simulation, not a replay:** there is no free source of
-historical QQQ option-chain data (strike-level bid/ask/IV by date) — that
+historical option-chain data (strike-level bid/ask/IV by date) — that
 requires a paid feed (CBOE DataShop, ORATS historical, Polygon.io). Free
 data only covers historical *underlying* prices and VIX. So the backtest
 instead prices a full synthetic chain at every entry/exit with
@@ -304,10 +320,17 @@ simplified volatility assumptions, not a prediction of live results.
   captured by a static delta snapshot from when the scan ran.
 - News/catalyst detection is a keyword scan over a handful of free RSS
   feeds — it is **not** a substitute for checking an economic calendar
-  (FOMC/CPI/NFP dates, earnings dates for QQQ's mega-cap holdings) before
-  trading.
+  (FOMC/CPI/NFP dates, mega-cap earnings dates) before trading.
 - IV rank is approximated via the VIX's 1-year percentile as a market-wide
-  proxy; it is not QQQ-specific historical IV.
+  proxy; it is not underlying-specific historical IV.
+- **Full-size SPX notional is ~10x QQQ's at current prices.** The
+  configured wing widths/deltas carry that through proportionally, but
+  *contract count* is still entirely your call -- the scanner has no
+  concept of account size, so sizing that felt routine on QQQ can be a
+  large fraction of a smaller account's capital on SPX at the same
+  contract count. Also note SPX index options typically require a
+  separate, higher options-approval tier from your broker than
+  equity/ETF options (QQQ) do.
 - This tool never places trades — it only produces an analysis/report.
 - The [backtest](#backtesting) is a Black-Scholes simulation driven by real
   historical underlying/VIX data, not a replay of real historical option
@@ -855,6 +878,8 @@ tests/
   test_strategy.py        # strike selection, sanity checks, real-vs-BS delta
   test_gates.py           # trade gate unit tests
   test_tradier.py         # Tradier response-parsing tests (mocked HTTP)
+  test_providers.py       # provider dispatch, incl. caret-stripping for Tradier symbols
+  test_report.py          # report rendering: data-provider-dependent banner/footer text
   test_backtest.py        # backtest simulation mechanics (settlement math, gating, non-overlap)
   test_directional_backtest.py  # directional backtest mechanics (touch detection, gating, aggregation)
   test_journal.py         # trade journal CSV persistence & realized-performance stats

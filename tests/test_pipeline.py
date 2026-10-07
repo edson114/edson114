@@ -8,7 +8,7 @@ from qqq_iron_condor.scan import _self_test_report
 
 def test_self_test_report_contains_expected_sections():
     report = _self_test_report()
-    assert "QQQ Iron Condor Daily Scan" in report
+    assert "SPX Iron Condor Daily Scan" in report
     assert "Market Snapshot" in report
     assert "Technical Indicators" in report
     assert "News & Catalysts" in report

@@ -22,39 +22,48 @@ def active_provider_name() -> str:
     return "tradier" if _tradier.is_available() else "yfinance"
 
 
+def _tradier_symbol(symbol: str) -> str:
+    """yfinance index tickers are caret-prefixed (e.g. "^SPX", "^VIX");
+    Tradier never uses that convention. Stripping it is a safe, universal
+    transform -- there's no symbol where Tradier actually wants a caret --
+    so this covers any symbol (not just the ones with a dedicated
+    tradier_*_symbol override, like VIX)."""
+    return symbol.lstrip("^")
+
+
 def get_price_history(symbol: str, period: str = "1y") -> pd.DataFrame:
     if _tradier.is_available():
-        return _tradier.get_price_history(symbol, period)
+        return _tradier.get_price_history(_tradier_symbol(symbol), period)
     return _yf.get_price_history(symbol, period)
 
 
 def get_spot_price(symbol: str, price_history: pd.DataFrame) -> float:
     if _tradier.is_available():
-        return _tradier.get_spot_price(symbol)
+        return _tradier.get_spot_price(_tradier_symbol(symbol))
     return _yf.get_spot_price(price_history)
 
 
 def get_gap_info(symbol: str, price_history: pd.DataFrame) -> tuple[Optional[float], bool]:
     if _tradier.is_available():
-        return _tradier.get_gap_info(symbol)
+        return _tradier.get_gap_info(_tradier_symbol(symbol))
     return _yf.get_gap_info(symbol, price_history)
 
 
 def list_expirations(symbol: str) -> list[str]:
     if _tradier.is_available():
-        return _tradier.list_expirations(symbol)
+        return _tradier.list_expirations(_tradier_symbol(symbol))
     return _yf.list_expirations(symbol)
 
 
 def get_option_chain_for_expiration(symbol: str, expiration: str) -> OptionChain:
     if _tradier.is_available():
-        return _tradier.get_option_chain_for_expiration(symbol, expiration)
+        return _tradier.get_option_chain_for_expiration(_tradier_symbol(symbol), expiration)
     return _yf.get_option_chain_for_expiration(symbol, expiration)
 
 
 def pick_expirations_for_targets(symbol: str, targets: tuple) -> dict[str, OptionChain]:
     if _tradier.is_available():
-        return _tradier.pick_expirations_for_targets(symbol, targets)
+        return _tradier.pick_expirations_for_targets(_tradier_symbol(symbol), targets)
     return _yf.pick_expirations_for_targets(symbol, targets)
 
 

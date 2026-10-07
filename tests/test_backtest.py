@@ -55,6 +55,18 @@ def test_simulate_chain_widens_range_for_high_iv():
     assert stressed_width > calm_width
 
 
+def test_simulate_chain_respects_custom_strike_step_for_spx_scale():
+    # SPX's near-the-money strikes are $5 apart (verified live), vs QQQ's
+    # $1 -- at SPX's price level the default step=1.0 still "works" but
+    # wastes thousands of unnecessary Black-Scholes evaluations per chain,
+    # which is what motivated making this configurable.
+    chain = backtest.simulate_chain(spot=7800.0, iv=0.18, dte=30, rate=0.045, expiration="2026-11-01", strike_step=5.0)
+    strikes = sorted(chain.calls["strike"].unique())
+    assert all(s % 5 == 0 for s in strikes)
+    # a non-trivial number of distinct strikes were actually generated
+    assert len(strikes) > 10
+
+
 def test_settle_pnl_is_max_profit_when_spot_finishes_between_short_strikes():
     chain = backtest.simulate_chain(spot=400.0, iv=0.20, dte=30, rate=0.045, expiration="2026-11-01")
     trade = build_iron_condor("Weekly", chain, 400.0, 0.045, 0.16, 5.0)
@@ -110,6 +122,18 @@ def test_summarize_handles_no_trades():
     summary = backtest.summarize("Weekly", [])
     assert summary.num_trades == 0
     assert summary.by_regime == []
+
+
+def test_infer_strike_step_picks_spx_scale_above_1000_and_qqq_scale_below():
+    assert backtest.infer_strike_step(7800.0) == 5.0
+    assert backtest.infer_strike_step(750.0) == 1.0
+    assert backtest.infer_strike_step(1000.0) == 1.0  # boundary is exclusive
+
+
+def test_render_backtest_report_strips_caret_from_display_symbol():
+    report_md = backtest.render_backtest_report("^SPX", 2.0, [], apply_gates=True)
+    assert "# SPX Iron Condor Backtest" in report_md
+    assert "^SPX" not in report_md
 
 
 def test_render_backtest_report_includes_each_label():
