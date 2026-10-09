@@ -1,5 +1,4 @@
-"""CLI entrypoint: run the full daily iron condor scan (SPX by default,
-see Config.symbol).
+"""CLI entrypoint: run the full daily QQQ iron condor scan.
 
 Usage:
     python -m qqq_iron_condor.scan
@@ -112,14 +111,9 @@ def _self_test_report() -> str:
     rng = np.random.default_rng(42)
     n = 260
     dates = pd.date_range(end=dt.date.today(), periods=n, freq="B")
-    # Scaled to roughly SPX's actual price level (~$7800+) rather than
-    # QQQ's (~$750) -- the synthetic option chain below needs a strike
-    # range wide enough to comfortably contain short+wing for every
-    # configured target, which depends on this being the right order of
-    # magnitude, not just internally self-consistent.
-    price = 7800 + np.cumsum(rng.normal(3.0, 30.0, n))
-    high = price + rng.uniform(5.0, 25.0, n)
-    low = price - rng.uniform(5.0, 25.0, n)
+    price = 400 + np.cumsum(rng.normal(0.3, 3.0, n))
+    high = price + rng.uniform(0.5, 2.5, n)
+    low = price - rng.uniform(0.5, 2.5, n)
     price_history = pd.DataFrame(
         {"Open": price, "High": high, "Low": low, "Close": price, "Volume": rng.integers(1_000_000, 5_000_000, n)},
         index=dates,
@@ -136,16 +130,7 @@ def _self_test_report() -> str:
     def synth_chain(label: str, dte: int) -> OptionChain:
         from .options_math import bs_price, time_to_expiration_years
 
-        # $5 strike step matches SPX's real near-the-money spacing (verified
-        # live); the +-700 range comfortably covers short+wing even for the
-        # Monthly target's widest realistic expected move -- a too-narrow
-        # range here doesn't error, it silently clamps the "long" strike to
-        # the edge of the range instead of the configured wing width, which
-        # is exactly the failure this synthetic chain hit before being
-        # rescaled for SPX.
-        strike_step = 5.0
-        center = round(spot / strike_step) * strike_step
-        strikes = np.arange(center - 700, center + 700, strike_step)
+        strikes = np.arange(round(spot) - 40, round(spot) + 40, 1.0)
         iv = 0.18 + rng.uniform(-0.02, 0.02, len(strikes))
         t_years = time_to_expiration_years(dte)
 
@@ -214,7 +199,7 @@ def _self_test_report() -> str:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="Iron condor daily scanner (SPX by default)")
+    parser = argparse.ArgumentParser(description="QQQ iron condor daily scanner")
     parser.add_argument("--no-issue", action="store_true", help="Skip creating a GitHub issue even if GITHUB_TOKEN is set")
     parser.add_argument("--output-dir", default=None, help="Override the reports output directory")
     parser.add_argument("--self-test", action="store_true", help="Run the full pipeline on synthetic data (no network)")

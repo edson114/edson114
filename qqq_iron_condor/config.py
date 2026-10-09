@@ -61,13 +61,7 @@ class ExpirationTarget:
 
 @dataclass(frozen=True)
 class Config:
-    # "^SPX" is the yfinance ticker for full-size S&P 500 index options --
-    # unlike QQQ, it serves both price history AND a real option chain
-    # (verified live; Yahoo's "^GSPC" has the former but not the latter).
-    # Tradier's convention drops the caret ("SPX"); providers.py strips it
-    # automatically when dispatching to Tradier, so this field never needs
-    # a separate tradier_symbol the way VIX does below.
-    symbol: str = "^SPX"
+    symbol: str = "QQQ"
     vix_symbol: str = "^VIX"
     # Symbol convention differs between providers: yfinance wants the
     # caret-prefixed Yahoo ticker, Tradier's market data generally uses the
@@ -82,25 +76,17 @@ class Config:
 
     # Target absolute delta for the short strikes of the iron condor.
     # ~0.16 delta is roughly a 1 standard deviation move (~84% POP per side).
-    # Delta targeting is underlying-agnostic by design, so this didn't need
-    # to change for the QQQ -> SPX switch -- only the dollar-denominated
-    # wing widths below did, since SPX trades ~10x QQQ's price.
     short_delta_target: float = 0.16
 
-    # Wing width in dollars for the long (protective) legs. SPX lists
-    # strikes every $5 near the money (confirmed live), vs QQQ's $1 --
-    # scaled roughly with the ~10x spot-price ratio between the two
-    # (QQQ's old default was $5) and rounded to a real $5 strike increment.
-    wing_width: float = 50.0
+    # Wing width in dollars for the long (protective) legs.
+    wing_width: float = 5.0
 
     # DTE (calendar days) windows to scan and label. 0DTE uses a tighter
     # wing and a lower delta target: intraday gamma risk is much higher,
-    # and a full weekly/monthly-sized wing would be disproportionately wide
-    # relative to a same-day expected move. Wing width here is likewise
-    # scaled for SPX's ~$5 near-the-money strike spacing (QQQ's old default
-    # was $2).
+    # and QQQ's $1 strike spacing makes a $5 wing disproportionately wide
+    # relative to a same-day expected move.
     expiration_targets: tuple = (
-        ExpirationTarget("0DTE", 0, 0, short_delta_target=0.10, wing_width=20.0, allow_fallback=False),
+        ExpirationTarget("0DTE", 0, 0, short_delta_target=0.10, wing_width=2.0, allow_fallback=False),
         ExpirationTarget("Weekly", 5, 10),
         ExpirationTarget("Monthly", 28, 45),
     )
@@ -113,12 +99,10 @@ class Config:
     price_history_period: str = "1y"
     vix_history_period: str = "1y"
 
-    # News. Swapped from QQQ/Nasdaq (^IXIC) feeds to SPY/S&P 500 (^GSPC)
-    # feeds to match the broad-index underlying -- QQQ-specific headlines
-    # skew tech-heavy and are less relevant once the scan trades SPX.
+    # News
     news_feeds: tuple = (
-        ("Yahoo Finance - SPY", "https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPY&region=US&lang=en-US"),
-        ("Yahoo Finance - S&P 500", "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"),
+        ("Yahoo Finance - QQQ", "https://feeds.finance.yahoo.com/rss/2.0/headline?s=QQQ&region=US&lang=en-US"),
+        ("Yahoo Finance - Nasdaq", "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EIXIC&region=US&lang=en-US"),
         ("CNBC Markets", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
         ("MarketWatch Top Stories", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
     )
