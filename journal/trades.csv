@@ -6,3 +6,4 @@ id,status,opened_at,closed_at,label,symbol,expiration,dte_at_entry,short_call,lo
 5,CLOSED,2026-10-06,2026-10-06,0DTE,QQQ,2026-10-06,0,764.0,766.0,759.0,757.0,20,0.7,0.7,1.3,2.0,2.0,761.29,,,0.35,700.0,20 contracts -- new high size (~21.7% of $12K account max loss) | Closed at 50% of max profit
 6,CLOSED,2026-10-07,2026-10-07,0DTE,SPX,2026-10-07,0,7820.0,7825.0,7720.0,7715.0,2,0.65,0.65,4.35,5.0,5.0,,,,0.3,70.0,"First SPXW trade, 7715/7720/7820/7825"
 7,CLOSED,2026-10-08,2026-10-08,0DTE,SPX,2026-10-08,0,7795.0,7815.0,7735.0,7715.0,7,3.62,3.62,16.38,20.0,20.0,7749.6,15.9,7760.0,0.0,2534.0,0DTE SPX condor from 2026-10-08 scan | Settled at expiration
+8,CLOSED,2026-10-09,2026-10-09,0DTE,SPX,2026-10-09,0,7820.0,7825.0,7745.0,7740.0,6,0.55,0.55,4.45,5.0,5.0,,,,0.35,120.0,"SPXW 7740/7745/7820/7825 | Bought back at 0.35, broker realized profit $120.00"
