@@ -52,6 +52,7 @@ def evaluate_gates(
     adx_trend_threshold: float,
     volume_ratio_threshold: float,
     catalyst_hits: list[CatalystHit],
+    vol_index_label: str = "VIX",
 ) -> GateResult:
     hard_reasons: list[str] = []
     soft_reasons: list[str] = []
@@ -70,7 +71,7 @@ def evaluate_gates(
 
     if vix_level >= vix_spike_threshold:
         hard_reasons.append(
-            f"VIX at {vix_level:.1f} is at/above the {vix_spike_threshold:.0f} spike threshold "
+            f"{vol_index_label} at {vix_level:.1f} is at/above the {vix_spike_threshold:.0f} spike threshold "
             "(checked at scan time -- a later intraday spike won't be caught until the next scan)."
         )
 

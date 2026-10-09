@@ -44,6 +44,29 @@ CPI_2026_RELEASE_DAYS = {
 DEFAULT_MACRO_EVENT_DATES = {**FOMC_2026_DECISION_DAYS, **CPI_2026_RELEASE_DAYS}
 
 
+def vol_index_for_symbol(symbol: str) -> tuple[str, str, float]:
+    """Pick the CBOE volatility index that actually tracks the underlying
+    being scanned, rather than always defaulting to VIX: VXN (Nasdaq-100)
+    for QQQ, VIX (S&P 500) for everything else (SPX, SPY, ...). Returns
+    (yfinance_symbol, tradier_symbol, spike_threshold).
+
+    VXN structurally trades richer than VIX -- about 30% higher on
+    average, confirmed against a year of live data -- so a flat 20.0
+    spike threshold carried over from VIX would fire on nearly every scan.
+    27.0 is VXN's equivalent: both thresholds sit at roughly the 80th
+    percentile of each index's own trailing 1-year range.
+
+    This intentionally does not read `Config.vix_symbol` /
+    `tradier_vix_symbol` / `vix_spike_threshold` -- those remain VIX-only
+    and are relied on by the sibling Directional Signal / Daily $ Target
+    tools (`daily_target_iv_vix_multiple` is calibrated specifically
+    against VIX's level, not VXN's), which stay out of scope here.
+    """
+    if symbol.lstrip("^").upper() == "QQQ":
+        return "^VXN", "VXN", 27.0
+    return "^VIX", "VIX", 20.0
+
+
 @dataclass(frozen=True)
 class ExpirationTarget:
     label: str

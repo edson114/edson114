@@ -73,7 +73,7 @@ def _catalyst_section(hits: list[CatalystHit], headlines: list[Headline]) -> str
     return "\n".join(lines)
 
 
-def _gate_section(gate: GateResult) -> str:
+def _gate_section(gate: GateResult, vol_index_label: str = "VIX") -> str:
     lines = []
     if gate.skip:
         lines.append("## 🛑 Trade Gate: SKIP TODAY")
@@ -84,7 +84,7 @@ def _gate_section(gate: GateResult) -> str:
     else:
         lines.append("## ✅ Trade Gate: OK to trade")
         lines.append("")
-        lines.append("No hard skip-day condition triggered (scheduled macro event, gap, or VIX spike).")
+        lines.append(f"No hard skip-day condition triggered (scheduled macro event, gap, or {vol_index_label} spike).")
 
     if gate.soft_reasons:
         lines.append("")
@@ -98,7 +98,7 @@ def _gate_section(gate: GateResult) -> str:
     lines.append(f"_Gap check: {gap_str} ({gap_kind})._")
     lines.append(
         "_Caveats: the trending/volume flag and headline scan are best-effort proxies, not live "
-        "intraday monitoring -- a single morning scan can't observe a VIX spike, volume surge, or "
+        f"intraday monitoring -- a single morning scan can't observe a {vol_index_label} spike, volume surge, or "
         "trend that develops later in the session. The macro calendar only covers dates you've "
         "entered in `Config.macro_event_dates`; keep it updated from official sources._"
     )
@@ -144,13 +144,13 @@ def render_report(
     parts.append("")
 
     if gate is not None:
-        parts.append(_gate_section(gate))
+        parts.append(_gate_section(gate, snapshot.vol_index_label))
 
     parts.append("## Market Snapshot")
     parts.append("")
     parts.append(f"- **{symbol} last close:** ${_fmt(snapshot.spot)} ({_fmt(snapshot.day_change_pct)}% vs prior close of ${_fmt(snapshot.prev_close)})")
     parts.append(f"- **Trend:** {snapshot.trend_label}")
-    parts.append(f"- **Volatility regime:** {snapshot.regime_label} (VIX {_fmt(snapshot.vix_level,1)}, {_fmt(snapshot.vix_percentile_1y,0)}th percentile of trailing 1y)")
+    parts.append(f"- **Volatility regime:** {snapshot.regime_label} ({snapshot.vol_index_label} {_fmt(snapshot.vix_level,1)}, {_fmt(snapshot.vix_percentile_1y,0)}th percentile of trailing 1y)")
     parts.append(f"- **20-day range:** ${_fmt(snapshot.low_20d)} - ${_fmt(snapshot.high_20d)}")
     parts.append(f"- **50-day range:** ${_fmt(snapshot.low_50d)} - ${_fmt(snapshot.high_50d)}")
     parts.append("")

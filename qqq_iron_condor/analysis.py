@@ -55,6 +55,12 @@ class MarketSnapshot:
     regime_label: str
     regime_notes: list
 
+    # Name of the volatility index vix_level/vix_percentile_1y actually
+    # come from -- "VIX" for the S&P 500 proxy, "VXN" when scanning QQQ
+    # (see config.vol_index_for_symbol). Defaults to "VIX" so existing
+    # callers that don't pass vol_index_label keep that wording.
+    vol_index_label: str = "VIX"
+
 
 def _trend_label(spot: float, sma50: float, sma200: float, macd_hist: float, adx: float, adx_threshold: float) -> str:
     if adx < adx_threshold:
@@ -66,7 +72,9 @@ def _trend_label(spot: float, sma50: float, sma200: float, macd_hist: float, adx
     return "Mixed / transitional trend"
 
 
-def build_snapshot(price_history: pd.DataFrame, vix_history: pd.DataFrame, adx_threshold: float) -> MarketSnapshot:
+def build_snapshot(
+    price_history: pd.DataFrame, vix_history: pd.DataFrame, adx_threshold: float, vol_index_label: str = "VIX",
+) -> MarketSnapshot:
     close = price_history["Close"]
     high = price_history["High"]
     low = price_history["Low"]
@@ -113,12 +121,12 @@ def build_snapshot(price_history: pd.DataFrame, vix_history: pd.DataFrame, adx_t
         )
     if vix_percentile_1y >= 70:
         regime_notes.append(
-            f"VIX ({vix_level:.1f}) is in the {vix_percentile_1y:.0f}th percentile of its "
+            f"{vol_index_label} ({vix_level:.1f}) is in the {vix_percentile_1y:.0f}th percentile of its "
             "1-year range -- elevated/rich premium environment, but also higher gap risk."
         )
     elif vix_percentile_1y <= 20:
         regime_notes.append(
-            f"VIX ({vix_level:.1f}) is in the {vix_percentile_1y:.0f}th percentile of its "
+            f"{vol_index_label} ({vix_level:.1f}) is in the {vix_percentile_1y:.0f}th percentile of its "
             "1-year range -- premium is cheap; credit received may not justify the risk."
         )
     if rsi14 >= 70:
@@ -157,6 +165,7 @@ def build_snapshot(price_history: pd.DataFrame, vix_history: pd.DataFrame, adx_t
         volume_ratio=volume_ratio,
         vix_level=vix_level,
         vix_percentile_1y=vix_percentile_1y,
+        vol_index_label=vol_index_label,
         trend_label=trend_label,
         regime_label=regime_label,
         regime_notes=regime_notes,

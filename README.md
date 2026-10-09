@@ -43,8 +43,11 @@ Each run:
 1. **Market snapshot** — QQQ price action, trend classification (trend vs.
    range via ADX), RSI(14), SMA20/50/200, EMA9/21, MACD, Bollinger Bands,
    ATR(14), 20-day historical volatility, and 20/50-day support & resistance.
-2. **Volatility regime** — VIX level and its percentile rank over the
-   trailing year, used as a market-wide IV proxy (cheap vs. rich premium).
+2. **Volatility regime** — a CBOE volatility index level and its percentile
+   rank over the trailing year, used as a market-wide IV proxy (cheap vs.
+   rich premium): VXN (Nasdaq-100) for the QQQ default, VIX (S&P 500) if
+   you switch `Config.symbol` to `"^SPX"` (see
+   `config.vol_index_for_symbol`).
 3. **News & catalysts** — pulls headlines from free RSS feeds (Yahoo
    Finance, CNBC, MarketWatch) and flags ones mentioning known
    market-moving topics (FOMC, CPI, jobs data, mega-cap earnings,
@@ -65,7 +68,7 @@ Each run:
 5. **Trade gate (skip-day rules)** — a SKIP/OK verdict at the top of the
    report, evaluating: a scheduled macro event (FOMC/CPI, from a
    user-maintained calendar), an opening/pre-market gap beyond a threshold,
-   and whether VIX is at/above a spike level at scan time (hard gates --
+   and whether the vol index (VXN/VIX) is at/above a spike level at scan time (hard gates --
    any one triggers SKIP), plus a trending-day-with-above-average-volume
    proxy and headline catalyst hits (soft flags -- shown, not forced). See
    [How the trade gate works](#how-the-trade-gate-works) for what each
@@ -156,8 +159,11 @@ calling Tradier, confirmed live to match Tradier's no-caret convention).
 If `get_option_chain_for_expiration()` ever fails for SPX, account
 permissions are the first thing to check -- SPX index options require
 separate options-approval from equity/ETF options. If `get_vix_history()`
-fails, the VIX symbol convention
-(`Config.tradier_vix_symbol`, default `"VIX"`) is the first thing to check.
+fails, the vol-index symbol convention is the first thing to check -- the
+iron condor scanner picks its own (`"VXN"` for QQQ, `"VIX"` for SPX) via
+`config.vol_index_for_symbol`, independent of `Config.tradier_vix_symbol`
+(default `"VIX"`), which the sibling Directional Signal / Daily $ Target
+tools still use directly.
 
 ## How strikes are chosen
 
@@ -184,7 +190,7 @@ target and wing width per expiration (0DTE already does this).
 Every report opens with a `🛑 SKIP TODAY` or `✅ OK to trade` verdict
 (`qqq_iron_condor/gates.py`), implementing: skip on FOMC days, CPI prints,
 surprise macro news, a strong pre-market gap, a trending day with
-above-average volume, or a VIX spike. Not all of those are equally
+above-average volume, or a vol-index spike. Not all of those are equally
 checkable from one point-in-time morning scan, so the gate splits them:
 
 **Hard gates** (any one → SKIP):
@@ -199,8 +205,10 @@ checkable from one point-in-time morning scan, so the gate splits them:
   Once the market has opened and today's daily bar exists, this is a
   confirmed move from the prior close; before the open, it falls back to
   a live quote for an indicative (unconfirmed) pre-market gap.
-- **VIX spike** — `Config.vix_spike_threshold` (default `20.0`), checked
-  against VIX's level **at scan time**. This cannot detect a spike that
+- **Vol-index spike** — VXN ≥ `27.0` for QQQ, or VIX ≥ `20.0` if you've
+  switched to `"^SPX"` (`config.vol_index_for_symbol`; both thresholds sit
+  at roughly the same 80th-percentile point of each index's own trailing
+  1-year range), checked **at scan time**. This cannot detect a spike that
   develops intraday after the report has already run.
 
 **Soft flags** (shown, don't force a skip alone):

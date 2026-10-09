@@ -16,7 +16,7 @@ from pathlib import Path
 
 from . import providers
 from .analysis import build_snapshot
-from .config import Config
+from .config import Config, vol_index_for_symbol
 from .data import get_news
 from .gates import evaluate_gates
 from .news import flag_catalysts
@@ -25,11 +25,14 @@ from .strategy import build_iron_condor
 
 
 def run_scan(cfg: Config) -> str:
+    vix_symbol, tradier_vix_symbol, vix_spike_threshold = vol_index_for_symbol(cfg.symbol)
+    vol_index_label = vix_symbol.lstrip("^")
+
     price_history = providers.get_price_history(cfg.symbol, cfg.price_history_period)
-    vix_history = providers.get_vix_history(cfg.vix_history_period, cfg.vix_symbol, cfg.tradier_vix_symbol)
+    vix_history = providers.get_vix_history(cfg.vix_history_period, vix_symbol, tradier_vix_symbol)
     spot = providers.get_spot_price(cfg.symbol, price_history)
 
-    snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
+    snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold, vol_index_label)
 
     chains = providers.pick_expirations_for_targets(cfg.symbol, cfg.expiration_targets)
     condors = {}
@@ -59,11 +62,12 @@ def run_scan(cfg: Config) -> str:
         gap_confirmed=gap_confirmed,
         gap_threshold_pct=cfg.gap_threshold_pct,
         vix_level=snapshot.vix_level,
-        vix_spike_threshold=cfg.vix_spike_threshold,
+        vix_spike_threshold=vix_spike_threshold,
         snapshot=snapshot,
         adx_trend_threshold=cfg.adx_trend_threshold,
         volume_ratio_threshold=cfg.volume_ratio_threshold,
         catalyst_hits=catalyst_hits,
+        vol_index_label=vol_index_label,
     )
 
     return render_report(
@@ -124,8 +128,10 @@ def _self_test_report() -> str:
     vix_history = pd.DataFrame({"Open": vix_price, "High": vix_price, "Low": vix_price, "Close": vix_price}, index=dates)
 
     cfg = Config()
+    vix_symbol, _tradier_vix_symbol, vix_spike_threshold = vol_index_for_symbol(cfg.symbol)
+    vol_index_label = vix_symbol.lstrip("^")
     spot = float(price_history["Close"].iloc[-1])
-    snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
+    snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold, vol_index_label)
 
     def synth_chain(label: str, dte: int) -> OptionChain:
         from .options_math import bs_price, time_to_expiration_years
@@ -188,11 +194,12 @@ def _self_test_report() -> str:
         gap_confirmed=gap_confirmed,
         gap_threshold_pct=cfg.gap_threshold_pct,
         vix_level=snapshot.vix_level,
-        vix_spike_threshold=cfg.vix_spike_threshold,
+        vix_spike_threshold=vix_spike_threshold,
         snapshot=snapshot,
         adx_trend_threshold=cfg.adx_trend_threshold,
         volume_ratio_threshold=cfg.volume_ratio_threshold,
         catalyst_hits=catalyst_hits,
+        vol_index_label=vol_index_label,
     )
 
     return render_report(cfg.symbol, snapshot, condors, headlines, catalyst_hits, gate=gate)

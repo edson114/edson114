@@ -50,3 +50,16 @@ def test_render_report_handles_missing_data_provider():
     # rather than silently claiming real broker greeks.
     report_md = render_report("QQQ", _snapshot(), {}, [], [], gate=_gate())
     assert "Black-Scholes delta approximation" in report_md
+
+
+def test_render_report_volatility_regime_defaults_to_vix_label():
+    report_md = render_report("QQQ", _snapshot(), {}, [], [], gate=_gate())
+    assert "VIX 16.0" in report_md
+    assert "VXN" not in report_md
+
+
+def test_render_report_volatility_regime_uses_snapshot_vol_index_label():
+    report_md = render_report("QQQ", _snapshot(vol_index_label="VXN"), {}, [], [], gate=_gate())
+    assert "VXN 16.0" in report_md
+    assert "VIX 16.0" not in report_md
+    assert "VXN spike" in report_md  # gate-section caveat text picks it up too

@@ -2,7 +2,7 @@
 
 import datetime as dt
 
-from qqq_iron_condor.config import Config
+from qqq_iron_condor.config import Config, vol_index_for_symbol
 from qqq_iron_condor.gates import evaluate_gates
 from qqq_iron_condor.news import CatalystHit, Headline
 
@@ -108,3 +108,33 @@ def test_real_fomc_date_triggers_skip_via_default_config():
     result = evaluate_gates(**_base_kwargs(today=dt.date(2026, 9, 16), macro_event_dates=cfg.macro_event_dates))
     assert result.skip is True
     assert any("FOMC" in r for r in result.hard_reasons)
+
+
+def test_vix_spike_reason_defaults_to_vix_label():
+    result = evaluate_gates(**_base_kwargs(vix_level=22.0))
+    assert any("VIX at 22.0" in r for r in result.hard_reasons)
+
+
+def test_vix_spike_reason_uses_custom_vol_index_label():
+    result = evaluate_gates(**_base_kwargs(vix_level=22.0, vol_index_label="VXN"))
+    assert any("VXN at 22.0" in r for r in result.hard_reasons)
+    assert not any("VIX at" in r for r in result.hard_reasons)
+
+
+def test_vol_index_for_symbol_picks_vxn_for_qqq():
+    yf_symbol, tradier_symbol, threshold = vol_index_for_symbol("QQQ")
+    assert yf_symbol == "^VXN"
+    assert tradier_symbol == "VXN"
+    assert threshold == 27.0
+
+
+def test_vol_index_for_symbol_picks_vix_for_spx_and_anything_else():
+    for symbol in ("^SPX", "SPX", "SPY", "qqq-but-not-quite"):
+        yf_symbol, tradier_symbol, threshold = vol_index_for_symbol(symbol)
+        assert yf_symbol == "^VIX"
+        assert tradier_symbol == "VIX"
+        assert threshold == 20.0
+
+
+def test_vol_index_for_symbol_is_case_and_caret_insensitive():
+    assert vol_index_for_symbol("qqq") == vol_index_for_symbol("QQQ") == vol_index_for_symbol("QQQ".lstrip("^"))
