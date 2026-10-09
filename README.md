@@ -304,6 +304,49 @@ Concretely, this means:
 Treat the output as a bound on the strategy's mechanical edge under
 simplified volatility assumptions, not a prediction of live results.
 
+## MEIC (Multiple-Entry Iron Condor) Backtest
+
+A separate backtest of **MEIC**, a popular 0DTE SPX income strategy: leg
+into several iron condors through the day (not one), each sized to a
+target *credit* rather than a target *delta*, each managed independently
+with its own stop-loss rather than held unconditionally to expiration.
+`qqq_iron_condor/meic_backtest.py` simulates it against the same real
+historical SPX/VIX data as the backtest above:
+
+```bash
+# Default rules: 6 entries/day, 55-wide spreads, $1.00-$1.75 credit
+# target per side, stop at 2x credit (a 1x net loss) -- always on ^SPX
+# regardless of Config.symbol, since MEIC's credit target/spread width
+# are calibrated to SPX's price scale.
+python -m qqq_iron_condor.meic_backtest --years 3
+
+# Tune any rule
+python -m qqq_iron_condor.meic_backtest --years 2 --entries-per-day 4 \
+    --credit-low 1.25 --credit-high 2.00 --spread-width 50 --stop-multiple 2.0
+```
+
+It reports trading days, legs entered, day/leg win rate, stop-out rate,
+average credit per leg, total P&L, profit factor, max drawdown, and the
+same Low/Normal/High-IV-regime breakdown as the backtest above. The
+report is printed and saved to `reports/backtests/meic-YYYY-MM-DD.md`.
+
+**This backtest is a cruder approximation than the one above it**, on top
+of the same no-free-historical-option-data constraint: free daily bars
+give Open/High/Low/Close, not a real intraday path, so each entry's spot
+is linearly interpolated across the day by how far its entry time sits
+through the regular session, and each side's stop-loss is checked against
+a worst-case adverse level scaled down from the day's real High/Low by how
+much session time was left after that entry (so an early entry can see
+close to the full day's eventual extreme; a late one, much less of it).
+Neither is a substitute for a real intraday price path. There's also a
+bias specific to a *credit*-targeted strategy: the flat VIX-as-IV
+approximation (no skew, no term structure) likely understates how far OTM
+a real market would place a given credit level, so this backtest's
+stop-out rate should be expected to run noticeably higher than live MEIC
+trackers typically report — read a high stop rate as a signal of that
+modeling gap, not a verdict on the strategy itself. See the full
+derivation in the `qqq_iron_condor/meic_backtest.py` module docstring.
+
 ## Limitations & caveats
 
 - Uses free Yahoo Finance data via `yfinance`; option chain liquidity and

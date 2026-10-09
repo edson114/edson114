@@ -58,7 +58,8 @@ def infer_strike_step(spot: float) -> float:
 
 
 def simulate_chain(spot: float, iv: float, dte: int, rate: float, expiration: str,
-                    strike_step: float = 1.0, strike_range: Optional[float] = None) -> OptionChain:
+                    strike_step: float = 1.0, strike_range: Optional[float] = None,
+                    t_years: Optional[float] = None) -> OptionChain:
     """Build a synthetic option chain by pricing every strike with flat
     Black-Scholes IV. No delta column is included, so strategy.py derives
     delta the same way it would from a real chain with a flat vol skew.
@@ -67,8 +68,17 @@ def simulate_chain(spot: float, iv: float, dte: int, rate: float, expiration: st
     high-vol regimes (e.g. a historical VIX spike) still have far enough
     OTM strikes listed for the delta target and wing to resolve, rather
     than silently clipping against a fixed-width chain.
+
+    t_years overrides the time-to-expiration used for pricing. Left as
+    None, it's derived from `dte` via `time_to_expiration_years`, which
+    for dte=0 means *actual current wall-clock time* to the 4pm close --
+    fine for run_backtest's single same-day entry/exit, but wrong for
+    anything pricing a specific historical time-of-day (e.g.
+    meic_backtest.py's multiple intraday entries), which must pass the
+    correct T explicitly instead.
     """
-    t_years = time_to_expiration_years(dte)
+    if t_years is None:
+        t_years = time_to_expiration_years(dte)
     if strike_range is None:
         expected_move = spot * iv * (t_years ** 0.5) if t_years > 0 else 0.0
         strike_range = max(60.0, 4.0 * expected_move)

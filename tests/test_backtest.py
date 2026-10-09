@@ -146,3 +146,18 @@ def test_render_backtest_report_includes_each_label():
     report_md = backtest.render_backtest_report("QQQ", 2.0, [summary], apply_gates=True)
     assert "Weekly" in report_md
     assert "Win rate" in report_md
+
+
+def test_simulate_chain_t_years_override_takes_precedence_over_dte():
+    # dte=0 with no override derives T from the ACTUAL current wall-clock
+    # time (time_to_expiration_years' default `now`), which varies with
+    # when the test happens to run -- a caller that needs a specific
+    # historical/intraday T (e.g. meic_backtest.py's multiple intraday
+    # entries) must be able to override it explicitly.
+    chain_default = backtest.simulate_chain(400.0, 0.20, 0, 0.045, "2026-11-01")
+    chain_override = backtest.simulate_chain(400.0, 0.20, 0, 0.045, "2026-11-01", t_years=5.0 / 365.0)
+    # A 5-day T is wildly more time value than any 0DTE wall-clock T can
+    # be, so the override must have actually taken effect.
+    price_default = chain_default.calls.set_index("strike").loc[410.0]["lastPrice"]
+    price_override = chain_override.calls.set_index("strike").loc[410.0]["lastPrice"]
+    assert price_override > price_default
