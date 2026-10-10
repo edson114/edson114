@@ -294,7 +294,7 @@ def main(argv=None) -> int:
 
     p_add = sub.add_parser("add", help="Log a newly opened trade")
     p_add.add_argument("--label", required=True)
-    p_add.add_argument("--symbol", default="QQQ")
+    p_add.add_argument("--symbol", default="SPX")
     p_add.add_argument("--expiration", required=True)
     p_add.add_argument("--dte", type=int, required=True)
     p_add.add_argument("--short-call", type=float, required=True)
