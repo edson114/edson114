@@ -242,6 +242,111 @@ def run_backtest(
     return trades
 
 
+def _mid(row: pd.Series) -> float:
+    bid = float(row.get("bid", 0.0) or 0.0)
+    ask = float(row.get("ask", 0.0) or 0.0)
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2.0
+    return float(row.get("lastPrice", 0.0) or 0.0)
+
+
+def _nearest_strike(df: pd.DataFrame, target: float) -> float:
+    idx = (df["strike"] - target).abs().idxmin()
+    return float(df.loc[idx, "strike"])
+
+
+def run_points_otm_backtest(
+    price_history: pd.DataFrame,
+    vix_history: pd.DataFrame,
+    cfg: Config,
+    points_otm: float,
+    wing_width: float,
+    apply_gates: bool = True,
+    strike_step: float = 1.0,
+) -> list[BacktestTrade]:
+    """A 0DTE iron condor backtest with short strikes picked by a fixed
+    POINT distance from spot (short = spot +/- points_otm, snapped to the
+    nearest listed strike) rather than `run_backtest`'s delta targeting --
+    e.g. "5 points out of the money", a common simpler rule some traders
+    use instead of chasing a specific delta.
+
+    Every entry is 0DTE (same-day entry and settlement), so unlike
+    `run_backtest` there's no non-overlap bookkeeping needed -- every
+    eligible trading day gets its own independent trade. Otherwise this
+    shares every simulation assumption `run_backtest` documents (synthetic
+    Black-Scholes chain, flat VIX-as-IV, no skew/slippage/commissions --
+    see the module docstring), including real historical gap/VIX-spike
+    hard gates.
+    """
+    dates = price_history.index
+    close = price_history["Close"]
+    open_ = price_history["Open"]
+
+    vix_close = vix_history["Close"].reindex(dates, method="ffill").ffill()
+
+    label = f"{points_otm:.0f}pt OTM"
+    trades: list[BacktestTrade] = []
+    for i in range(MIN_HISTORY_DAYS, len(dates)):
+        entry_date = dates[i]
+
+        if apply_gates:
+            event_label = cfg.macro_event_dates.get(entry_date.date().isoformat())
+            gap_pct = (float(close.iloc[i]) / float(close.iloc[i - 1]) - 1.0) * 100.0
+            vix_level = float(vix_close.iloc[i])
+            if event_label or abs(gap_pct) >= cfg.gap_threshold_pct or vix_level >= cfg.vix_spike_threshold:
+                continue
+
+        spot_entry = float(open_.iloc[i])
+        exit_spot = float(close.iloc[i])
+        iv = float(vix_close.iloc[i]) / 100.0
+        expiration = entry_date.date().isoformat()
+
+        chain = simulate_chain(spot_entry, iv, 0, cfg.risk_free_rate, expiration, strike_step=strike_step)
+        calls = chain.calls.set_index("strike")
+        puts = chain.puts.set_index("strike")
+
+        short_call_strike = _nearest_strike(chain.calls, spot_entry + points_otm)
+        short_put_strike = _nearest_strike(chain.puts, spot_entry - points_otm)
+        long_call_strike = _nearest_strike(chain.calls, short_call_strike + wing_width)
+        long_put_strike = _nearest_strike(chain.puts, short_put_strike - wing_width)
+
+        if long_call_strike <= short_call_strike or long_put_strike >= short_put_strike:
+            continue  # wing_width too small relative to strike_step to produce a real spread
+
+        credit = (
+            (_mid(calls.loc[short_call_strike]) - _mid(calls.loc[long_call_strike]))
+            + (_mid(puts.loc[short_put_strike]) - _mid(puts.loc[long_put_strike]))
+        )
+        credit = max(credit, 0.0)
+        call_width = long_call_strike - short_call_strike
+        put_width = short_put_strike - long_put_strike
+        max_loss = max(call_width, put_width) - credit
+
+        call_loss = min(max(exit_spot - short_call_strike, 0.0), call_width)
+        put_loss = min(max(short_put_strike - exit_spot, 0.0), put_width)
+        pnl = credit - call_loss - put_loss
+
+        vix_pctile = ind.percentile_rank(vix_close.iloc[max(0, i - MIN_HISTORY_DAYS):i + 1], float(vix_close.iloc[i]))
+        regime = "High IV" if vix_pctile >= 70 else ("Low IV" if vix_pctile <= 20 else "Normal IV")
+
+        trades.append(BacktestTrade(
+            label=label,
+            entry_date=entry_date.date(),
+            exit_date=entry_date.date(),
+            entry_spot=spot_entry,
+            exit_spot=exit_spot,
+            credit=round(credit, 2),
+            max_loss=round(max_loss, 2),
+            pnl=round(pnl, 4),
+            short_call_strike=short_call_strike,
+            short_put_strike=short_put_strike,
+            vix_at_entry=float(vix_close.iloc[i]),
+            iv_regime=regime,
+        ))
+
+    return trades
+
+
 def _regime_stats(regime: str, trades: list[BacktestTrade]) -> RegimeStats:
     if not trades:
         return RegimeStats(regime=regime, num_trades=0, win_rate_pct=float("nan"), expectancy=float("nan"), total_pnl=0.0)

@@ -161,3 +161,59 @@ def test_simulate_chain_t_years_override_takes_precedence_over_dte():
     price_default = chain_default.calls.set_index("strike").loc[410.0]["lastPrice"]
     price_override = chain_override.calls.set_index("strike").loc[410.0]["lastPrice"]
     assert price_override > price_default
+
+
+def test_points_otm_backtest_picks_strikes_at_the_requested_distance():
+    price_history, vix_history = _synthetic_history(n_days=252 + 60)
+    cfg = Config()
+    strike_step = backtest.infer_strike_step(float(price_history["Close"].iloc[-1]))
+
+    trades = backtest.run_points_otm_backtest(
+        price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=True, strike_step=strike_step,
+    )
+
+    assert len(trades) > 5
+    for t in trades:
+        assert t.short_call_strike - t.entry_spot == pytest.approx(5.0, abs=strike_step)
+        assert t.entry_spot - t.short_put_strike == pytest.approx(5.0, abs=strike_step)
+        assert t.entry_date == t.exit_date  # every trade is 0DTE
+
+
+def test_points_otm_backtest_settles_at_max_profit_between_short_strikes():
+    chain = backtest.simulate_chain(spot=400.0, iv=0.20, dte=0, rate=0.045, expiration="2026-11-01", strike_step=1.0)
+    calls = chain.calls.set_index("strike")
+    puts = chain.puts.set_index("strike")
+    short_call, long_call = 405.0, 410.0
+    short_put, long_put = 395.0, 390.0
+    credit = (backtest._mid(calls.loc[short_call]) - backtest._mid(calls.loc[long_call])) + (
+        backtest._mid(puts.loc[short_put]) - backtest._mid(puts.loc[long_put])
+    )
+    # Settling between the short strikes keeps the full credit, same
+    # max-profit settlement math as the delta-targeted backtest.
+    exit_spot = 400.0
+    call_loss = min(max(exit_spot - short_call, 0.0), long_call - short_call)
+    put_loss = min(max(short_put - exit_spot, 0.0), short_put - long_put)
+    pnl = credit - call_loss - put_loss
+    assert pnl == pytest.approx(credit)
+
+
+def test_points_otm_backtest_skips_entries_on_large_gap_days_when_gates_applied():
+    price_history, vix_history = _synthetic_history(n_days=252 + 40)
+    gap_day_idx = 252 + 10
+    price_history.iloc[gap_day_idx, price_history.columns.get_loc("Close")] *= 1.05
+
+    cfg = Config()
+    gap_date = price_history.index[gap_day_idx].date()
+
+    gated_trades = backtest.run_points_otm_backtest(price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=True)
+    ungated_trades = backtest.run_points_otm_backtest(price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=False)
+
+    assert gap_date not in {t.entry_date for t in gated_trades}
+    assert gap_date in {t.entry_date for t in ungated_trades}
+
+
+def test_points_otm_backtest_label_reflects_requested_distance():
+    price_history, vix_history = _synthetic_history(n_days=252 + 30)
+    cfg = Config()
+    trades = backtest.run_points_otm_backtest(price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=False)
+    assert all(t.label == "5pt OTM" for t in trades)
