@@ -1,4 +1,4 @@
-# Next video — plan (agreed, not started)
+# Next video — "Rain on a Tent in the Forest at Night" (8 hours) — agreed, not started
 
 **Sound:** real field recordings (Option A), not AI. The user downloads 2–3 long rain recordings and sends them.
 - Free, royalty-free sources: Sonniss GDC game-audio bundles (sonniss.com/gameaudiogdc), Freesound.org recordings licensed **CC0**.
