@@ -5,7 +5,8 @@ then a soft breath in. Each shush starts with a gentle accent and fades as the b
 runs out, the tone drops slightly as the lips relax, and there is a faint tremble and
 warm breath under the hiss. A small, soft room echo places the voice beside the crib.
 
-Usage: python3 make_shush.py <white|pink|brown> <seconds> <out.wav> [seed]
+Usage: python3 make_shush.py <white|pink|brown> <seconds> <out.wav> [seed] [--loop]
+  --loop: end right after a breath so the file repeats seamlessly
 """
 import subprocess, sys
 import numpy as np
@@ -66,9 +67,10 @@ def inhale(m, rng):
     t = np.linspace(0, 1, m)
     return x * np.sin(np.pi * t) ** 2
 
-def make_voice(n, rng):
+def make_voice(n, rng, loop=False):
     v = np.zeros(n + 30 * SR)   # room for the last phrase to finish past the end
     t = int(0.4 * SR)
+    ends = []
     while t < n:
         phrase = rng.integers(2, 4)                 # 2–3 shushes...
         for k in range(phrase + 1):
@@ -84,6 +86,10 @@ def make_voice(n, rng):
         im = int(rng.uniform(0.8, 1.1) * SR)        # slow, soft breath in
         v[t:t + im] += inhale(im, rng) * 0.07
         t += im + int(rng.uniform(0.15, 0.3) * SR)
+        ends.append(t)
+    if loop:
+        # end exactly after a breath so the file can repeat seamlessly
+        n = max(e for e in ends if e <= n) - int(0.4 * SR)
     v = v[:n]
     # small soft nursery: short diffuse echo, a touch different in each ear
     ir_len = int(0.28 * SR)
@@ -92,27 +98,36 @@ def make_voice(n, rng):
         ir = rng.standard_normal(ir_len) * np.exp(-np.linspace(0, 9, ir_len))
         ir[0] = 0
         ir *= 0.05 / np.sqrt(np.sum(ir ** 2))
-        L = 1 << int(np.ceil(np.log2(n + ir_len)))
-        wet = np.fft.irfft(np.fft.rfft(v, L) * np.fft.rfft(ir, L), L)[:n]
+        # circular convolution: the echo of the last shush wraps into the start
+        wet = np.fft.irfft(np.fft.rfft(v) * np.fft.rfft(ir, n), n)
         out[:, ch] = v + wet
     return out
 
 def main():
     kind, secs, out = sys.argv[1], float(sys.argv[2]), sys.argv[3]
     rng = np.random.default_rng(int(sys.argv[4]) if len(sys.argv) > 4 else 11)
-    n = int(secs * SR)
-    voice = make_voice(n, rng)
+    loop = "--loop" in sys.argv
+    voice = make_voice(int(secs * SR), rng, loop=loop)
+    n = len(voice)
     # bed dips gently while she shushes, then fills back in during the breath
     hop = SR // 50
     env = np.sqrt(np.convolve((voice[:, 0] ** 2)[::hop], np.ones(10) / 10, mode="same"))
     env = env / (np.percentile(env, 95) + 1e-9)
     duck = np.interp(np.arange(n), np.arange(len(env)) * hop, 1 - 0.35 * np.clip(env, 0, 1))
-    mix = 0.24 * shaped_noise(n, rng, kind) * duck[:, None] + voice
-    proc = subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-",
-         "-af", "loudnorm=I=-25:TP=-3:LRA=9", "-ar", str(SR), "-c:a", "pcm_s16le", out],
-        input=(mix * 0.05).astype(np.float32).tobytes())
-    proc.check_returncode()
+    # FFT noise is periodic over n samples, so the bed itself loops perfectly
+    mix = (0.24 * shaped_noise(n, rng, kind) * duck[:, None] + voice).astype(np.float32)
+    # fixed gain to -25 LUFS (no time-varying loudness processing, so the loop join stays level)
+    meas = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-",
+         "-af", "ebur128", "-f", "null", "-"], input=mix.tobytes(), capture_output=True, text=False)
+    lufs = float([l for l in meas.stderr.decode().splitlines() if l.strip().startswith("I:")][-1].split()[1])
+    mix *= 10 ** ((-25.0 - lufs) / 20)
+    pcm = (np.clip(mix, -1, 1) * 32767).astype(np.int16)
+    import wave
+    with wave.open(out, "wb") as w:
+        w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
+        w.writeframes(pcm.tobytes())
+    print(f"wrote {out}: {n / SR / 60:.2f} min, peak {20 * np.log10(np.abs(mix).max()):.1f} dBFS")
 
 if __name__ == "__main__":
     main()
