@@ -21,6 +21,7 @@ def shaped_noise(n, rng, kind):
     tilt = tilt * (f > 25)
     if kind == "white":
         tilt = tilt / (1 + (f / 9000) ** 4)
+    tilt = tilt * (1 - 0.6 * band(f, 2200, 5500, 2))   # make space for the shush
     for ch in range(2):
         x = np.fft.irfft(np.fft.rfft(rng.standard_normal(n)) * tilt, n)
         out[:, ch] = x / np.sqrt(np.mean(x ** 2))
@@ -39,9 +40,9 @@ def fricative(m, rng, center_start, center_end):
     nblk = max(1, (m + hop - 1) // hop)
     for i in range(nblk):
         c = center_start + (center_end - center_start) * i / max(1, nblk - 1)
-        peak = np.exp(-0.5 * (np.log(np.maximum(f, 1) / c) / 0.32) ** 2)
-        shape = band(f, c * 0.5, c * 2.4) * (0.3 + peak)
-        shape += 0.06 * band(f, 300, 900, 2)        # warm breath under the hiss
+        peak = np.exp(-0.5 * (np.log(np.maximum(f, 1) / c) / 0.26) ** 2)
+        shape = band(f, c * 0.6, c * 2.8, 4) * (0.2 + peak)
+        shape += 0.015 * band(f, 300, 900, 2)       # just a hint of breath
         seg = np.fft.irfft(np.fft.rfft(rng.standard_normal(blk)) * shape, blk) * win
         out[i * hop:i * hop + blk] += seg
     out = out[:m]
@@ -66,7 +67,7 @@ def inhale(m, rng):
     return x * np.sin(np.pi * t) ** 2
 
 def make_voice(n, rng):
-    v = np.zeros(n + 5 * SR)
+    v = np.zeros(n + 30 * SR)   # room for the last phrase to finish past the end
     t = int(0.4 * SR)
     while t < n:
         phrase = rng.integers(2, 4)                 # 2–3 shushes...
@@ -90,7 +91,7 @@ def make_voice(n, rng):
     for ch in range(2):
         ir = rng.standard_normal(ir_len) * np.exp(-np.linspace(0, 9, ir_len))
         ir[0] = 0
-        ir *= 0.12 / np.sqrt(np.sum(ir ** 2))
+        ir *= 0.05 / np.sqrt(np.sum(ir ** 2))
         L = 1 << int(np.ceil(np.log2(n + ir_len)))
         wet = np.fft.irfft(np.fft.rfft(v, L) * np.fft.rfft(ir, L), L)[:n]
         out[:, ch] = v + wet
@@ -100,10 +101,16 @@ def main():
     kind, secs, out = sys.argv[1], float(sys.argv[2]), sys.argv[3]
     rng = np.random.default_rng(int(sys.argv[4]) if len(sys.argv) > 4 else 11)
     n = int(secs * SR)
-    mix = 0.42 * shaped_noise(n, rng, kind) + make_voice(n, rng)
+    voice = make_voice(n, rng)
+    # bed dips gently while she shushes, then fills back in during the breath
+    hop = SR // 50
+    env = np.sqrt(np.convolve((voice[:, 0] ** 2)[::hop], np.ones(10) / 10, mode="same"))
+    env = env / (np.percentile(env, 95) + 1e-9)
+    duck = np.interp(np.arange(n), np.arange(len(env)) * hop, 1 - 0.35 * np.clip(env, 0, 1))
+    mix = 0.24 * shaped_noise(n, rng, kind) * duck[:, None] + voice
     proc = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-",
-         "-af", "loudnorm=I=-27:TP=-4:LRA=7", "-ar", str(SR), "-c:a", "pcm_s16le", out],
+         "-af", "loudnorm=I=-25:TP=-3:LRA=9", "-ar", str(SR), "-c:a", "pcm_s16le", out],
         input=(mix * 0.05).astype(np.float32).tobytes())
     proc.check_returncode()
 
