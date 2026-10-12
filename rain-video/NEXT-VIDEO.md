@@ -13,3 +13,9 @@
 **Credits:** Everygen 43 of 200 used. vidIQ ~22 left (refills Oct 24).
 
 Do not start generating until the user says to.
+
+## Sound — done (2026-10-12)
+- Main: Freesound #717863 by trp, "rain on fabric tent", 3 takes (light/medium/heavy), **CC0** (confirmed by user). Real field recording, EM272 mics, no internal repetition.
+- Bed: Pixabay "night heavy rain in forest" (nematoki), mixed quietly underneath (~-41 dB RMS before loudness pass).
+- Rejected: Pixabay "rain on tent in forest" (enternalrainsounds) — the 15 min file is a ~49 s loop, and 24 kHz (dull).
+- `tent/make_rain_mix.py` builds a seamless 20-min master: random 18–40 s chunks, 4 s equal-power crossfades, slow light/medium/heavy drift, gentle limiter on loud drops, -24 LUFS.
