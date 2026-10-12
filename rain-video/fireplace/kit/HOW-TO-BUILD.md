@@ -12,5 +12,5 @@ ffmpeg -stream_loop -1 -i fireplace_loop.mp4 -stream_loop -1 -i fire_crackle_20m
 open .
 ```
 
-Takes about 15–30 minutes. Result: `cozy_christmas_fireplace_10h.mp4`, 10 hours, 1080p, about 14 GB.
-(Make sure you have ~15 GB free.)
+Takes about 15–30 minutes. Result: `cozy_christmas_fireplace_10h.mp4`, 10 hours, 1080p, about 11 GB.
+(Make sure you have ~12 GB free.)
