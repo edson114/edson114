@@ -50,12 +50,12 @@ def fricative(m, rng, center_start, center_end):
 def envelope(m, rng, accent):
     t = np.linspace(0, 1, m)
     dur = m / SR
-    a = min(0.18, 0.25 * dur) / dur                 # quick, soft onset
+    a = min(0.40, 0.2 * dur) / dur                  # slow, smooth onset
     rise = np.sin(np.clip(t / a, 0, 1) * np.pi / 2)
-    decay = np.exp(-t * rng.uniform(0.9, 1.6))      # breath running out
-    tail = np.sin(np.clip((1 - t) / 0.22, 0, 1) * np.pi / 2)
-    bump = 1 + accent * np.exp(-((t - a * 1.3) / 0.12) ** 2)   # the "SH" accent
-    tremble = 1 + 0.03 * np.sin(2 * np.pi * rng.uniform(5, 7) * t * dur + rng.uniform(0, 6))
+    decay = np.exp(-t * rng.uniform(0.35, 0.7))     # breath running out, slowly
+    tail = np.sin(np.clip((1 - t) / 0.30, 0, 1) * np.pi / 2) ** 2
+    bump = 1 + accent * np.exp(-((t - a * 1.2) / 0.18) ** 2)   # soft "SH" accent
+    tremble = 1 + 0.015 * np.sin(2 * np.pi * rng.uniform(5, 7) * t * dur + rng.uniform(0, 6))
     return rise * decay * tail * bump * tremble
 
 def inhale(m, rng):
@@ -69,19 +69,19 @@ def make_voice(n, rng):
     v = np.zeros(n + 5 * SR)
     t = int(0.4 * SR)
     while t < n:
-        phrase = rng.integers(3, 6)                 # 3–5 short shushes...
+        phrase = rng.integers(2, 4)                 # 2–3 shushes...
         for k in range(phrase + 1):
             last = k == phrase                      # ...then one long one
-            dur = rng.uniform(1.9, 2.6) if last else rng.uniform(0.75, 1.15)
-            gap = rng.uniform(0.18, 0.32)
+            dur = rng.uniform(3.4, 4.2) if last else rng.uniform(2.0, 2.6)
+            gap = rng.uniform(0.25, 0.4)
             m = int(dur * SR)
             c0 = rng.uniform(3500, 4100)
-            sh = fricative(m, rng, c0, c0 * rng.uniform(0.82, 0.9))
+            sh = fricative(m, rng, c0, c0 * rng.uniform(0.9, 0.95))
             g = 10 ** (rng.uniform(-1.0, 1.0) / 20) * (0.92 if last else 1.0)
-            v[t:t + m] += sh * envelope(m, rng, accent=rng.uniform(0.25, 0.45)) * g
+            v[t:t + m] += sh * envelope(m, rng, accent=rng.uniform(0.08, 0.18)) * g
             t += m + int(gap * SR)
-        im = int(rng.uniform(0.55, 0.8) * SR)       # soft breath in
-        v[t:t + im] += inhale(im, rng) * 0.10
+        im = int(rng.uniform(0.8, 1.1) * SR)        # slow, soft breath in
+        v[t:t + im] += inhale(im, rng) * 0.07
         t += im + int(rng.uniform(0.15, 0.3) * SR)
     v = v[:n]
     # small soft nursery: short diffuse echo, a touch different in each ear
