@@ -1,0 +1,17 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Line,Liberation Sans,62,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,5,2,2,80,80,430,1
+Style: Title,DejaVu Serif,92,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,-1,0,0,0,100,100,6,0,1,5,3,8,60,60,260,1
+Style: Sub,Liberation Sans,44,&H0094D6FF,&H000000FF,&H00000000,&H64000000,-1,0,0,0,100,100,8,0,1,4,2,8,60,60,390,1
+Style: End,DejaVu Serif,96,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,8,0,1,0,0,5,60,60,0,1
+Style: Small,Liberation Sans,36,&H00AAAAAA,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,2,0,1,0,0,2,60,60,240,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
