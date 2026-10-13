@@ -7,13 +7,13 @@ import subprocess, os
 
 SRC = os.path.join(os.path.dirname(__file__), "..", "src")
 EDIT = [  # file, in, out, captions [(clip_start, clip_end, style, text)]
-    ("shot1.mp4", 0.8, 6.0, [(2.0, 5.3, "Line", "They said the evacuation\\Nwould take an hour.")]),
+    ("shot1.mp4", 0.8, 6.0, []),
     ("shot2.mp4", 1.0, 6.0, []),
-    ("shot3.mp4", 0.0, 4.6, [(0.1, 4.0, "Line", "Eyes on the ridge.\\NNobody fires till I say.")]),
+    ("shot3.mp4", 0.0, 4.6, []),
     ("shot4.mp4", 1.0, 5.5, []),
     ("shot5.mp4", 0.5, 6.5, []),
     ("shot6.mp4", 0.5, 6.5, []),
-    ("shot7.mp4", 1.5, 8.0, [(5.4, 7.9, "Line", "Hell, it's about time.")]),
+    ("shot7.mp4", 1.5, 8.0, []),
     ("shot8.mp4", 0.0, 7.0, []),
 ]
 END = 3.5               # black end card
@@ -31,6 +31,14 @@ def main():
             events.append((t + cs - a, t + min(ce, b) - a, style, text))
         t += b - a
     total = t + END
+    # dialogue captions at the exact times found by speech-to-text on the cut (seconds on the timeline)
+    events += [
+        (1.00, 4.35, "Line", "They said the evacuation\\Nwould take an hour."),
+        (10.00, 13.85, "Line", "Eyes on the ridge!\\NNobody fires till I say!"),
+        (26.00, 27.60, "Line", "Burn them all!"),
+        (35.00, 37.35, "Line", "Hell, it's about time!"),
+        (38.25, 39.70, "Line", "{\\i1}[Radio]{\\i0} Hold on, we're coming in!"),
+    ]
     events += [
         (0.15, 2.6, "Title", "THE LAST STAND"),
         (0.15, 2.6, "Sub", "MAR SARA"),
