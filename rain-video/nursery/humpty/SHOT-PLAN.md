@@ -30,3 +30,10 @@ Set: sunny castle garden (stone wall, pink castle, sunflowers, topiary, tulips).
 Clip windows at the stitch: clip 1 = 8.4 s (rendered 9 s), clip 2 = 8.4 s (rendered 9 s),
 clip 3 = 12.14 s (rendered 13 s). Total 28.94 s = song length.
 Prompts: prompts/clip1.txt, clip2.txt, clip3.txt (Seedance 2.5, 480p, first frame only).
+
+## Final cut
+- `clips/with_song.mp4`: the three clips joined (8.4 + 8.4 + 12.14 s) with the song, no captions.
+- `humpty_dumpty_singalong.mp4`: final Short, 1080x1920, 29 s, with sing-along captions
+  burned in by `edit/make_captions.py` (exact lyrics, the sung word turns gold, Lilita One
+  font, OFL licence in `edit/fonts/OFL.txt`). Re-render:
+  `ffmpeg -i clips/with_song.mp4 -vf "ass=edit/captions.ass:fontsdir=edit/fonts" -c:v libx264 -crf 19 -preset slow -pix_fmt yuv420p -c:a copy -movflags +faststart humpty_dumpty_singalong.mp4`
