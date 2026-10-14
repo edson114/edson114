@@ -433,3 +433,11 @@ def test_uses_broker_delta_when_chain_has_one():
     leg = dtg.build_leg_plan(chain, 750.0, 9.5, "call", CFG, model_iv=0.20)
     assert leg.contract.strike == 740.0
     assert leg.contract.delta == pytest.approx(0.80)
+
+
+def test_plan_config_pins_daily_target_symbol():
+    # The shared Config.symbol belongs to the iron condor scan (switched to
+    # "^SPX" on Oct 10); the daily plan must stay on its own symbol.
+    spx_cfg = dataclasses.replace(CFG, symbol="^SPX")
+    assert dtg.plan_config(spx_cfg).symbol == "QQQ"
+    assert dtg.plan_config(dataclasses.replace(spx_cfg, daily_target_symbol="SPY")).symbol == "SPY"

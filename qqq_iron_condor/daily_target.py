@@ -29,6 +29,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime as dt
 import sys
 from dataclasses import dataclass, field
@@ -635,6 +636,15 @@ def render_status(status: PositionStatus, side: str, strike: float, expiration: 
 
 # --- Live orchestration -----------------------------------------------------
 
+def plan_config(cfg: Config) -> Config:
+    """`cfg` with `symbol` pinned to `daily_target_symbol`. The shared
+    `symbol` belongs to the iron condor scan and can be switched (e.g. to
+    "^SPX") without the daily plan meaning to follow; the directional
+    signal run inside the plan reads `symbol` too, so the override applies
+    to it as well."""
+    return dataclasses.replace(cfg, symbol=cfg.daily_target_symbol)
+
+
 def _today_intraday(cfg: Config):
     from .data import get_intraday_history
 
@@ -646,6 +656,7 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     from . import providers
     from .analysis import build_snapshot
 
+    cfg = plan_config(cfg)
     source = source or cfg.daily_target_direction_source
     price_history = providers.get_price_history(cfg.symbol, cfg.price_history_period)
     notes: list = []
@@ -763,7 +774,7 @@ def main(argv=None) -> int:
     parser.add_argument("--self-test", action="store_true", help="Run on synthetic data (no network)")
     args = parser.parse_args(argv)
 
-    cfg = Config()
+    cfg = plan_config(Config())
 
     if args.check:
         missing = [k for k in ("side", "strike", "expiration", "entry") if getattr(args, k) is None]
