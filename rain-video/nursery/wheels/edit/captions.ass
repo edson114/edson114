@@ -1,0 +1,314 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Sing,Lilita One,82,&H00FFFFFF,&H00FFFFFF,&H00301A10,&H80000000,0,0,0,0,100,100,1,0,1,6,3,2,160,160,60,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:10.55,0:00:10.80,Sing,,0,0,0,,The wheels on the bus go round and round
+Dialogue: 0,0:00:10.80,0:00:11.56,Sing,,0,0,0,,{\c&H003DC8FF&}The{\c&H00FFFFFF&} wheels on the bus go round and round
+Dialogue: 0,0:00:11.56,0:00:11.82,Sing,,0,0,0,,The {\c&H003DC8FF&}wheels{\c&H00FFFFFF&} on the bus go round and round
+Dialogue: 0,0:00:11.82,0:00:12.00,Sing,,0,0,0,,The wheels {\c&H003DC8FF&}on{\c&H00FFFFFF&} the bus go round and round
+Dialogue: 0,0:00:12.00,0:00:12.12,Sing,,0,0,0,,The wheels on {\c&H003DC8FF&}the{\c&H00FFFFFF&} bus go round and round
+Dialogue: 0,0:00:12.12,0:00:12.28,Sing,,0,0,0,,The wheels on the {\c&H003DC8FF&}bus{\c&H00FFFFFF&} go round and round
+Dialogue: 0,0:00:12.28,0:00:12.60,Sing,,0,0,0,,The wheels on the bus {\c&H003DC8FF&}go{\c&H00FFFFFF&} round and round
+Dialogue: 0,0:00:12.60,0:00:12.92,Sing,,0,0,0,,The wheels on the bus go {\c&H003DC8FF&}round{\c&H00FFFFFF&} and round
+Dialogue: 0,0:00:12.92,0:00:13.18,Sing,,0,0,0,,The wheels on the bus go round {\c&H003DC8FF&}and{\c&H00FFFFFF&} round
+Dialogue: 0,0:00:13.18,0:00:13.50,Sing,,0,0,0,,The wheels on the bus go round and {\c&H003DC8FF&}round{\c&H00FFFFFF&}
+Dialogue: 0,0:00:13.27,0:00:13.52,Sing,,0,0,0,,Rolling, rolling, round and round
+Dialogue: 0,0:00:13.52,0:00:14.22,Sing,,0,0,0,,{\c&H003DC8FF&}Rolling,{\c&H00FFFFFF&} rolling, round and round
+Dialogue: 0,0:00:14.22,0:00:14.92,Sing,,0,0,0,,Rolling, {\c&H003DC8FF&}rolling,{\c&H00FFFFFF&} round and round
+Dialogue: 0,0:00:14.92,0:00:15.08,Sing,,0,0,0,,Rolling, rolling, {\c&H003DC8FF&}round{\c&H00FFFFFF&} and round
+Dialogue: 0,0:00:15.08,0:00:15.36,Sing,,0,0,0,,Rolling, rolling, round {\c&H003DC8FF&}and{\c&H00FFFFFF&} round
+Dialogue: 0,0:00:15.36,0:00:15.70,Sing,,0,0,0,,Rolling, rolling, round and {\c&H003DC8FF&}round{\c&H00FFFFFF&}
+Dialogue: 0,0:00:15.47,0:00:15.72,Sing,,0,0,0,,Big and yellow, castle-town bound
+Dialogue: 0,0:00:15.72,0:00:16.22,Sing,,0,0,0,,{\c&H003DC8FF&}Big{\c&H00FFFFFF&} and yellow, castle-town bound
+Dialogue: 0,0:00:16.22,0:00:16.48,Sing,,0,0,0,,Big {\c&H003DC8FF&}and{\c&H00FFFFFF&} yellow, castle-town bound
+Dialogue: 0,0:00:16.48,0:00:16.94,Sing,,0,0,0,,Big and {\c&H003DC8FF&}yellow,{\c&H00FFFFFF&} castle-town bound
+Dialogue: 0,0:00:16.94,0:00:17.02,Sing,,0,0,0,,Big and yellow, {\c&H003DC8FF&}castle-town{\c&H00FFFFFF&} bound
+Dialogue: 0,0:00:17.02,0:00:17.70,Sing,,0,0,0,,Big and yellow, castle-town {\c&H003DC8FF&}bound{\c&H00FFFFFF&}
+Dialogue: 0,0:00:17.53,0:00:17.78,Sing,,0,0,0,,Gliding through the town!
+Dialogue: 0,0:00:17.78,0:00:18.44,Sing,,0,0,0,,{\c&H003DC8FF&}Gliding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:00:18.44,0:00:18.88,Sing,,0,0,0,,Gliding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:00:18.88,0:00:19.16,Sing,,0,0,0,,Gliding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:00:19.16,0:00:19.65,Sing,,0,0,0,,Gliding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:00:19.45,0:00:19.70,Sing,,0,0,0,,Swish, swish, swish, go the wipers fast
+Dialogue: 0,0:00:19.70,0:00:20.68,Sing,,0,0,0,,{\c&H003DC8FF&}Swish,{\c&H00FFFFFF&} swish, swish, go the wipers fast
+Dialogue: 0,0:00:20.68,0:00:21.22,Sing,,0,0,0,,Swish, {\c&H003DC8FF&}swish,{\c&H00FFFFFF&} swish, go the wipers fast
+Dialogue: 0,0:00:21.22,0:00:21.82,Sing,,0,0,0,,Swish, swish, {\c&H003DC8FF&}swish,{\c&H00FFFFFF&} go the wipers fast
+Dialogue: 0,0:00:21.82,0:00:22.14,Sing,,0,0,0,,Swish, swish, swish, {\c&H003DC8FF&}go{\c&H00FFFFFF&} the wipers fast
+Dialogue: 0,0:00:22.14,0:00:22.52,Sing,,0,0,0,,Swish, swish, swish, go {\c&H003DC8FF&}the{\c&H00FFFFFF&} wipers fast
+Dialogue: 0,0:00:22.52,0:00:23.20,Sing,,0,0,0,,Swish, swish, swish, go the {\c&H003DC8FF&}wipers{\c&H00FFFFFF&} fast
+Dialogue: 0,0:00:23.20,0:00:24.00,Sing,,0,0,0,,Swish, swish, swish, go the wipers {\c&H003DC8FF&}fast{\c&H00FFFFFF&}
+Dialogue: 0,0:00:23.79,0:00:24.04,Sing,,0,0,0,,Swish, swish, swish, till the rain has passed
+Dialogue: 0,0:00:24.04,0:00:25.02,Sing,,0,0,0,,{\c&H003DC8FF&}Swish,{\c&H00FFFFFF&} swish, swish, till the rain has passed
+Dialogue: 0,0:00:25.02,0:00:25.56,Sing,,0,0,0,,Swish, {\c&H003DC8FF&}swish,{\c&H00FFFFFF&} swish, till the rain has passed
+Dialogue: 0,0:00:25.56,0:00:26.18,Sing,,0,0,0,,Swish, swish, {\c&H003DC8FF&}swish,{\c&H00FFFFFF&} till the rain has passed
+Dialogue: 0,0:00:26.18,0:00:26.54,Sing,,0,0,0,,Swish, swish, swish, {\c&H003DC8FF&}till{\c&H00FFFFFF&} the rain has passed
+Dialogue: 0,0:00:26.54,0:00:26.88,Sing,,0,0,0,,Swish, swish, swish, till {\c&H003DC8FF&}the{\c&H00FFFFFF&} rain has passed
+Dialogue: 0,0:00:26.88,0:00:27.10,Sing,,0,0,0,,Swish, swish, swish, till the {\c&H003DC8FF&}rain{\c&H00FFFFFF&} has passed
+Dialogue: 0,0:00:27.10,0:00:27.56,Sing,,0,0,0,,Swish, swish, swish, till the rain {\c&H003DC8FF&}has{\c&H00FFFFFF&} passed
+Dialogue: 0,0:00:27.56,0:00:28.40,Sing,,0,0,0,,Swish, swish, swish, till the rain has {\c&H003DC8FF&}passed{\c&H00FFFFFF&}
+Dialogue: 0,0:00:28.23,0:00:28.48,Sing,,0,0,0,,Peekaboo, the sun is out at last
+Dialogue: 0,0:00:28.48,0:00:30.52,Sing,,0,0,0,,{\c&H003DC8FF&}Peekaboo,{\c&H00FFFFFF&} the sun is out at last
+Dialogue: 0,0:00:30.52,0:00:30.72,Sing,,0,0,0,,Peekaboo, {\c&H003DC8FF&}the{\c&H00FFFFFF&} sun is out at last
+Dialogue: 0,0:00:30.72,0:00:30.90,Sing,,0,0,0,,Peekaboo, the {\c&H003DC8FF&}sun{\c&H00FFFFFF&} is out at last
+Dialogue: 0,0:00:30.90,0:00:31.16,Sing,,0,0,0,,Peekaboo, the sun {\c&H003DC8FF&}is{\c&H00FFFFFF&} out at last
+Dialogue: 0,0:00:31.16,0:00:31.54,Sing,,0,0,0,,Peekaboo, the sun is {\c&H003DC8FF&}out{\c&H00FFFFFF&} at last
+Dialogue: 0,0:00:31.54,0:00:32.06,Sing,,0,0,0,,Peekaboo, the sun is out {\c&H003DC8FF&}at{\c&H00FFFFFF&} last
+Dialogue: 0,0:00:32.06,0:00:32.70,Sing,,0,0,0,,Peekaboo, the sun is out at {\c&H003DC8FF&}last{\c&H00FFFFFF&}
+Dialogue: 0,0:00:32.51,0:00:32.76,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:00:32.76,0:00:34.26,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:00:34.26,0:00:34.88,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:00:34.88,0:00:35.52,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:00:35.52,0:00:36.42,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:00:36.42,0:00:37.23,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:00:37.23,0:00:37.48,Sing,,0,0,0,,Beep, beep, beep, says the horn, hooray!
+Dialogue: 0,0:00:37.48,0:00:38.34,Sing,,0,0,0,,{\c&H003DC8FF&}Beep,{\c&H00FFFFFF&} beep, beep, says the horn, hooray!
+Dialogue: 0,0:00:38.34,0:00:38.72,Sing,,0,0,0,,Beep, {\c&H003DC8FF&}beep,{\c&H00FFFFFF&} beep, says the horn, hooray!
+Dialogue: 0,0:00:38.72,0:00:39.32,Sing,,0,0,0,,Beep, beep, {\c&H003DC8FF&}beep,{\c&H00FFFFFF&} says the horn, hooray!
+Dialogue: 0,0:00:39.32,0:00:39.56,Sing,,0,0,0,,Beep, beep, beep, {\c&H003DC8FF&}says{\c&H00FFFFFF&} the horn, hooray!
+Dialogue: 0,0:00:39.56,0:00:39.96,Sing,,0,0,0,,Beep, beep, beep, says {\c&H003DC8FF&}the{\c&H00FFFFFF&} horn, hooray!
+Dialogue: 0,0:00:39.96,0:00:40.46,Sing,,0,0,0,,Beep, beep, beep, says the {\c&H003DC8FF&}horn,{\c&H00FFFFFF&} hooray!
+Dialogue: 0,0:00:40.46,0:00:41.36,Sing,,0,0,0,,Beep, beep, beep, says the horn, {\c&H003DC8FF&}hooray!{\c&H00FFFFFF&}
+Dialogue: 0,0:00:41.36,0:00:41.95,Sing,,0,0,0,,Beep, beep, beep, says the horn, hooray!
+Dialogue: 0,0:00:41.95,0:00:42.20,Sing,,0,0,0,,Beep, beep, beep, little ducks, this way!
+Dialogue: 0,0:00:42.20,0:00:42.72,Sing,,0,0,0,,{\c&H003DC8FF&}Beep,{\c&H00FFFFFF&} beep, beep, little ducks, this way!
+Dialogue: 0,0:00:42.72,0:00:43.26,Sing,,0,0,0,,Beep, {\c&H003DC8FF&}beep,{\c&H00FFFFFF&} beep, little ducks, this way!
+Dialogue: 0,0:00:43.26,0:00:43.94,Sing,,0,0,0,,Beep, beep, {\c&H003DC8FF&}beep,{\c&H00FFFFFF&} little ducks, this way!
+Dialogue: 0,0:00:43.94,0:00:44.29,Sing,,0,0,0,,Beep, beep, beep, {\c&H003DC8FF&}little{\c&H00FFFFFF&} ducks, this way!
+Dialogue: 0,0:00:44.29,0:00:44.64,Sing,,0,0,0,,Beep, beep, beep, little {\c&H003DC8FF&}ducks,{\c&H00FFFFFF&} this way!
+Dialogue: 0,0:00:44.64,0:00:45.26,Sing,,0,0,0,,Beep, beep, beep, little ducks, {\c&H003DC8FF&}this{\c&H00FFFFFF&} way!
+Dialogue: 0,0:00:45.26,0:00:46.16,Sing,,0,0,0,,Beep, beep, beep, little ducks, this {\c&H003DC8FF&}way!{\c&H00FFFFFF&}
+Dialogue: 0,0:00:46.16,0:00:46.89,Sing,,0,0,0,,Beep, beep, beep, little ducks, this way!
+Dialogue: 0,0:00:46.89,0:00:47.14,Sing,,0,0,0,,Waddle, waddle, cross the road and play
+Dialogue: 0,0:00:47.14,0:00:47.24,Sing,,0,0,0,,{\c&H003DC8FF&}Waddle,{\c&H00FFFFFF&} waddle, cross the road and play
+Dialogue: 0,0:00:47.24,0:00:48.28,Sing,,0,0,0,,Waddle, {\c&H003DC8FF&}waddle,{\c&H00FFFFFF&} cross the road and play
+Dialogue: 0,0:00:48.28,0:00:48.40,Sing,,0,0,0,,Waddle, waddle, {\c&H003DC8FF&}cross{\c&H00FFFFFF&} the road and play
+Dialogue: 0,0:00:48.40,0:00:48.78,Sing,,0,0,0,,Waddle, waddle, cross {\c&H003DC8FF&}the{\c&H00FFFFFF&} road and play
+Dialogue: 0,0:00:48.78,0:00:49.28,Sing,,0,0,0,,Waddle, waddle, cross the {\c&H003DC8FF&}road{\c&H00FFFFFF&} and play
+Dialogue: 0,0:00:49.28,0:00:49.76,Sing,,0,0,0,,Waddle, waddle, cross the road {\c&H003DC8FF&}and{\c&H00FFFFFF&} play
+Dialogue: 0,0:00:49.76,0:00:50.35,Sing,,0,0,0,,Waddle, waddle, cross the road and {\c&H003DC8FF&}play{\c&H00FFFFFF&}
+Dialogue: 0,0:00:50.15,0:00:50.40,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:00:50.40,0:00:51.84,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:00:51.84,0:00:52.42,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:00:52.42,0:00:53.04,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:00:53.04,0:00:53.94,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:00:53.94,0:00:55.14,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:01:03.53,0:01:03.78,Sing,,0,0,0,,Open, shut, go the big red doors
+Dialogue: 0,0:01:03.78,0:01:05.10,Sing,,0,0,0,,{\c&H003DC8FF&}Open,{\c&H00FFFFFF&} shut, go the big red doors
+Dialogue: 0,0:01:05.10,0:01:05.64,Sing,,0,0,0,,Open, {\c&H003DC8FF&}shut,{\c&H00FFFFFF&} go the big red doors
+Dialogue: 0,0:01:05.64,0:01:05.80,Sing,,0,0,0,,Open, shut, {\c&H003DC8FF&}go{\c&H00FFFFFF&} the big red doors
+Dialogue: 0,0:01:05.80,0:01:06.10,Sing,,0,0,0,,Open, shut, go {\c&H003DC8FF&}the{\c&H00FFFFFF&} big red doors
+Dialogue: 0,0:01:06.10,0:01:06.56,Sing,,0,0,0,,Open, shut, go the {\c&H003DC8FF&}big{\c&H00FFFFFF&} red doors
+Dialogue: 0,0:01:06.56,0:01:07.04,Sing,,0,0,0,,Open, shut, go the big {\c&H003DC8FF&}red{\c&H00FFFFFF&} doors
+Dialogue: 0,0:01:07.04,0:01:07.80,Sing,,0,0,0,,Open, shut, go the big red {\c&H003DC8FF&}doors{\c&H00FFFFFF&}
+Dialogue: 0,0:01:07.61,0:01:07.86,Sing,,0,0,0,,Open, shut, there's a mouse on board!
+Dialogue: 0,0:01:07.86,0:01:09.20,Sing,,0,0,0,,{\c&H003DC8FF&}Open,{\c&H00FFFFFF&} shut, there's a mouse on board!
+Dialogue: 0,0:01:09.20,0:01:09.90,Sing,,0,0,0,,Open, {\c&H003DC8FF&}shut,{\c&H00FFFFFF&} there's a mouse on board!
+Dialogue: 0,0:01:09.90,0:01:10.20,Sing,,0,0,0,,Open, shut, {\c&H003DC8FF&}there's{\c&H00FFFFFF&} a mouse on board!
+Dialogue: 0,0:01:10.20,0:01:10.48,Sing,,0,0,0,,Open, shut, there's {\c&H003DC8FF&}a{\c&H00FFFFFF&} mouse on board!
+Dialogue: 0,0:01:10.48,0:01:10.70,Sing,,0,0,0,,Open, shut, there's a {\c&H003DC8FF&}mouse{\c&H00FFFFFF&} on board!
+Dialogue: 0,0:01:10.70,0:01:11.18,Sing,,0,0,0,,Open, shut, there's a mouse {\c&H003DC8FF&}on{\c&H00FFFFFF&} board!
+Dialogue: 0,0:01:11.18,0:01:11.90,Sing,,0,0,0,,Open, shut, there's a mouse on {\c&H003DC8FF&}board!{\c&H00FFFFFF&}
+Dialogue: 0,0:01:11.73,0:01:11.98,Sing,,0,0,0,,Hop on in, there's room for more
+Dialogue: 0,0:01:11.98,0:01:13.02,Sing,,0,0,0,,{\c&H003DC8FF&}Hop{\c&H00FFFFFF&} on in, there's room for more
+Dialogue: 0,0:01:13.02,0:01:13.68,Sing,,0,0,0,,Hop {\c&H003DC8FF&}on{\c&H00FFFFFF&} in, there's room for more
+Dialogue: 0,0:01:13.68,0:01:14.22,Sing,,0,0,0,,Hop on {\c&H003DC8FF&}in,{\c&H00FFFFFF&} there's room for more
+Dialogue: 0,0:01:14.22,0:01:14.80,Sing,,0,0,0,,Hop on in, {\c&H003DC8FF&}there's{\c&H00FFFFFF&} room for more
+Dialogue: 0,0:01:14.80,0:01:15.14,Sing,,0,0,0,,Hop on in, there's {\c&H003DC8FF&}room{\c&H00FFFFFF&} for more
+Dialogue: 0,0:01:15.14,0:01:15.68,Sing,,0,0,0,,Hop on in, there's room {\c&H003DC8FF&}for{\c&H00FFFFFF&} more
+Dialogue: 0,0:01:15.68,0:01:16.40,Sing,,0,0,0,,Hop on in, there's room for {\c&H003DC8FF&}more{\c&H00FFFFFF&}
+Dialogue: 0,0:01:16.23,0:01:16.48,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:01:16.48,0:01:17.80,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:01:17.80,0:01:18.44,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:01:18.44,0:01:19.02,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:01:19.02,0:01:19.92,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:01:19.92,0:01:20.57,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:01:20.57,0:01:20.82,Sing,,0,0,0,,Clip, clip, clop, go the pony's feet
+Dialogue: 0,0:01:20.82,0:01:21.54,Sing,,0,0,0,,{\c&H003DC8FF&}Clip,{\c&H00FFFFFF&} clip, clop, go the pony's feet
+Dialogue: 0,0:01:21.54,0:01:22.12,Sing,,0,0,0,,Clip, {\c&H003DC8FF&}clip,{\c&H00FFFFFF&} clop, go the pony's feet
+Dialogue: 0,0:01:22.12,0:01:22.94,Sing,,0,0,0,,Clip, clip, {\c&H003DC8FF&}clop,{\c&H00FFFFFF&} go the pony's feet
+Dialogue: 0,0:01:22.94,0:01:23.10,Sing,,0,0,0,,Clip, clip, clop, {\c&H003DC8FF&}go{\c&H00FFFFFF&} the pony's feet
+Dialogue: 0,0:01:23.10,0:01:23.85,Sing,,0,0,0,,Clip, clip, clop, go {\c&H003DC8FF&}the{\c&H00FFFFFF&} pony's feet
+Dialogue: 0,0:01:23.85,0:01:24.60,Sing,,0,0,0,,Clip, clip, clop, go the {\c&H003DC8FF&}pony's{\c&H00FFFFFF&} feet
+Dialogue: 0,0:01:24.60,0:01:24.65,Sing,,0,0,0,,Clip, clip, clop, go the pony's {\c&H003DC8FF&}feet{\c&H00FFFFFF&}
+Dialogue: 0,0:01:24.43,0:01:24.68,Sing,,0,0,0,,Clip, clip, clop, dancing on her seat
+Dialogue: 0,0:01:24.68,0:01:25.86,Sing,,0,0,0,,{\c&H003DC8FF&}Clip,{\c&H00FFFFFF&} clip, clop, dancing on her seat
+Dialogue: 0,0:01:25.86,0:01:26.42,Sing,,0,0,0,,Clip, {\c&H003DC8FF&}clip,{\c&H00FFFFFF&} clop, dancing on her seat
+Dialogue: 0,0:01:26.42,0:01:27.28,Sing,,0,0,0,,Clip, clip, {\c&H003DC8FF&}clop,{\c&H00FFFFFF&} dancing on her seat
+Dialogue: 0,0:01:27.28,0:01:27.64,Sing,,0,0,0,,Clip, clip, clop, {\c&H003DC8FF&}dancing{\c&H00FFFFFF&} on her seat
+Dialogue: 0,0:01:27.64,0:01:28.02,Sing,,0,0,0,,Clip, clip, clop, dancing {\c&H003DC8FF&}on{\c&H00FFFFFF&} her seat
+Dialogue: 0,0:01:28.02,0:01:28.46,Sing,,0,0,0,,Clip, clip, clop, dancing on {\c&H003DC8FF&}her{\c&H00FFFFFF&} seat
+Dialogue: 0,0:01:28.46,0:01:29.36,Sing,,0,0,0,,Clip, clip, clop, dancing on her {\c&H003DC8FF&}seat{\c&H00FFFFFF&}
+Dialogue: 0,0:01:29.36,0:01:29.45,Sing,,0,0,0,,Clip, clip, clop, dancing on her seat
+Dialogue: 0,0:01:29.45,0:01:29.70,Sing,,0,0,0,,Tap your toes to the happy beat
+Dialogue: 0,0:01:29.70,0:01:30.26,Sing,,0,0,0,,{\c&H003DC8FF&}Tap{\c&H00FFFFFF&} your toes to the happy beat
+Dialogue: 0,0:01:30.26,0:01:30.84,Sing,,0,0,0,,Tap {\c&H003DC8FF&}your{\c&H00FFFFFF&} toes to the happy beat
+Dialogue: 0,0:01:30.84,0:01:31.38,Sing,,0,0,0,,Tap your {\c&H003DC8FF&}toes{\c&H00FFFFFF&} to the happy beat
+Dialogue: 0,0:01:31.38,0:01:31.78,Sing,,0,0,0,,Tap your toes {\c&H003DC8FF&}to{\c&H00FFFFFF&} the happy beat
+Dialogue: 0,0:01:31.78,0:01:32.08,Sing,,0,0,0,,Tap your toes to {\c&H003DC8FF&}the{\c&H00FFFFFF&} happy beat
+Dialogue: 0,0:01:32.08,0:01:32.82,Sing,,0,0,0,,Tap your toes to the {\c&H003DC8FF&}happy{\c&H00FFFFFF&} beat
+Dialogue: 0,0:01:32.82,0:01:33.60,Sing,,0,0,0,,Tap your toes to the happy {\c&H003DC8FF&}beat{\c&H00FFFFFF&}
+Dialogue: 0,0:01:33.43,0:01:33.68,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:01:33.68,0:01:35.14,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:01:35.14,0:01:35.74,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:01:35.74,0:01:36.34,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:01:36.34,0:01:37.20,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:01:37.20,0:01:37.57,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:01:37.57,0:01:37.82,Sing,,0,0,0,,Squeak, squeak, squeak, says the mouse with glee
+Dialogue: 0,0:01:37.82,0:01:38.96,Sing,,0,0,0,,{\c&H003DC8FF&}Squeak,{\c&H00FFFFFF&} squeak, squeak, says the mouse with glee
+Dialogue: 0,0:01:38.96,0:01:39.52,Sing,,0,0,0,,Squeak, {\c&H003DC8FF&}squeak,{\c&H00FFFFFF&} squeak, says the mouse with glee
+Dialogue: 0,0:01:39.52,0:01:40.16,Sing,,0,0,0,,Squeak, squeak, {\c&H003DC8FF&}squeak,{\c&H00FFFFFF&} says the mouse with glee
+Dialogue: 0,0:01:40.16,0:01:40.46,Sing,,0,0,0,,Squeak, squeak, squeak, {\c&H003DC8FF&}says{\c&H00FFFFFF&} the mouse with glee
+Dialogue: 0,0:01:40.46,0:01:40.78,Sing,,0,0,0,,Squeak, squeak, squeak, says {\c&H003DC8FF&}the{\c&H00FFFFFF&} mouse with glee
+Dialogue: 0,0:01:40.78,0:01:41.06,Sing,,0,0,0,,Squeak, squeak, squeak, says the {\c&H003DC8FF&}mouse{\c&H00FFFFFF&} with glee
+Dialogue: 0,0:01:41.06,0:01:41.44,Sing,,0,0,0,,Squeak, squeak, squeak, says the mouse {\c&H003DC8FF&}with{\c&H00FFFFFF&} glee
+Dialogue: 0,0:01:41.44,0:01:42.34,Sing,,0,0,0,,Squeak, squeak, squeak, says the mouse with {\c&H003DC8FF&}glee{\c&H00FFFFFF&}
+Dialogue: 0,0:01:42.34,0:01:42.57,Sing,,0,0,0,,Squeak, squeak, squeak, says the mouse with glee
+Dialogue: 0,0:01:42.57,0:01:42.82,Sing,,0,0,0,,Squeak, squeak, peekaboo, tee-hee!
+Dialogue: 0,0:01:42.82,0:01:43.54,Sing,,0,0,0,,{\c&H003DC8FF&}Squeak,{\c&H00FFFFFF&} squeak, peekaboo, tee-hee!
+Dialogue: 0,0:01:43.54,0:01:45.10,Sing,,0,0,0,,Squeak, {\c&H003DC8FF&}squeak,{\c&H00FFFFFF&} peekaboo, tee-hee!
+Dialogue: 0,0:01:45.10,0:01:46.66,Sing,,0,0,0,,Squeak, squeak, {\c&H003DC8FF&}peekaboo,{\c&H00FFFFFF&} tee-hee!
+Dialogue: 0,0:01:46.66,0:01:47.10,Sing,,0,0,0,,Squeak, squeak, peekaboo, {\c&H003DC8FF&}tee-hee!{\c&H00FFFFFF&}
+Dialogue: 0,0:01:47.10,0:01:47.33,Sing,,0,0,0,,Squeak, squeak, peekaboo, tee-hee!
+Dialogue: 0,0:01:47.33,0:01:47.58,Sing,,0,0,0,,The wheels go round and round
+Dialogue: 0,0:01:47.58,0:01:47.81,Sing,,0,0,0,,{\c&H003DC8FF&}The{\c&H00FFFFFF&} wheels go round and round
+Dialogue: 0,0:01:47.81,0:01:48.04,Sing,,0,0,0,,The {\c&H003DC8FF&}wheels{\c&H00FFFFFF&} go round and round
+Dialogue: 0,0:01:48.04,0:01:48.38,Sing,,0,0,0,,The wheels {\c&H003DC8FF&}go{\c&H00FFFFFF&} round and round
+Dialogue: 0,0:01:48.38,0:01:48.62,Sing,,0,0,0,,The wheels go {\c&H003DC8FF&}round{\c&H00FFFFFF&} and round
+Dialogue: 0,0:01:48.62,0:01:48.88,Sing,,0,0,0,,The wheels go round {\c&H003DC8FF&}and{\c&H00FFFFFF&} round
+Dialogue: 0,0:01:48.88,0:01:49.20,Sing,,0,0,0,,The wheels go round and {\c&H003DC8FF&}round{\c&H00FFFFFF&}
+Dialogue: 0,0:01:48.99,0:01:49.24,Sing,,0,0,0,,Rolling, rolling, round and round
+Dialogue: 0,0:01:49.24,0:01:49.91,Sing,,0,0,0,,{\c&H003DC8FF&}Rolling,{\c&H00FFFFFF&} rolling, round and round
+Dialogue: 0,0:01:49.91,0:01:50.58,Sing,,0,0,0,,Rolling, {\c&H003DC8FF&}rolling,{\c&H00FFFFFF&} round and round
+Dialogue: 0,0:01:50.58,0:01:50.74,Sing,,0,0,0,,Rolling, rolling, {\c&H003DC8FF&}round{\c&H00FFFFFF&} and round
+Dialogue: 0,0:01:50.74,0:01:50.98,Sing,,0,0,0,,Rolling, rolling, round {\c&H003DC8FF&}and{\c&H00FFFFFF&} round
+Dialogue: 0,0:01:50.98,0:01:51.35,Sing,,0,0,0,,Rolling, rolling, round and {\c&H003DC8FF&}round{\c&H00FFFFFF&}
+Dialogue: 0,0:01:51.19,0:01:51.44,Sing,,0,0,0,,Standing in the castle town
+Dialogue: 0,0:01:51.44,0:01:51.74,Sing,,0,0,0,,{\c&H003DC8FF&}Standing{\c&H00FFFFFF&} in the castle town
+Dialogue: 0,0:01:51.74,0:01:52.04,Sing,,0,0,0,,Standing {\c&H003DC8FF&}in{\c&H00FFFFFF&} the castle town
+Dialogue: 0,0:01:52.04,0:01:52.34,Sing,,0,0,0,,Standing in {\c&H003DC8FF&}the{\c&H00FFFFFF&} castle town
+Dialogue: 0,0:01:52.34,0:01:52.64,Sing,,0,0,0,,Standing in the {\c&H003DC8FF&}castle{\c&H00FFFFFF&} town
+Dialogue: 0,0:01:52.64,0:01:53.40,Sing,,0,0,0,,Standing in the castle {\c&H003DC8FF&}town{\c&H00FFFFFF&}
+Dialogue: 0,0:01:53.19,0:01:53.44,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:01:53.44,0:01:54.12,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:01:54.12,0:01:54.56,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:01:54.56,0:01:54.84,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:01:54.84,0:01:55.30,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:01:55.17,0:01:55.42,Sing,,0,0,0,,Clank, clank, clank, goes the little knight
+Dialogue: 0,0:01:55.42,0:01:56.16,Sing,,0,0,0,,{\c&H003DC8FF&}Clank,{\c&H00FFFFFF&} clank, clank, goes the little knight
+Dialogue: 0,0:01:56.16,0:01:56.44,Sing,,0,0,0,,Clank, {\c&H003DC8FF&}clank,{\c&H00FFFFFF&} clank, goes the little knight
+Dialogue: 0,0:01:56.44,0:01:56.82,Sing,,0,0,0,,Clank, clank, {\c&H003DC8FF&}clank,{\c&H00FFFFFF&} goes the little knight
+Dialogue: 0,0:01:56.82,0:01:56.92,Sing,,0,0,0,,Clank, clank, clank, {\c&H003DC8FF&}goes{\c&H00FFFFFF&} the little knight
+Dialogue: 0,0:01:56.92,0:01:57.10,Sing,,0,0,0,,Clank, clank, clank, goes {\c&H003DC8FF&}the{\c&H00FFFFFF&} little knight
+Dialogue: 0,0:01:57.10,0:01:57.50,Sing,,0,0,0,,Clank, clank, clank, goes the {\c&H003DC8FF&}little{\c&H00FFFFFF&} knight
+Dialogue: 0,0:01:57.50,0:01:57.80,Sing,,0,0,0,,Clank, clank, clank, goes the little {\c&H003DC8FF&}knight{\c&H00FFFFFF&}
+Dialogue: 0,0:01:57.63,0:01:57.88,Sing,,0,0,0,,Clank, clank, clank, hold the wheel tight
+Dialogue: 0,0:01:57.88,0:01:58.36,Sing,,0,0,0,,{\c&H003DC8FF&}Clank,{\c&H00FFFFFF&} clank, clank, hold the wheel tight
+Dialogue: 0,0:01:58.36,0:01:58.62,Sing,,0,0,0,,Clank, {\c&H003DC8FF&}clank,{\c&H00FFFFFF&} clank, hold the wheel tight
+Dialogue: 0,0:01:58.62,0:01:58.85,Sing,,0,0,0,,Clank, clank, {\c&H003DC8FF&}clank,{\c&H00FFFFFF&} hold the wheel tight
+Dialogue: 0,0:01:58.85,0:01:59.08,Sing,,0,0,0,,Clank, clank, clank, {\c&H003DC8FF&}hold{\c&H00FFFFFF&} the wheel tight
+Dialogue: 0,0:01:59.08,0:01:59.38,Sing,,0,0,0,,Clank, clank, clank, hold {\c&H003DC8FF&}the{\c&H00FFFFFF&} wheel tight
+Dialogue: 0,0:01:59.38,0:01:59.68,Sing,,0,0,0,,Clank, clank, clank, hold the {\c&H003DC8FF&}wheel{\c&H00FFFFFF&} tight
+Dialogue: 0,0:01:59.68,0:01:59.95,Sing,,0,0,0,,Clank, clank, clank, hold the wheel {\c&H003DC8FF&}tight{\c&H00FFFFFF&}
+Dialogue: 0,0:01:59.79,0:02:00.04,Sing,,0,0,0,,Turning left and turning right
+Dialogue: 0,0:02:00.04,0:02:00.94,Sing,,0,0,0,,{\c&H003DC8FF&}Turning{\c&H00FFFFFF&} left and turning right
+Dialogue: 0,0:02:00.94,0:02:01.06,Sing,,0,0,0,,Turning {\c&H003DC8FF&}left{\c&H00FFFFFF&} and turning right
+Dialogue: 0,0:02:01.06,0:02:01.47,Sing,,0,0,0,,Turning left {\c&H003DC8FF&}and{\c&H00FFFFFF&} turning right
+Dialogue: 0,0:02:01.47,0:02:01.88,Sing,,0,0,0,,Turning left and {\c&H003DC8FF&}turning{\c&H00FFFFFF&} right
+Dialogue: 0,0:02:01.88,0:02:02.00,Sing,,0,0,0,,Turning left and turning {\c&H003DC8FF&}right{\c&H00FFFFFF&}
+Dialogue: 0,0:02:01.89,0:02:02.14,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:02:02.14,0:02:02.82,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:02:02.82,0:02:03.24,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:02:03.24,0:02:03.52,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:02:03.52,0:02:04.00,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:02:04.00,0:02:05.20,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:02:13.11,0:02:13.36,Sing,,0,0,0,,Wobble, wobble, Humpty on the go
+Dialogue: 0,0:02:13.36,0:02:14.24,Sing,,0,0,0,,{\c&H003DC8FF&}Wobble,{\c&H00FFFFFF&} wobble, Humpty on the go
+Dialogue: 0,0:02:14.24,0:02:14.84,Sing,,0,0,0,,Wobble, {\c&H003DC8FF&}wobble,{\c&H00FFFFFF&} Humpty on the go
+Dialogue: 0,0:02:14.84,0:02:15.28,Sing,,0,0,0,,Wobble, wobble, {\c&H003DC8FF&}Humpty{\c&H00FFFFFF&} on the go
+Dialogue: 0,0:02:15.28,0:02:15.60,Sing,,0,0,0,,Wobble, wobble, Humpty {\c&H003DC8FF&}on{\c&H00FFFFFF&} the go
+Dialogue: 0,0:02:15.60,0:02:15.92,Sing,,0,0,0,,Wobble, wobble, Humpty on {\c&H003DC8FF&}the{\c&H00FFFFFF&} go
+Dialogue: 0,0:02:15.92,0:02:16.60,Sing,,0,0,0,,Wobble, wobble, Humpty on the {\c&H003DC8FF&}go{\c&H00FFFFFF&}
+Dialogue: 0,0:02:16.45,0:02:16.70,Sing,,0,0,0,,Wobble, wobble, rolling to and fro
+Dialogue: 0,0:02:16.70,0:02:18.56,Sing,,0,0,0,,{\c&H003DC8FF&}Wobble,{\c&H00FFFFFF&} wobble, rolling to and fro
+Dialogue: 0,0:02:18.56,0:02:19.16,Sing,,0,0,0,,Wobble, {\c&H003DC8FF&}wobble,{\c&H00FFFFFF&} rolling to and fro
+Dialogue: 0,0:02:19.16,0:02:19.76,Sing,,0,0,0,,Wobble, wobble, {\c&H003DC8FF&}rolling{\c&H00FFFFFF&} to and fro
+Dialogue: 0,0:02:19.76,0:02:19.84,Sing,,0,0,0,,Wobble, wobble, rolling {\c&H003DC8FF&}to{\c&H00FFFFFF&} and fro
+Dialogue: 0,0:02:19.84,0:02:20.14,Sing,,0,0,0,,Wobble, wobble, rolling to {\c&H003DC8FF&}and{\c&H00FFFFFF&} fro
+Dialogue: 0,0:02:20.14,0:02:21.04,Sing,,0,0,0,,Wobble, wobble, rolling to and {\c&H003DC8FF&}fro{\c&H00FFFFFF&}
+Dialogue: 0,0:02:21.04,0:02:21.61,Sing,,0,0,0,,Wobble, wobble, rolling to and fro
+Dialogue: 0,0:02:21.61,0:02:21.86,Sing,,0,0,0,,Catch him, friends! Whoa, whoa, whoa!
+Dialogue: 0,0:02:21.86,0:02:22.74,Sing,,0,0,0,,{\c&H003DC8FF&}Catch{\c&H00FFFFFF&} him, friends! Whoa, whoa, whoa!
+Dialogue: 0,0:02:22.74,0:02:24.16,Sing,,0,0,0,,Catch {\c&H003DC8FF&}him,{\c&H00FFFFFF&} friends! Whoa, whoa, whoa!
+Dialogue: 0,0:02:24.16,0:02:24.30,Sing,,0,0,0,,Catch him, {\c&H003DC8FF&}friends!{\c&H00FFFFFF&} Whoa, whoa, whoa!
+Dialogue: 0,0:02:24.30,0:02:25.26,Sing,,0,0,0,,Catch him, friends! {\c&H003DC8FF&}Whoa,{\c&H00FFFFFF&} whoa, whoa!
+Dialogue: 0,0:02:25.26,0:02:26.10,Sing,,0,0,0,,Catch him, friends! Whoa, {\c&H003DC8FF&}whoa,{\c&H00FFFFFF&} whoa!
+Dialogue: 0,0:02:26.10,0:02:26.70,Sing,,0,0,0,,Catch him, friends! Whoa, whoa, {\c&H003DC8FF&}whoa!{\c&H00FFFFFF&}
+Dialogue: 0,0:02:26.57,0:02:26.82,Sing,,0,0,0,,Ride it, ride it through the town!
+Dialogue: 0,0:02:26.82,0:02:27.70,Sing,,0,0,0,,{\c&H003DC8FF&}Ride{\c&H00FFFFFF&} it, ride it through the town!
+Dialogue: 0,0:02:27.70,0:02:28.60,Sing,,0,0,0,,Ride {\c&H003DC8FF&}it,{\c&H00FFFFFF&} ride it through the town!
+Dialogue: 0,0:02:28.60,0:02:28.88,Sing,,0,0,0,,Ride it, {\c&H003DC8FF&}ride{\c&H00FFFFFF&} it through the town!
+Dialogue: 0,0:02:28.88,0:02:29.34,Sing,,0,0,0,,Ride it, ride {\c&H003DC8FF&}it{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:02:29.34,0:02:29.58,Sing,,0,0,0,,Ride it, ride it {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:02:29.58,0:02:29.88,Sing,,0,0,0,,Ride it, ride it through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:02:29.88,0:02:30.30,Sing,,0,0,0,,Ride it, ride it through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:02:30.29,0:02:30.54,Sing,,0,0,0,,Clap, clap, clap, everybody now
+Dialogue: 0,0:02:30.54,0:02:31.30,Sing,,0,0,0,,{\c&H003DC8FF&}Clap,{\c&H00FFFFFF&} clap, clap, everybody now
+Dialogue: 0,0:02:31.30,0:02:31.86,Sing,,0,0,0,,Clap, {\c&H003DC8FF&}clap,{\c&H00FFFFFF&} clap, everybody now
+Dialogue: 0,0:02:31.86,0:02:32.68,Sing,,0,0,0,,Clap, clap, {\c&H003DC8FF&}clap,{\c&H00FFFFFF&} everybody now
+Dialogue: 0,0:02:32.68,0:02:33.26,Sing,,0,0,0,,Clap, clap, clap, {\c&H003DC8FF&}everybody{\c&H00FFFFFF&} now
+Dialogue: 0,0:02:33.26,0:02:34.16,Sing,,0,0,0,,Clap, clap, clap, everybody {\c&H003DC8FF&}now{\c&H00FFFFFF&}
+Dialogue: 0,0:02:34.16,0:02:34.45,Sing,,0,0,0,,Clap, clap, clap, everybody now
+Dialogue: 0,0:02:34.45,0:02:34.70,Sing,,0,0,0,,Clap your hands and show me how
+Dialogue: 0,0:02:34.70,0:02:35.52,Sing,,0,0,0,,{\c&H003DC8FF&}Clap{\c&H00FFFFFF&} your hands and show me how
+Dialogue: 0,0:02:35.52,0:02:35.80,Sing,,0,0,0,,Clap {\c&H003DC8FF&}your{\c&H00FFFFFF&} hands and show me how
+Dialogue: 0,0:02:35.80,0:02:36.12,Sing,,0,0,0,,Clap your {\c&H003DC8FF&}hands{\c&H00FFFFFF&} and show me how
+Dialogue: 0,0:02:36.12,0:02:36.38,Sing,,0,0,0,,Clap your hands {\c&H003DC8FF&}and{\c&H00FFFFFF&} show me how
+Dialogue: 0,0:02:36.38,0:02:36.60,Sing,,0,0,0,,Clap your hands and {\c&H003DC8FF&}show{\c&H00FFFFFF&} me how
+Dialogue: 0,0:02:36.60,0:02:36.94,Sing,,0,0,0,,Clap your hands and show {\c&H003DC8FF&}me{\c&H00FFFFFF&} how
+Dialogue: 0,0:02:36.94,0:02:37.30,Sing,,0,0,0,,Clap your hands and show me {\c&H003DC8FF&}how{\c&H00FFFFFF&}
+Dialogue: 0,0:02:37.11,0:02:37.36,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:02:37.36,0:02:37.82,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:02:37.82,0:02:38.22,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:02:38.22,0:02:38.56,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:02:38.56,0:02:38.80,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:02:38.31,0:02:38.56,Sing,,0,0,0,,The wheels on the bus go round and round
+Dialogue: 0,0:02:38.56,0:02:38.88,Sing,,0,0,0,,{\c&H003DC8FF&}The{\c&H00FFFFFF&} wheels on the bus go round and round
+Dialogue: 0,0:02:38.88,0:02:39.82,Sing,,0,0,0,,The {\c&H003DC8FF&}wheels{\c&H00FFFFFF&} on the bus go round and round
+Dialogue: 0,0:02:39.82,0:02:40.06,Sing,,0,0,0,,The wheels {\c&H003DC8FF&}on{\c&H00FFFFFF&} the bus go round and round
+Dialogue: 0,0:02:40.06,0:02:40.22,Sing,,0,0,0,,The wheels on {\c&H003DC8FF&}the{\c&H00FFFFFF&} bus go round and round
+Dialogue: 0,0:02:40.22,0:02:40.36,Sing,,0,0,0,,The wheels on the {\c&H003DC8FF&}bus{\c&H00FFFFFF&} go round and round
+Dialogue: 0,0:02:40.36,0:02:40.66,Sing,,0,0,0,,The wheels on the bus {\c&H003DC8FF&}go{\c&H00FFFFFF&} round and round
+Dialogue: 0,0:02:40.66,0:02:40.96,Sing,,0,0,0,,The wheels on the bus go {\c&H003DC8FF&}round{\c&H00FFFFFF&} and round
+Dialogue: 0,0:02:40.96,0:02:41.24,Sing,,0,0,0,,The wheels on the bus go round {\c&H003DC8FF&}and{\c&H00FFFFFF&} round
+Dialogue: 0,0:02:41.24,0:02:41.50,Sing,,0,0,0,,The wheels on the bus go round and {\c&H003DC8FF&}round{\c&H00FFFFFF&}
+Dialogue: 0,0:02:40.99,0:02:41.24,Sing,,0,0,0,,Rolling, rolling, round and round
+Dialogue: 0,0:02:41.24,0:02:42.10,Sing,,0,0,0,,{\c&H003DC8FF&}Rolling,{\c&H00FFFFFF&} rolling, round and round
+Dialogue: 0,0:02:42.10,0:02:42.96,Sing,,0,0,0,,Rolling, {\c&H003DC8FF&}rolling,{\c&H00FFFFFF&} round and round
+Dialogue: 0,0:02:42.96,0:02:43.14,Sing,,0,0,0,,Rolling, rolling, {\c&H003DC8FF&}round{\c&H00FFFFFF&} and round
+Dialogue: 0,0:02:43.14,0:02:43.40,Sing,,0,0,0,,Rolling, rolling, round {\c&H003DC8FF&}and{\c&H00FFFFFF&} round
+Dialogue: 0,0:02:43.40,0:02:44.10,Sing,,0,0,0,,Rolling, rolling, round and {\c&H003DC8FF&}round{\c&H00FFFFFF&}
+Dialogue: 0,0:02:44.10,0:02:45.30,Sing,,0,0,0,,Rolling, rolling, round and round
+Dialogue: 0,0:02:48.45,0:02:48.70,Sing,,0,0,0,,Hip, hip, hooray, what a happy sound
+Dialogue: 0,0:02:48.70,0:02:48.78,Sing,,0,0,0,,{\c&H003DC8FF&}Hip,{\c&H00FFFFFF&} hip, hooray, what a happy sound
+Dialogue: 0,0:02:48.78,0:02:49.14,Sing,,0,0,0,,Hip, {\c&H003DC8FF&}hip,{\c&H00FFFFFF&} hooray, what a happy sound
+Dialogue: 0,0:02:49.14,0:02:49.74,Sing,,0,0,0,,Hip, hip, {\c&H003DC8FF&}hooray,{\c&H00FFFFFF&} what a happy sound
+Dialogue: 0,0:02:49.74,0:02:50.20,Sing,,0,0,0,,Hip, hip, hooray, {\c&H003DC8FF&}what{\c&H00FFFFFF&} a happy sound
+Dialogue: 0,0:02:50.20,0:02:50.44,Sing,,0,0,0,,Hip, hip, hooray, what {\c&H003DC8FF&}a{\c&H00FFFFFF&} happy sound
+Dialogue: 0,0:02:50.44,0:02:51.12,Sing,,0,0,0,,Hip, hip, hooray, what a {\c&H003DC8FF&}happy{\c&H00FFFFFF&} sound
+Dialogue: 0,0:02:51.12,0:02:52.02,Sing,,0,0,0,,Hip, hip, hooray, what a happy {\c&H003DC8FF&}sound{\c&H00FFFFFF&}
+Dialogue: 0,0:02:52.02,0:02:52.51,Sing,,0,0,0,,Hip, hip, hooray, what a happy sound
+Dialogue: 0,0:02:52.51,0:02:52.76,Sing,,0,0,0,,Riding through the town!
+Dialogue: 0,0:02:52.76,0:02:53.56,Sing,,0,0,0,,{\c&H003DC8FF&}Riding{\c&H00FFFFFF&} through the town!
+Dialogue: 0,0:02:53.56,0:02:54.14,Sing,,0,0,0,,Riding {\c&H003DC8FF&}through{\c&H00FFFFFF&} the town!
+Dialogue: 0,0:02:54.14,0:02:54.74,Sing,,0,0,0,,Riding through {\c&H003DC8FF&}the{\c&H00FFFFFF&} town!
+Dialogue: 0,0:02:54.74,0:02:55.20,Sing,,0,0,0,,Riding through the {\c&H003DC8FF&}town!{\c&H00FFFFFF&}
+Dialogue: 0,0:02:55.20,0:02:56.40,Sing,,0,0,0,,Riding through the town!
