@@ -340,3 +340,108 @@ def test_managed_backtest_with_unreachable_stop_never_loses_more_than_credit_via
     for m, u in zip(managed, unmanaged):
         assert m.entry_date == u.entry_date
         assert m.pnl >= u.pnl - 1e-6  # profit-take only ever helps or matches, never hurts, with no real stop active
+
+
+def test_points_otm_backtest_multi_entry_defaults_match_single_entry_at_open():
+    ph, vh = _flat_history(252 + 5, spot=7800.0, day_high=7805.0, day_low=7795.0)
+    cfg = Config()
+    default_trades = backtest.run_points_otm_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+    )
+    explicit_trades = backtest.run_points_otm_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+        entries_per_day=1, entry_spacing_minutes=30, first_entry_hour=9, first_entry_minute=30,
+    )
+    assert default_trades == explicit_trades
+
+
+def test_points_otm_backtest_multi_entry_opens_n_trades_per_eligible_day():
+    n_days = 252 + 5
+    ph, vh = _flat_history(n_days, spot=7800.0, day_high=7805.0, day_low=7795.0)
+    cfg = Config()
+    single = backtest.run_points_otm_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+    )
+    staggered = backtest.run_points_otm_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+        entries_per_day=3, entry_spacing_minutes=30, first_entry_hour=10, first_entry_minute=0,
+    )
+    assert len(staggered) == 3 * len(single)
+    assert {t.entry_date for t in staggered} == {t.entry_date for t in single}
+
+
+def test_entry_times_spacing_and_start():
+    # The user's specific ask: 3 entries starting at 10:00am, 30 minutes apart.
+    times = backtest.entry_times(3, first_hour=10, first_minute=0, spacing_minutes=30)
+    assert times == [dt.time(10, 0), dt.time(10, 30), dt.time(11, 0)]
+
+
+def test_entry_times_single_entry_defaults_to_market_open():
+    assert backtest.entry_times(1) == [dt.time(backtest.MARKET_OPEN_HOUR, backtest.MARKET_OPEN_MINUTE)]
+
+
+def test_session_fraction_bounds():
+    assert backtest._session_fraction(dt.time(9, 30)) == pytest.approx(0.0)
+    assert backtest._session_fraction(dt.time(16, 0)) == pytest.approx(1.0)
+    assert backtest._session_fraction(dt.time(12, 45)) == pytest.approx(0.5, abs=1e-6)
+
+
+def test_managed_backtest_multi_entry_defaults_match_single_entry_at_open():
+    # entries_per_day=1 is the default -- explicitly passing it (and the
+    # market-open first-entry time) must reproduce the original
+    # single-entry behavior exactly, since this is the backward-compatible
+    # default every existing test above relies on.
+    ph, vh = _flat_history(252 + 5, spot=7800.0, day_high=7805.0, day_low=7795.0)
+    cfg = Config()
+    default_trades = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+    )
+    explicit_trades = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+        entries_per_day=1, entry_spacing_minutes=30, first_entry_hour=9, first_entry_minute=30,
+    )
+    assert default_trades == explicit_trades
+
+
+def test_managed_backtest_multi_entry_opens_n_trades_per_eligible_day():
+    n_days = 252 + 5
+    ph, vh = _flat_history(n_days, spot=7800.0, day_high=7805.0, day_low=7795.0)
+    cfg = Config()
+    single = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+    )
+    staggered = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+        entries_per_day=3, entry_spacing_minutes=30, first_entry_hour=10, first_entry_minute=0,
+    )
+    assert len(staggered) == 3 * len(single)
+    assert {t.entry_date for t in staggered} == {t.entry_date for t in single}
+
+
+def test_managed_backtest_multi_entry_interpolates_spot_between_open_and_close():
+    n_days = 252 + 1
+    dates = pd.date_range(end=dt.date.today(), periods=n_days, freq="B")
+    day_open = np.full(n_days, 7800.0)
+    day_close = np.full(n_days, 7800.0)
+    day_close[-1] = 7850.0  # only the last (tested) day actually drifts
+    price_history = pd.DataFrame(
+        {"Open": day_open, "High": np.maximum(day_open, day_close), "Low": np.minimum(day_open, day_close),
+         "Close": day_close, "Volume": np.full(n_days, 2_000_000)},
+        index=dates,
+    )
+    vix = np.full(n_days, 16.0)
+    vix_history = pd.DataFrame({"Open": vix, "High": vix, "Low": vix, "Close": vix}, index=dates)
+    cfg = Config()
+
+    trades = backtest.run_points_otm_managed_backtest(
+        price_history, vix_history, cfg, points_otm=20.0, wing_width=20.0,
+        profit_take_pct=0.0, stop_multiple=1000.0, apply_gates=False, strike_step=5.0,
+        entries_per_day=3, entry_spacing_minutes=30, first_entry_hour=10, first_entry_minute=0,
+    )
+    assert len(trades) == 3
+    # 10:00, 10:30, 11:00 sit at increasing fractions of the 9:30-16:00
+    # session, so each entry's interpolated spot should be strictly
+    # further from the Open and closer to the Close than the last.
+    spots = [t.entry_spot for t in trades]
+    assert spots[0] < spots[1] < spots[2]
+    assert all(7800.0 < s < 7850.0 for s in spots)

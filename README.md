@@ -358,6 +358,46 @@ chains were being priced using the actual current wall-clock time rather
 than a fixed market-open time, understating every historical day's time
 value by however far into the real session this code happened to run.)
 
+**Staggered multiple entries per day:** both `run_points_otm_backtest()`
+and `run_points_otm_managed_backtest()` accept `entries_per_day`,
+`entry_spacing_minutes`, `first_entry_hour`, and `first_entry_minute` to
+open several of these fixed-distance condors per day instead of one at
+the open -- e.g. 3 entries 30 minutes apart starting at 10:00am ET:
+
+```python
+trades = backtest.run_points_otm_backtest(
+    ph, vh, Config(), points_otm=30.0, wing_width=20.0,
+    entries_per_day=3, entry_spacing_minutes=30, first_entry_hour=10, first_entry_minute=0,
+)
+```
+
+Each entry's synthetic spot is linearly interpolated between the day's
+Open and Close by how far its clock time sits through the regular
+9:30am-4:00pm ET session (free daily bars carry no real intraday path, so
+this captures the day's net drift across entries but not real intraday
+noise/reversals between them -- the same approximation
+`meic_backtest.py` uses, and the mechanic is duplicated rather than
+imported from there to avoid a circular import, since `meic_backtest.py`
+already imports from this module). In the managed variant, each entry's
+stop-loss worst case also scales the room between its own spot and the
+day's realized High/Low by `sqrt(fraction of the session remaining after
+that entry)` -- an entry early in the day is assumed capable of seeing
+close to the full eventual extreme, one placed later only a fraction of
+it. At `entries_per_day=1` with the default first-entry time (market
+open), every one of these reduces to exactly the original single-entry
+behavior (scale factor 1.0), so the default is fully backward-compatible.
+
+Against 3 years of real SPX/VIX data, staggering 3 entries 30 minutes
+apart (10:00/10:30/11:00 ET) against a single entry at the open raised
+both configurations' win rate and total P&L (since it's 3x the trade
+count) but also roughly tripled the capital held at risk simultaneously
+for the rest of the session -- by 11:00am all three condors are open at
+once on a hold-to-expiration structure, so this is economically closer to
+sizing up 3x at market open than it is to true diversification. Confirm
+margin/buying-power requirements can cover three (or `entries_per_day`
+times your normal) simultaneously open positions before running this
+live, not just one.
+
 ## MEIC (Multiple-Entry Iron Condor) Backtest
 
 A separate backtest of **MEIC**, a popular 0DTE SPX income strategy: leg
