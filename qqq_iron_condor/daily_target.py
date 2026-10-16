@@ -42,6 +42,7 @@ from .config import Config
 from .data import OptionChain
 from .direction import SuggestedContract, _mid_price
 from .options_math import bs_delta, bs_price, time_to_expiration_years
+from .supply_demand import SupplyDemandRead, hourly_bars_before, supply_demand_read
 
 DISCLAIMER = (
     "> Decision-support, not an auto-trader and not financial advice. A $1,000/day goal is a "
@@ -156,9 +157,15 @@ def choose_bias(
     forced_no_trade: list,
     signal_bias: Optional[str],
     first_hour: Optional[FirstHourRead],
+    sd: Optional[SupplyDemandRead] = None,
 ) -> tuple[str, str]:
     """(bias, description of where it came from). Bias is CALL / PUT /
-    NO TRADE / WAIT (first hour not finished) / UNKNOWN (no data)."""
+    NO TRADE / WAIT (first hour not finished) / UNKNOWN (no data).
+
+    Sources: "first_hour", "signal", "supply_demand" (the supply/demand
+    read alone) and "sd_first_hour" (only when supply/demand and the
+    first hour agree). The supply/demand read uses today's first hourly
+    bar, so it also waits for the first hour."""
     if override:
         return override.upper(), "manual override (--direction)"
     if forced_no_trade:
@@ -170,7 +177,16 @@ def choose_bias(
     if first_hour is None:
         return "UNKNOWN", "first-hour momentum unavailable"
     if not first_hour.ready:
-        return "WAIT", "first-hour momentum (not ready yet)"
+        return "WAIT", "first hour not finished yet"
+    if source in ("supply_demand", "sd_first_hour"):
+        label = "supply/demand" if source == "supply_demand" else "supply/demand + first hour"
+        if sd is None or not sd.ready:
+            return "UNKNOWN", f"{label} (read unavailable)"
+        if sd.side is None:
+            return "NO TRADE", f"{label} (no clear supply/demand edge)"
+        if source == "sd_first_hour" and sd.side != first_hour.side:
+            return "NO TRADE", f"{label} (the two reads disagree)"
+        return sd.side.upper(), label
     if first_hour.side is None:
         return "NO TRADE", "first-hour momentum (flat first hour)"
     return first_hour.side.upper(), "first-hour momentum"
@@ -187,6 +203,7 @@ class DailyTargetPlan:
     notes: list = field(default_factory=list)
     signal_bias: Optional[str] = None
     first_hour: Optional[FirstHourRead] = None
+    sd: Optional[SupplyDemandRead] = None
 
     @property
     def chosen(self) -> Optional[LegPlan]:
@@ -403,6 +420,7 @@ def build_plan(
     model_iv: Optional[float] = None,
     signal_bias: Optional[str] = None,
     first_hour: Optional[FirstHourRead] = None,
+    sd: Optional[SupplyDemandRead] = None,
 ) -> DailyTargetPlan:
     notes = list(notes or [])
     legs: dict = {"call": None, "put": None}
@@ -416,7 +434,7 @@ def build_plan(
             legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv, model_iv)
     return DailyTargetPlan(
         bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs,
-        notes=notes, signal_bias=signal_bias, first_hour=first_hour,
+        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd,
     )
 
 
@@ -536,17 +554,34 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
         fh = plan.first_hour
         says = (fh.side or "flat").upper() if fh.ready else "not ready"
         lines.append(f"| First-hour momentum | **{says}** -- {fh.detail} |")
+    if plan.sd is not None:
+        if plan.sd.ready and plan.first_hour is not None and plan.first_hour.ready:
+            says = (plan.sd.side or "no edge").upper()
+            lines.append(f"| Supply/demand | **{says}** -- {plan.sd.detail} |")
+        else:
+            lines.append(f"| Supply/demand | **not ready** -- {plan.sd.detail or 'waits for the first hour'} |")
     if plan.signal_bias is not None:
         score = f" (score {plan.signal_score:+.2f})" if plan.signal_score is not None else ""
         lines.append(f"| Directional signal | **{plan.signal_bias}**{score} |")
     lines.append("")
+    if plan.sd is not None and plan.sd.ready and plan.sd.zones:
+        zone_list = ", ".join(f"{z.kind} ${z.low:,.2f}-${z.high:,.2f}" for z in plan.sd.zones)
+        lines.append(f"_Live supply/demand zones near the price: {zone_list}._")
+        lines.append("")
     if plan.first_hour is not None and plan.signal_bias in ("CALL", "PUT") and plan.first_hour.side:
         agree = plan.first_hour.side.upper() == plan.signal_bias
         lines.append(
             "Both reads agree." if agree else "⚠️ The two reads disagree -- consider sitting this one out or sizing down."
         )
         lines.append("")
-    if "first-hour" in plan.bias_source:
+    if "supply/demand" in plan.bias_source:
+        lines.append(
+            "_Supply/demand as the direction **lost money in the backtest**: 40% win rate and about -$23k "
+            "over 122 trades (Nov 2023-Oct 2026), and its flipped (breakout) version lost too. Shown "
+            "here because it was selected; first-hour momentum is the default._"
+        )
+        lines.append("")
+    elif "first-hour" in plan.bias_source:
         lines.append(
             "_First-hour momentum is a **paper-trade-only** rule: it made +$30k over 455 backtested trades at "
             "$0.05/share slippage, but lost money at $0.10/share or with worst-case scoring "
@@ -692,14 +727,29 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     except Exception as exc:
         first_hour = FirstHourRead(False, None, None, None, None, f"Intraday bars unavailable ({exc}).")
 
-    bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour)
+    sd: Optional[SupplyDemandRead] = None
+    try:
+        from .data import get_intraday_history
+
+        hourly = get_intraday_history(cfg.symbol, "1h", "60d")
+        today_bars = hourly[hourly.index.date == dt.date.today()]
+        if first_hour.ready and len(today_bars):
+            start = today_bars.index[0]
+            sd = supply_demand_read(hourly_bars_before(hourly, start + dt.timedelta(minutes=60)), start)
+        else:
+            sd = SupplyDemandRead(False, None, detail="waits for the first hour")
+    except Exception as exc:
+        sd = SupplyDemandRead(False, None, detail=f"hourly bars unavailable ({exc})")
+
+    bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour, sd)
     chains = providers.pick_expirations_for_targets(cfg.symbol, (cfg.daily_target_expiration,))
     reference_hv = daily.hv20_pct / 100.0 if daily.hv20_pct == daily.hv20_pct else None
     vix = daily.vix_level
     model_iv = vix / 100.0 * cfg.daily_target_iv_vix_multiple if vix == vix and vix > 0 else reference_hv
     plan = build_plan(
         daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, bias_source, cfg,
-        signal_score=score, reference_hv=reference_hv, notes=notes, model_iv=model_iv, signal_bias=signal_bias, first_hour=first_hour,
+        signal_score=score, reference_hv=reference_hv, notes=notes, model_iv=model_iv, signal_bias=signal_bias,
+        first_hour=first_hour, sd=sd,
     )
     return render_plan(plan, cfg), plan
 
@@ -760,7 +810,7 @@ def main(argv=None) -> int:
     parser.add_argument("--direction", choices=["call", "put"], help="Override the direction entirely")
     parser.add_argument(
         "--direction-source",
-        choices=["first-hour", "signal"],
+        choices=["first-hour", "signal", "supply-demand", "sd-first-hour"],
         help="Which read picks CALL/PUT (default: Config.daily_target_direction_source)",
     )
     parser.add_argument("--check", action="store_true", help="Check an open position against the exit rules")

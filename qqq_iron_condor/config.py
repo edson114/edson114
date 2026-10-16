@@ -296,7 +296,10 @@ class Config:
     # its open after the first `daily_target_first_hour_minutes`, puts if
     # below -- the only rule that made money in daily_target_experiments.py,
     # and fragile: negative at 2x slippage, so paper-trade it) or "signal"
-    # (the directional signal's score). Hard skip-day gates apply to both.
+    # (the directional signal's score), "supply_demand" (supply/demand zones +
+    # volume pressure, supply_demand.py -- it lost money in the backtest, so
+    # it's opt-in) or "sd_first_hour" (only when supply/demand and the first
+    # hour agree). Hard skip-day gates apply to all of them.
     daily_target_direction_source: str = "first_hour"
     daily_target_first_hour_minutes: int = 60
 
