@@ -872,6 +872,30 @@ momentum, ~730 sessions of hourly bars):
   first hour) is shown in each plan for context, but as a filter it made
   results worse at every threshold tried.
 
+**Key levels + reaction setups** (`key_levels.py`, tested Oct 2026):
+a rules-based version of a "levels, confirmation, invalidation,
+context" framework.
+- **Levels:** multi-touch levels from hourly swing highs and lows.
+- **Setups:** reclaim, flip-and-retest and rejection, each confirmed by
+  an hourly close and scanned 10:30–2:30.
+- **Stop:** an hourly close back through the level.
+- **Size:** full, half or pass, depending on QQQ's daily trend and how
+  extended the day's move already is.
+
+It lost to first-hour momentum + level stop (+$53k on the same window,
+−$4,000 backstop for both):
+
+| Variant | Trades | Win rate | Total | 2× costs |
+|---|---|---|---|---|
+| The original three setups, context sizing | 202 | 62% | −$12k | −$30k |
+| All six setups (with mirrors), context sizing | 249 | 63% | +$3k | −$9k |
+| All six, no context (always full size) | 257 | 63% | +$2k | −$14k |
+| Levels with ≥3 touches, all six, context | 155 | 62% | −$20k | −$28k |
+
+Context sizing cut the average loss (−$1,344 vs −$1,841 at full size)
+but didn't create an edge. It's kept as a research tool and isn't used
+by the live plan.
+
 **Better data (optional):** set the `TRADIER_TOKEN` repo secret (plus
 `TRADIER_BASE_URL=https://sandbox.tradier.com/v1` for a sandbox token,
 see [Data providers](#data-providers)). The plan then takes price
@@ -1013,6 +1037,7 @@ qqq_iron_condor/
   daily_target_experiments.py # entry/direction/exit/hold variants, half-split + stress tests
   supply_demand.py        # supply/demand zones + volume pressure read (hourly bars)
   breadth.py              # mega-cap first-hour breadth (NVDA, MSFT, AAPL, AMZN, META, GOOGL, AVGO)
+  key_levels.py           # multi-touch levels + reclaim/flip/rejection setups + context sizing (research)
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)

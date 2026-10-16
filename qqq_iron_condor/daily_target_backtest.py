@@ -67,6 +67,7 @@ class TargetTrade:
     outcome: str  # "target", "stop", "time"
     sessions: int  # sessions the position was open, entry day = 1
     capital_usd: float
+    size: float = 1.0  # position size multiple (0.5 = half size); pnl_usd already includes it
 
 
 @dataclass
@@ -137,6 +138,7 @@ def simulate(
     structure_stop: bool = False,
     stop_on_close: bool = False,
     backstop: bool = False,
+    entry_window: Optional[tuple] = None,
 ) -> list[TargetTrade]:
     """Replay the rules. With `intraday` bars (e.g. hourly), each session
     is walked bar by bar so the order of the target and stop touches is
@@ -163,6 +165,13 @@ def simulate(
         that level is.
       - `stop_on_close`: the stop only triggers when a bar *closes* beyond
         its level (exiting at that close), not when a wick touches it.
+      - `entry_window`: `(first, last)` bar indexes. Instead of deciding once
+        at `entry_bar`, call `direction` after each completed bar from
+        `first` to `last` and enter at the next bar's open the first time it
+        returns a side (one entry per day, as always).
+      - `direction` may return a side, or a tuple `(side, stop_level)` /
+        `(side, stop_level, size)`: `stop_level` (a QQQ price) becomes the
+        stop, and `size` scales the position (and its P&L), e.g. 0.5.
       - `backstop`: alongside a structure stop, also keep the -$ stop
         (`daily_target_stop_usd`) as a hard touch stop, capping the loss
         when the structure level is far away or a bar closes far past it."""
@@ -199,8 +208,23 @@ def simulate(
                 continue
             if len(bars) <= entry_bar:
                 continue
+            custom_stop, size = None, 1.0
             if direction is not None:
-                side = direction(i, bars.iloc[:entry_bar])
+                candidates = (
+                    range(entry_window[0], min(entry_window[1], len(bars) - 1) + 1) if entry_window else [entry_bar]
+                )
+                side = None
+                for k in candidates:
+                    res = direction(i, bars.iloc[:k])
+                    if isinstance(res, tuple):
+                        side = res[0]
+                        custom_stop = res[1] if len(res) > 1 else None
+                        size = res[2] if len(res) > 2 else 1.0
+                    else:
+                        side = res
+                    if side is not None:
+                        eb = k
+                        break
             elif mode in ("call", "put"):
                 side = mode
             elif bias_cache is not None and date in bias_cache:
@@ -209,22 +233,27 @@ def simulate(
                 side = daily_bias(df.iloc[:i], vix_history.loc[: df.index[i - 1]], cfg)
                 if bias_cache is not None:
                     bias_cache[date] = side
-            if side is None:
+            if side is None or not size:
                 continue
-            entry_px = float(bars["Open"].iloc[entry_bar])
-            before_entry = bars.iloc[:entry_bar]
-            bars = bars.iloc[entry_bar:]
+            if direction is None:
+                eb = entry_bar
+            entry_px = float(bars["Open"].iloc[eb])
+            before_entry = bars.iloc[:eb]
+            bars = bars.iloc[eb:]
             expiry = date + dt.timedelta(days=DTE)
             t = DTE / 365.0
             strike = strike_for_delta(entry_px, t, r, iv, side, cfg.daily_target_delta)
             fill = bs_price(entry_px, strike, t, r, iv, side) + slip
-            pos = {"side": side, "strike": strike, "expiry": expiry, "fill": fill, "date": date, "sessions": 0}
+            pos = {"side": side, "strike": strike, "expiry": expiry, "fill": fill, "date": date, "sessions": 0, "size": size}
             if atr_exits is not None:
                 sign = 1.0 if side == "call" else -1.0
                 prev_atr = float(atr.iloc[i - 1])
                 pos["target_u"] = entry_px + sign * atr_exits[0] * prev_atr
                 pos["stop_u"] = entry_px - sign * atr_exits[1] * prev_atr
-            if structure_stop and len(before_entry):
+            if custom_stop is not None:
+                if (side == "call" and custom_stop < entry_px) or (side == "put" and custom_stop > entry_px):
+                    pos["stop_u"] = float(custom_stop)
+            elif structure_stop and len(before_entry):
                 level = float(before_entry["Low"].min()) if side == "call" else float(before_entry["High"].max())
                 # A level already on the wrong side of entry would stop out instantly.
                 if (side == "call" and level < entry_px) or (side == "put" and level > entry_px):
@@ -295,10 +324,11 @@ def simulate(
                     strike=strike,
                     entry_fill=round(fill, 2),
                     exit_fill=round(exit_fill, 2),
-                    pnl_usd=round((exit_fill - fill) * 100 * n_contracts, 2),
+                    pnl_usd=round((exit_fill - fill) * 100 * n_contracts * pos["size"], 2),
                     outcome=outcome,
                     sessions=pos["sessions"],
-                    capital_usd=round(fill * 100 * n_contracts, 2),
+                    capital_usd=round(fill * 100 * n_contracts * pos["size"], 2),
+                    size=pos["size"],
                 )
             )
             pos = None
