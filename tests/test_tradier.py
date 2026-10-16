@@ -66,12 +66,23 @@ def test_get_quote_handles_singleton_quote(monkeypatch):
     assert mock_get.call_args.kwargs["params"] == {"symbols": "QQQ"}
 
 
-def test_get_gap_info_uses_quote_and_is_always_confirmed(monkeypatch):
+def test_get_gap_info_uses_todays_open(monkeypatch):
+    # The opening gap is open vs prior close -- not the current price, which
+    # would measure the intraday move instead.
     monkeypatch.setenv("TRADIER_TOKEN", "fake-token")
-    body = {"quotes": {"quote": {"symbol": "QQQ", "last": 744.77, "prevclose": 741.10}}}
+    body = {"quotes": {"quote": {"symbol": "QQQ", "open": 742.50, "last": 735.00, "prevclose": 741.10}}}
     with mock.patch("requests.get", return_value=_mock_response(body)):
         gap_pct, confirmed = tradier.get_gap_info("QQQ")
     assert confirmed is True
+    assert gap_pct == pytest.approx((742.50 / 741.10 - 1.0) * 100.0)
+
+
+def test_get_gap_info_before_open_is_indicative(monkeypatch):
+    monkeypatch.setenv("TRADIER_TOKEN", "fake-token")
+    body = {"quotes": {"quote": {"symbol": "QQQ", "open": None, "last": 744.77, "prevclose": 741.10}}}
+    with mock.patch("requests.get", return_value=_mock_response(body)):
+        gap_pct, confirmed = tradier.get_gap_info("QQQ")
+    assert confirmed is False
     assert gap_pct == pytest.approx((744.77 / 741.10 - 1.0) * 100.0)
 
 

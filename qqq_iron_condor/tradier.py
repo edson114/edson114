@@ -127,19 +127,26 @@ def get_spot_price(symbol: str) -> float:
 
 
 def get_gap_info(symbol: str) -> tuple[Optional[float], bool]:
-    """Tradier's quote endpoint always returns a live (or, on a sandbox
-    token, 15-minute-delayed) last price and the prior session's close,
-    so -- unlike the yfinance path -- this is always a confirmed reading,
-    never a pre-market approximation."""
+    """Opening gap: today's open vs the prior session's close, from
+    Tradier's quote. Before the regular-session open there's no `open` yet,
+    so it falls back to the latest (pre-market) trade as an indicative,
+    unconfirmed gap -- the same split the yfinance path makes. (The
+    current price is deliberately not used once the session has opened:
+    that would measure the intraday move, not the gap.)"""
     try:
         quote = get_quote(symbol)
-        last_price = float(quote["last"])
         prev_close = float(quote["prevclose"])
+        open_px = float(quote.get("open") or 0.0)
+        last_price = float(quote.get("last") or 0.0)
     except Exception:
         return None, False
     if prev_close <= 0:
         return None, False
-    return (last_price / prev_close - 1.0) * 100.0, True
+    if open_px > 0:
+        return (open_px / prev_close - 1.0) * 100.0, True
+    if last_price > 0:
+        return (last_price / prev_close - 1.0) * 100.0, False
+    return None, False
 
 
 def list_expirations(symbol: str) -> list[str]:
