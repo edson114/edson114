@@ -60,16 +60,19 @@ def get_gap_info(symbol: str, price_history: pd.DataFrame) -> tuple[Optional[flo
     """Return (gap_pct, is_confirmed_open).
 
     Once today's daily bar exists (market has opened and printed at least
-    one trade), this is a confirmed move-from-prior-close using the same
-    daily history everything else in the app already relies on. Before
-    that, it falls back to a live quote via yfinance's fast_info for an
-    indicative (unconfirmed) pre-market gap -- fast_info reflects the
-    latest available trade, pre-market included.
+    one trade), this is the confirmed opening gap: today's *open* vs the
+    prior close, from the same daily history everything else in the app
+    relies on. (It used to use today's Close -- i.e. the current price --
+    which made the "gap" grow with every intraday move and trip the 0.8%
+    skip-day rule on days that opened flat; the backtests always used the
+    open.) Before the open, it falls back to a live quote via yfinance's
+    fast_info for an indicative (unconfirmed) pre-market gap -- fast_info
+    reflects the latest available trade, pre-market included.
 
     Returns (None, False) if no gap could be determined at all.
     """
     if is_today_bar_present(price_history):
-        gap_pct = (float(price_history["Close"].iloc[-1]) / float(price_history["Close"].iloc[-2]) - 1.0) * 100.0
+        gap_pct = (float(price_history["Open"].iloc[-1]) / float(price_history["Close"].iloc[-2]) - 1.0) * 100.0
         return gap_pct, True
 
     try:

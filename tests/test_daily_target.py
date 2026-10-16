@@ -559,3 +559,15 @@ def test_evaluate_position_level_mode():
     put_hit = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="put", level=751.0, last_hourly_close=751.2)
     assert put_hit.action == "CLOSE -- LEVEL STOP"
     assert "Level stop" in dtg.render_status(hit, "call", 700.0, "2026-12-18", CFG)
+
+
+def test_yfinance_gap_uses_todays_open_not_current_price():
+    from qqq_iron_condor import data
+
+    idx = pd.DatetimeIndex([pd.Timestamp(dt.date.today() - dt.timedelta(days=1)), pd.Timestamp(dt.date.today())])
+    # Oct 16, 2026: prior close $728.00, open $725.48, price later $709.80.
+    hist = pd.DataFrame({"Open": [718.55, 725.48], "High": [729.43, 725.94], "Low": [715.44, 707.23],
+                         "Close": [728.00, 709.80]}, index=idx)
+    gap, confirmed = data.get_gap_info("QQQ", hist)
+    assert confirmed is True
+    assert gap == pytest.approx((725.48 / 728.00 - 1) * 100)  # -0.35%, not the -2.50% intraday drop
