@@ -44,7 +44,14 @@ import pandas as pd
 from . import indicators as ind
 from .config import Config, ExpirationTarget
 from .data import OptionChain
-from .options_math import bs_price, time_to_expiration_years
+from .options_math import MARKET_TIMEZONE, ZoneInfo, bs_price, time_to_expiration_years
+
+MARKET_OPEN_HOUR, MARKET_OPEN_MINUTE = 9, 30
+
+
+def _market_open_datetime(trade_date: dt.date) -> dt.datetime:
+    tzinfo = ZoneInfo(MARKET_TIMEZONE) if ZoneInfo else None
+    return dt.datetime.combine(trade_date, dt.time(MARKET_OPEN_HOUR, MARKET_OPEN_MINUTE), tzinfo=tzinfo)
 from .strategy import IronCondorTrade, build_iron_condor
 
 MIN_HISTORY_DAYS = 252  # need a trailing year for HV/VIX-percentile inputs before the first entry
@@ -300,8 +307,11 @@ def run_points_otm_backtest(
         exit_spot = float(close.iloc[i])
         iv = float(vix_close.iloc[i]) / 100.0
         expiration = entry_date.date().isoformat()
+        t_years_entry = time_to_expiration_years(0, now=_market_open_datetime(entry_date.date()))
 
-        chain = simulate_chain(spot_entry, iv, 0, cfg.risk_free_rate, expiration, strike_step=strike_step)
+        chain = simulate_chain(
+            spot_entry, iv, 0, cfg.risk_free_rate, expiration, strike_step=strike_step, t_years=t_years_entry,
+        )
         calls = chain.calls.set_index("strike")
         puts = chain.puts.set_index("strike")
 
@@ -325,6 +335,180 @@ def run_points_otm_backtest(
         call_loss = min(max(exit_spot - short_call_strike, 0.0), call_width)
         put_loss = min(max(short_put_strike - exit_spot, 0.0), put_width)
         pnl = credit - call_loss - put_loss
+
+        vix_pctile = ind.percentile_rank(vix_close.iloc[max(0, i - MIN_HISTORY_DAYS):i + 1], float(vix_close.iloc[i]))
+        regime = "High IV" if vix_pctile >= 70 else ("Low IV" if vix_pctile <= 20 else "Normal IV")
+
+        trades.append(BacktestTrade(
+            label=label,
+            entry_date=entry_date.date(),
+            exit_date=entry_date.date(),
+            entry_spot=spot_entry,
+            exit_spot=exit_spot,
+            credit=round(credit, 2),
+            max_loss=round(max_loss, 2),
+            pnl=round(pnl, 4),
+            short_call_strike=short_call_strike,
+            short_put_strike=short_put_strike,
+            vix_at_entry=float(vix_close.iloc[i]),
+            iv_regime=regime,
+        ))
+
+    return trades
+
+
+def _condor_debit_to_close(
+    spot: float, short_call: float, long_call: float, short_put: float, long_put: float,
+    t_years: float, rate: float, iv: float,
+) -> float:
+    """Mark-to-market cost to close the whole condor (buy back both short
+    legs, sell back both long legs) at a hypothetical spot/time -- used for
+    the stop-loss and profit-take checks in run_points_otm_managed_backtest,
+    not for the entry credit itself (which comes from the real simulated
+    chain's mid prices, same as run_points_otm_backtest)."""
+    call_debit = bs_price(spot, short_call, t_years, rate, iv, "call") - bs_price(spot, long_call, t_years, rate, iv, "call")
+    put_debit = bs_price(spot, short_put, t_years, rate, iv, "put") - bs_price(spot, long_put, t_years, rate, iv, "put")
+    return call_debit + put_debit
+
+
+def run_points_otm_managed_backtest(
+    price_history: pd.DataFrame,
+    vix_history: pd.DataFrame,
+    cfg: Config,
+    points_otm: float,
+    wing_width: float,
+    profit_take_pct: float = 0.5,
+    stop_multiple: float = 2.0,
+    apply_gates: bool = True,
+    strike_step: float = 1.0,
+) -> list[BacktestTrade]:
+    """Same fixed-distance 0DTE iron condor as run_points_otm_backtest, but
+    ACTIVELY MANAGED instead of held unconditionally to expiration -- take
+    profit early at `profit_take_pct` of max profit, cut losses early at
+    `stop_multiple`x the entry credit, the standard real-world iron condor
+    practice this app's own Risk Management notes recommend (and that
+    run_points_otm_backtest's unconditional hold ignores entirely).
+
+    Free daily bars give no real intraday price path, so each trade is
+    checked against two approximations, both evaluated at the SAME
+    intraday checkpoint -- half the entry's remaining time-to-expiration --
+    rather than mixing a "no decay yet" assumption for one and "half
+    decayed" for the other. Checking a bad move against full, undecayed
+    time value would stack maximum gamma sensitivity on top of maximum
+    extrinsic value simultaneously, which isn't a realistic worst case
+    (some time necessarily passes before the day's high or low actually
+    prints) -- an earlier version of this function did exactly that and
+    produced an implausible ~15% win rate even for configurations that
+    held-to-expiration at ~85%, which is how this was caught:
+
+    1. **Stop-loss**: the day's realized High and Low (whichever is worse
+       for this condor), re-priced at the shared midpoint checkpoint. If
+       either breach pushes the cost-to-close to `stop_multiple`x the
+       entry credit, the trade is stopped there.
+    2. **Profit-take**: checked only if not stopped, using pure theta decay
+       at the ENTRY spot (no price movement at all), re-priced at that same
+       midpoint checkpoint. 0DTE options bleed time value fast enough that
+       this can trigger with no move whatsoever; using the entry spot
+       rather than guessing a favorable move is a deliberately conservative
+       lower bound on how early the target could realistically have been
+       hit -- a real path that moves favorably would hit it even sooner, so
+       this likely UNDERSTATES how often/how early profit-taking would have
+       triggered.
+    3. **Otherwise**: settled normally at the day's close (same intrinsic
+       value math as run_points_otm_backtest) -- this covers both a
+       "walked it to max profit without early decay reaching the target"
+       case and a loss that never got bad enough to hit the stop.
+
+    Shares every other simulation assumption run_points_otm_backtest
+    documents (synthetic Black-Scholes chain, flat VIX-as-IV, no
+    skew/slippage/commissions, real historical gap/VIX-spike hard gates).
+    """
+    dates = price_history.index
+    close = price_history["Close"]
+    open_ = price_history["Open"]
+    high = price_history["High"]
+    low = price_history["Low"]
+
+    vix_close = vix_history["Close"].reindex(dates, method="ffill").ffill()
+
+    label = f"{points_otm:.0f}pt OTM (managed)"
+    trades: list[BacktestTrade] = []
+    for i in range(MIN_HISTORY_DAYS, len(dates)):
+        entry_date = dates[i]
+
+        if apply_gates:
+            event_label = cfg.macro_event_dates.get(entry_date.date().isoformat())
+            gap_pct = (float(close.iloc[i]) / float(close.iloc[i - 1]) - 1.0) * 100.0
+            vix_level = float(vix_close.iloc[i])
+            if event_label or abs(gap_pct) >= cfg.gap_threshold_pct or vix_level >= cfg.vix_spike_threshold:
+                continue
+
+        spot_entry = float(open_.iloc[i])
+        exit_spot = float(close.iloc[i])
+        day_high = float(high.iloc[i])
+        day_low = float(low.iloc[i])
+        iv = float(vix_close.iloc[i]) / 100.0
+        expiration = entry_date.date().isoformat()
+        t_years_entry = time_to_expiration_years(0, now=_market_open_datetime(entry_date.date()))
+
+        chain = simulate_chain(
+            spot_entry, iv, 0, cfg.risk_free_rate, expiration, strike_step=strike_step, t_years=t_years_entry,
+        )
+        calls = chain.calls.set_index("strike")
+        puts = chain.puts.set_index("strike")
+
+        short_call_strike = _nearest_strike(chain.calls, spot_entry + points_otm)
+        short_put_strike = _nearest_strike(chain.puts, spot_entry - points_otm)
+        long_call_strike = _nearest_strike(chain.calls, short_call_strike + wing_width)
+        long_put_strike = _nearest_strike(chain.puts, short_put_strike - wing_width)
+
+        if long_call_strike <= short_call_strike or long_put_strike >= short_put_strike:
+            continue  # wing_width too small relative to strike_step to produce a real spread
+
+        credit = (
+            (_mid(calls.loc[short_call_strike]) - _mid(calls.loc[long_call_strike]))
+            + (_mid(puts.loc[short_put_strike]) - _mid(puts.loc[long_put_strike]))
+        )
+        credit = max(credit, 0.0)
+        call_width = long_call_strike - short_call_strike
+        put_width = short_put_strike - long_put_strike
+        max_loss = max(call_width, put_width) - credit
+
+        # Both checks below are evaluated at the SAME intraday checkpoint --
+        # half the entry's remaining time-to-expiration -- rather than
+        # mixing "no decay yet" for the stop with "half decayed" for the
+        # profit target. Checking a bad move against full, undecayed time
+        # value stacks maximum gamma sensitivity on top of maximum
+        # extrinsic value at once, which isn't a realistic worst case: by
+        # the time the day's high or low actually prints, some time has
+        # necessarily passed. A shared midpoint checkpoint keeps the stop
+        # and profit-take checks internally consistent with each other.
+        t_years_mid = t_years_entry * 0.5
+
+        debit_at_high = _condor_debit_to_close(
+            day_high, short_call_strike, long_call_strike, short_put_strike, long_put_strike, t_years_mid, cfg.risk_free_rate, iv,
+        )
+        debit_at_low = _condor_debit_to_close(
+            day_low, short_call_strike, long_call_strike, short_put_strike, long_put_strike, t_years_mid, cfg.risk_free_rate, iv,
+        )
+        worst_debit = max(debit_at_high, debit_at_low)
+        stop_target = credit * stop_multiple
+
+        if credit > 0 and worst_debit >= stop_target:
+            exit_value = stop_target
+            pnl = credit - exit_value
+        else:
+            debit_mid = _condor_debit_to_close(
+                spot_entry, short_call_strike, long_call_strike, short_put_strike, long_put_strike, t_years_mid, cfg.risk_free_rate, iv,
+            )
+            profit_target = credit * (1.0 - profit_take_pct)
+            if credit > 0 and debit_mid <= profit_target:
+                exit_value = debit_mid
+                pnl = credit - exit_value
+            else:
+                call_loss = min(max(exit_spot - short_call_strike, 0.0), call_width)
+                put_loss = min(max(short_put_strike - exit_spot, 0.0), put_width)
+                pnl = credit - call_loss - put_loss
 
         vix_pctile = ind.percentile_rank(vix_close.iloc[max(0, i - MIN_HISTORY_DAYS):i + 1], float(vix_close.iloc[i]))
         regime = "High IV" if vix_pctile >= 70 else ("Low IV" if vix_pctile <= 20 else "Normal IV")

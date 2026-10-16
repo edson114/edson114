@@ -324,6 +324,40 @@ trades = backtest.run_points_otm_backtest(ph, vh, Config(), points_otm=5.0, wing
 print(backtest.render_backtest_report("SPY", 3.0, [backtest.summarize("5pt OTM", trades)], apply_gates=True))
 ```
 
+**Actively managed instead of held to expiration:** `backtest.run_points_otm_managed_backtest()`
+is the same fixed-distance condor, but closed early -- take profit at a
+configurable `profit_take_pct` of max profit, stop out at `stop_multiple`x
+the entry credit -- instead of held unconditionally to the close. Both
+checks use the day's real High/Low (for the stop) and pure theta decay at
+the entry spot (for the profit target), evaluated at a shared intraday
+checkpoint (half the entry's remaining time-to-expiration) rather than two
+different time assumptions -- an earlier version checked the stop against
+the day's extreme with *zero* decay, which stacks maximum gamma on maximum
+extrinsic value and produced an implausible ~15% win rate even for setups
+that held-to-expiration at ~85%; that mismatch is what caught the bug.
+
+```python
+trades = backtest.run_points_otm_managed_backtest(
+    ph, vh, Config(), points_otm=30.0, wing_width=20.0, profit_take_pct=0.5, stop_multiple=4.0,
+)
+print(backtest.render_backtest_report("SPY", 3.0, [backtest.summarize("30pt OTM managed", trades)], apply_gates=True))
+```
+
+A grid search across distances/widths/stop multiples on 3 years of real
+SPX data (see git history for the full numbers) found that a **tight**
+stop (2-3x credit) consistently hurt expectancy relative to holding to
+expiration -- SPX's realized daily range is often wide enough that the
+day's worst intraday point breaches a tight stop even on days that would
+have closed as wins, an intraday whipsaw effect. The configurations that
+actually improved on hold-to-expiration all used a stop loose enough that
+it was structurally unreachable (`stop_multiple * credit` exceeding the
+wing's own max loss) -- meaning the real edge came entirely from the
+**profit-take rule**, not downside protection. (This module intentionally
+also fixed a second, unrelated bug in `run_points_otm_backtest`: dte=0
+chains were being priced using the actual current wall-clock time rather
+than a fixed market-open time, understating every historical day's time
+value by however far into the real session this code happened to run.)
+
 ## MEIC (Multiple-Entry Iron Condor) Backtest
 
 A separate backtest of **MEIC**, a popular 0DTE SPX income strategy: leg

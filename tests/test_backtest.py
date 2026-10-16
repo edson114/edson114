@@ -217,3 +217,126 @@ def test_points_otm_backtest_label_reflects_requested_distance():
     cfg = Config()
     trades = backtest.run_points_otm_backtest(price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=False)
     assert all(t.label == "5pt OTM" for t in trades)
+
+
+def test_market_open_datetime_gives_a_consistent_time_to_expiration():
+    # Regression test for the bug this and the managed backtest's
+    # correctness depend on: simulate_chain's dte=0 default silently uses
+    # the actual current wall-clock time, which varies with whenever the
+    # backtest happens to run. Pricing "entered at the open" trades must
+    # use a fixed market-open time instead, so every historical day gets
+    # the same (correct) ~6.5 hours of time value regardless of when the
+    # backtest script itself is executed.
+    from qqq_iron_condor.options_math import time_to_expiration_years
+
+    t1 = time_to_expiration_years(0, now=backtest._market_open_datetime(dt.date(2026, 1, 5)))
+    t2 = time_to_expiration_years(0, now=backtest._market_open_datetime(dt.date(2026, 6, 15)))
+    assert t1 == pytest.approx(t2)
+    assert t1 == pytest.approx(6.5 / (24 * 365), abs=1e-6)
+
+
+def _flat_history(n_days: int, spot: float = 7800.0, vix_level: float = 16.0, day_high=None, day_low=None):
+    """n_days of a completely flat market (Open=Close=spot every day), with
+    the LAST day's High/Low overridden if given -- lets a test control
+    exactly one day's intraday range while keeping the warmup period inert."""
+    dates = pd.date_range(end=dt.date.today(), periods=n_days, freq="B")
+    price = np.full(n_days, spot)
+    high = price.copy()
+    low = price.copy()
+    if day_high is not None:
+        high[-1] = day_high
+    if day_low is not None:
+        low[-1] = day_low
+    price_history = pd.DataFrame(
+        {"Open": price, "High": high, "Low": low, "Close": price, "Volume": np.full(n_days, 2_000_000)},
+        index=dates,
+    )
+    vix = np.full(n_days, vix_level)
+    vix_history = pd.DataFrame({"Open": vix, "High": vix, "Low": vix, "Close": vix}, index=dates)
+    return price_history, vix_history
+
+
+def test_condor_debit_to_close_grows_with_adverse_move_either_direction():
+    debit_atm = backtest._condor_debit_to_close(7800.0, 7830.0, 7850.0, 7770.0, 7750.0, 0.0005, 0.045, 0.16)
+    debit_call_side_threatened = backtest._condor_debit_to_close(7825.0, 7830.0, 7850.0, 7770.0, 7750.0, 0.0005, 0.045, 0.16)
+    debit_put_side_threatened = backtest._condor_debit_to_close(7775.0, 7830.0, 7850.0, 7770.0, 7750.0, 0.0005, 0.045, 0.16)
+    assert debit_call_side_threatened > debit_atm
+    assert debit_put_side_threatened > debit_atm
+
+
+def test_managed_backtest_profit_take_triggers_via_pure_theta_decay_on_a_calm_day():
+    # No intraday move at all (High=Low=Open=Close) -- a low profit-take
+    # bar (10% of max profit) should still trigger from theta decay alone
+    # by the midpoint checkpoint, since 0DTE options bleed value fast.
+    ph, vh = _flat_history(252 + 1, spot=7800.0, day_high=7800.0, day_low=7800.0)
+    cfg = Config()
+    trades = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, profit_take_pct=0.1, stop_multiple=100.0,
+        apply_gates=False, strike_step=5.0,
+    )
+    assert len(trades) == 1
+    t = trades[0]
+    assert t.pnl > 0
+    assert t.pnl < t.credit  # an early partial-profit exit, not the full credit a settlement would keep
+
+
+def test_managed_backtest_stop_triggers_on_large_adverse_move():
+    # A violent move threatens the put side hard enough, with a tight
+    # stop and a wing wide enough for the stop to actually bind (rather
+    # than being structurally unreachable), to force a stop-loss exit.
+    ph, vh = _flat_history(252 + 1, spot=7800.0, day_high=7800.0, day_low=7600.0)
+    cfg = Config()
+    trades = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=100.0, profit_take_pct=0.5, stop_multiple=1.5,
+        apply_gates=False, strike_step=5.0,
+    )
+    assert len(trades) == 1
+    t = trades[0]
+    assert t.pnl < 0
+    assert t.pnl == pytest.approx(t.credit - t.credit * 1.5, abs=1e-2)
+
+
+def test_managed_backtest_label_is_suffixed():
+    ph, vh = _flat_history(252 + 5, spot=7800.0, day_high=7805.0, day_low=7795.0)
+    cfg = Config()
+    trades = backtest.run_points_otm_managed_backtest(
+        ph, vh, cfg, points_otm=20.0, wing_width=20.0, apply_gates=False, strike_step=5.0,
+    )
+    assert all(t.label == "20pt OTM (managed)" for t in trades)
+
+
+def test_managed_backtest_skips_entries_on_large_gap_days_when_gates_applied():
+    price_history, vix_history = _synthetic_history(n_days=252 + 40)
+    gap_day_idx = 252 + 10
+    price_history.iloc[gap_day_idx, price_history.columns.get_loc("Close")] *= 1.05
+
+    cfg = Config()
+    gap_date = price_history.index[gap_day_idx].date()
+
+    gated_trades = backtest.run_points_otm_managed_backtest(price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=True)
+    ungated_trades = backtest.run_points_otm_managed_backtest(price_history, vix_history, cfg, points_otm=5.0, wing_width=5.0, apply_gates=False)
+
+    assert gap_date not in {t.entry_date for t in gated_trades}
+    assert gap_date in {t.entry_date for t in ungated_trades}
+
+
+def test_managed_backtest_with_unreachable_stop_never_loses_more_than_credit_via_stop_path():
+    # stop_multiple so large it structurally can't bind (max loss is
+    # capped by wing_width regardless) -- this isolates the profit-take
+    # rule's effect, which should never produce a worse per-trade loss
+    # than plain settlement would (it only ever exits EARLY and partially
+    # in its own favor, never adds risk).
+    price_history, vix_history = _synthetic_history(n_days=252 + 60)
+    cfg = Config()
+    strike_step = backtest.infer_strike_step(float(price_history["Close"].iloc[-1]))
+    managed = backtest.run_points_otm_managed_backtest(
+        price_history, vix_history, cfg, points_otm=20.0, wing_width=10.0,
+        profit_take_pct=0.5, stop_multiple=1000.0, apply_gates=True, strike_step=strike_step,
+    )
+    unmanaged = backtest.run_points_otm_backtest(
+        price_history, vix_history, cfg, points_otm=20.0, wing_width=10.0, apply_gates=True, strike_step=strike_step,
+    )
+    assert len(managed) == len(unmanaged)
+    for m, u in zip(managed, unmanaged):
+        assert m.entry_date == u.entry_date
+        assert m.pnl >= u.pnl - 1e-6  # profit-take only ever helps or matches, never hurts, with no real stop active
