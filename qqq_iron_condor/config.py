@@ -316,6 +316,17 @@ class Config:
     # entry is suggested while one is still open, so positions can't stack.
     daily_target_max_hold_days: int = 5
 
+    # Which stop the order ticket uses. "fixed": -daily_target_stop_usd on any
+    # touch. "first_hour_level": exit when an *hourly bar closes* below the
+    # first hour's low (calls) / above its high (puts), plus a hard
+    # -daily_target_backstop_usd touch stop. In the backtest (~730 sessions,
+    # first-hour momentum) the level stop made ~+$53k vs +$24k for the fixed
+    # stop and held up under worst-case scoring and 2x slippage, but its
+    # average loss is ~$2,600 (worst ~$6,800) instead of ~$1,000, and it
+    # still turns negative at 3x slippage. The ticket shows both either way.
+    daily_target_stop_mode: str = "fixed"
+    daily_target_backstop_usd: float = 4000.0
+
     # Backtest-only assumptions (no free historical option chains exist):
     # QQQ IV is approximated as VIX x this multiple, and every fill pays
     # this much per share vs. the Black-Scholes mid on each side.

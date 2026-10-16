@@ -154,6 +154,18 @@ def run_experiments(
     add("Direction", "Supply/demand + first hour agree, 10:30 entry",
         direction=make_backtest_direction(intraday, require_first_hour=True), entry_bar=1)
 
+    # Stop placed at a price level instead of -$: the first hour's low (calls)
+    # / high (puts), on any touch or only on an hourly close, optionally with
+    # a hard -$ backstop. First-hour momentum direction, 10:30 entry.
+    fh = dirs["first-hour momentum"]
+    add("Level stop", "First-hour level stop (touch)", direction=fh, entry_bar=1, structure_stop=True)
+    add("Level stop", "First-hour level stop (hourly close)", direction=fh, entry_bar=1,
+        structure_stop=True, stop_on_close=True)
+    for cap in (2000, 3000, 4000):
+        add("Level stop", f"First-hour level stop (hourly close) + -${cap:,} backstop", direction=fh, entry_bar=1,
+            structure_stop=True, stop_on_close=True, backstop=True,
+            cfg=dataclasses.replace(cfg, daily_target_stop_usd=float(cap)))
+
     # 3. Target / stop sizes (daily signal, 9:30 entry).
     for target, stop in ((1000, 500), (1000, 600), (1000, 750), (1500, 750), (500, 500)):
         add("Target / stop", f"+${target:,} / -${stop:,}", direction=dirs["daily signal"], cfg=stops(target, stop))
