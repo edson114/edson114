@@ -90,7 +90,7 @@ def test_plan_without_chain_notes_it():
     ],
 )
 def test_evaluate_position(current, days, action):
-    status = dtg.evaluate_position(50.00, current, days, CFG)
+    status = dtg.evaluate_position(50.00, current, days, dataclasses.replace(CFG, daily_target_stop_mode="fixed"))
     assert status.action == action
     assert status.pnl_usd == pytest.approx((current - 50.00) * 1000)
     assert status.target_option_price == 51.00
@@ -510,8 +510,9 @@ def test_leg_plan_level_stop_fields():
 def test_ticket_marks_active_stop():
     fh = dtg.FirstHourRead(True, "call", 748.0, 750.0, 2.0, "up", high=751.0, low=747.0)
     chain = dtg._synthetic_chain(750.0, 60, CFG)
-    plan = dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", CFG, first_hour=fh)
-    fixed = dtg.render_plan(plan, CFG)
+    fixed_cfg = dataclasses.replace(CFG, daily_target_stop_mode="fixed")
+    plan = dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", fixed_cfg, first_hour=fh)
+    fixed = dtg.render_plan(plan, fixed_cfg)
     assert "**Stop (active)**" in fixed and "**Level stop**" in fixed
     level_cfg = dataclasses.replace(CFG, daily_target_stop_mode="first_hour_level")
     level = dtg.render_plan(dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", level_cfg, first_hour=fh), level_cfg)
@@ -544,3 +545,17 @@ def test_breadth_read_and_direction():
     assert br.make_backtest_direction(hourly, 5)(0, qqq_down) is None  # QQQ disagrees with breadth
     assert br.make_backtest_direction(hourly, 5, with_first_hour=False)(0, qqq_down) == "call"
     assert br.make_backtest_direction(hourly, 6)(0, qqq_up) is None
+
+
+def test_evaluate_position_level_mode():
+    # Level mode (default): the $ stop is the -$4,000 backstop, and an hourly
+    # close past the first-hour level closes the trade.
+    assert dtg.evaluate_position(50.00, 49.00, 0, CFG).action == "HOLD"  # -$1,000 no longer stops it
+    assert dtg.evaluate_position(50.00, 46.00, 0, CFG).action == "CLOSE -- STOP HIT"
+    hold = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="call", level=747.0, last_hourly_close=747.5)
+    assert hold.action == "HOLD" and hold.level == 747.0
+    hit = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="call", level=747.0, last_hourly_close=746.9)
+    assert hit.action == "CLOSE -- LEVEL STOP"
+    put_hit = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="put", level=751.0, last_hourly_close=751.2)
+    assert put_hit.action == "CLOSE -- LEVEL STOP"
+    assert "Level stop" in dtg.render_status(hit, "call", 700.0, "2026-12-18", CFG)

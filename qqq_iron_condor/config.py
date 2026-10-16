@@ -324,7 +324,8 @@ class Config:
     # stop and held up under worst-case scoring and 2x slippage, but its
     # average loss is ~$2,600 (worst ~$6,800) instead of ~$1,000, and it
     # still turns negative at 3x slippage. The ticket shows both either way.
-    daily_target_stop_mode: str = "fixed"
+    # Default switched to "first_hour_level" on Oct 16, 2026 for paper trading.
+    daily_target_stop_mode: str = "first_hour_level"
     daily_target_backstop_usd: float = 4000.0
 
     # Backtest-only assumptions (no free historical option chains exist):
