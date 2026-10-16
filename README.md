@@ -850,6 +850,28 @@ trades, which is still negative. It's re-tested in
 volume, not order-book data; free sources don't publish actual resting
 bids and offers.
 
+**Level stop and mega-cap breadth** (tested Oct 2026, first-hour
+momentum, ~730 sessions of hourly bars):
+
+| Variant | Win rate | Total | Worst-case ties | 2× costs | 3× costs | Worst loss |
+|---|---|---|---|---|---|---|
+| −$1,000 stop | 53% | +$24k | −$18k | −$17k | — | −$4.3k |
+| First-hour level stop, on hourly close | 76% | +$63k | +$52k | +$35k | −$22k | −$10.9k |
+| …plus −$4,000 hard backstop (**default**) | 74% | +$53k | +$36k | +$25k | −$27k | −$6.8k |
+| First hour + ≥5 of 7 mega-caps agree | 51% | +$1k | −$29k | −$18k | — | −$4.3k |
+
+- **The level stop** exits when an hourly bar *closes* past the first
+  hour's low (calls) or high (puts), with a hard −$4,000 touch stop. It
+  is the only change so far that survives the stress tests, but its
+  average loss is about $2,600 instead of about $1,000. Most of its gain
+  came in the first half of the window. **It is the active stop by
+  default** (`daily_target_stop_mode = "first_hour_level"`); the ticket
+  still shows the fixed −$1,000 stop next to it, and
+  `daily_target_stop_mode = "fixed"` switches back.
+- **Mega-cap breadth** (NVDA, MSFT, AAPL, AMZN, META, GOOGL, AVGO in the
+  first hour) is shown in each plan for context, but as a filter it made
+  results worse at every threshold tried.
+
 **Better data (optional):** set the `TRADIER_TOKEN` repo secret (plus
 `TRADIER_BASE_URL=https://sandbox.tradier.com/v1` for a sandbox token,
 see [Data providers](#data-providers)). The plan then takes price
@@ -990,6 +1012,7 @@ qqq_iron_condor/
   daily_target_backtest.py # replays the daily $ target rules over ~730 sessions of hourly bars
   daily_target_experiments.py # entry/direction/exit/hold variants, half-split + stress tests
   supply_demand.py        # supply/demand zones + volume pressure read (hourly bars)
+  breadth.py              # mega-cap first-hour breadth (NVDA, MSFT, AAPL, AMZN, META, GOOGL, AVGO)
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)

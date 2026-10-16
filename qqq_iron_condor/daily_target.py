@@ -42,6 +42,7 @@ from .config import Config
 from .data import OptionChain
 from .direction import SuggestedContract, _mid_price
 from .options_math import bs_delta, bs_price, time_to_expiration_years
+from .breadth import BreadthRead
 from .supply_demand import SupplyDemandRead, hourly_bars_before, supply_demand_read
 
 DISCLAIMER = (
@@ -114,6 +115,9 @@ class LegPlan:
     ask: Optional[float] = None
     spread: Optional[float] = None  # ask - bid per share; None = no live quote
     tradeable: Optional[bool] = None  # spread within cap; None = unknown (no live quotes)
+    level_stop_underlying: Optional[float] = None  # first-hour low (call) / high (put)
+    level_stop_loss_usd: Optional[float] = None  # estimated $ result if stopped right at that level
+    backstop_underlying: Optional[float] = None  # QQQ level of the hard -backstop_usd stop
 
 
 @dataclass
@@ -124,6 +128,8 @@ class FirstHourRead:
     end_price: Optional[float]
     move: Optional[float]
     detail: str
+    high: Optional[float] = None  # first hour's high / low: the level stops
+    low: Optional[float] = None
 
 
 def first_hour_read(bars, minutes: int = 60) -> FirstHourRead:
@@ -148,6 +154,8 @@ def first_hour_read(bars, minutes: int = 60) -> FirstHourRead:
     return FirstHourRead(
         True, side, round(open_px, 2), round(end_px, 2), round(move, 2),
         f"QQQ {direction} {move:+.2f} in the first hour (${open_px:,.2f} open -> ${end_px:,.2f} at {cutoff:%H:%M}).",
+        high=round(float(window["High"].max()), 2),
+        low=round(float(window["Low"].min()), 2),
     )
 
 
@@ -204,6 +212,7 @@ class DailyTargetPlan:
     signal_bias: Optional[str] = None
     first_hour: Optional[FirstHourRead] = None
     sd: Optional[SupplyDemandRead] = None
+    breadth: Optional[BreadthRead] = None
 
     @property
     def chosen(self) -> Optional[LegPlan]:
@@ -342,7 +351,9 @@ def build_leg_plan(
     cfg: Config,
     reference_hv: Optional[float] = None,
     model_iv: Optional[float] = None,
+    level: Optional[float] = None,
 ) -> Optional[LegPlan]:
+    """`level`: the first hour's low (call) / high (put), for the level stop."""
     model_iv = model_iv or reference_hv or 0.20
     picked = _select_tradeable_contract(chain, spot, option_type, cfg, model_iv)
     if picked is not None:
@@ -381,6 +392,16 @@ def build_leg_plan(
     move_t = abs(target_u - spot) if target_u is not None else None
     move_s = abs(stop_u - spot) if stop_u is not None else None
 
+    level_u = level_loss = backstop_u = None
+    if level is not None and ((option_type == "call" and level < spot) or (option_type == "put" and level > spot)):
+        level_u = level
+        # Sold at the bid after buying at the ask: the spread is part of the loss.
+        level_loss = (bs_price(level, contract.strike, t_years, cfg.risk_free_rate, iv, option_type) - model_now - spread) * 100 * n
+        backstop_u = underlying_for_option_price(
+            max(model_now - (per_share(cfg.daily_target_backstop_usd, n) - spread), 0.01),
+            contract.strike, t_years, cfg.risk_free_rate, iv, option_type,
+        )
+
     one_day = 1.0 / 365.0
     theta_share = (
         bs_price(spot, contract.strike, max(t_years - one_day, one_day), cfg.risk_free_rate, iv, option_type) - model_now
@@ -404,6 +425,9 @@ def build_leg_plan(
         ask=round(ask, 2) if ask is not None else None,
         spread=round(spread, 2) if bid is not None else None,
         tradeable=tradeable,
+        level_stop_underlying=round(level_u, 2) if level_u is not None else None,
+        level_stop_loss_usd=round(level_loss, 2) if level_loss is not None else None,
+        backstop_underlying=round(backstop_u, 2) if backstop_u is not None else None,
     )
 
 
@@ -421,6 +445,7 @@ def build_plan(
     signal_bias: Optional[str] = None,
     first_hour: Optional[FirstHourRead] = None,
     sd: Optional[SupplyDemandRead] = None,
+    breadth: Optional[BreadthRead] = None,
 ) -> DailyTargetPlan:
     notes = list(notes or [])
     legs: dict = {"call": None, "put": None}
@@ -431,10 +456,13 @@ def build_plan(
         )
     else:
         for option_type in ("call", "put"):
-            legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv, model_iv)
+            level = None
+            if first_hour is not None and first_hour.ready:
+                level = first_hour.low if option_type == "call" else first_hour.high
+            legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv, model_iv, level)
     return DailyTargetPlan(
         bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs,
-        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd,
+        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd, breadth=breadth,
     )
 
 
@@ -448,19 +476,46 @@ class PositionStatus:
     target_option_price: float
     stop_option_price: float
     days_held: int
+    level: Optional[float] = None  # level-stop mode: the first-hour low/high being watched
+    last_hourly_close: Optional[float] = None
 
 
-def evaluate_position(entry_price: float, current_price: float, days_held: int, cfg: Config, contracts: Optional[int] = None) -> PositionStatus:
+def evaluate_position(
+    entry_price: float,
+    current_price: float,
+    days_held: int,
+    cfg: Config,
+    contracts: Optional[int] = None,
+    side: Optional[str] = None,
+    level: Optional[float] = None,
+    last_hourly_close: Optional[float] = None,
+) -> PositionStatus:
     """Apply the exit rules to an open position. `days_held` counts
-    completed sessions since entry (0 on the entry day)."""
+    completed sessions since entry (0 on the entry day).
+
+    In "first_hour_level" stop mode the $ stop is the hard backstop
+    (`daily_target_backstop_usd`), and with `side`, `level` (the first
+    hour's low for a call, high for a put) and QQQ's last completed hourly
+    close, a close past the level also means close the position."""
     n = contracts or cfg.daily_target_contracts
+    level_mode = cfg.daily_target_stop_mode == "first_hour_level"
+    stop_usd = cfg.daily_target_backstop_usd if level_mode else cfg.daily_target_stop_usd
     pnl = (current_price - entry_price) * 100 * n
     target_px = entry_price + per_share(cfg.daily_target_profit_usd, n)
-    stop_px = entry_price - per_share(cfg.daily_target_stop_usd, n)
+    stop_px = entry_price - per_share(stop_usd, n)
+    level_hit = (
+        level_mode
+        and level is not None
+        and last_hourly_close is not None
+        and side in ("call", "put")
+        and (last_hourly_close < level if side == "call" else last_hourly_close > level)
+    )
     if pnl >= cfg.daily_target_profit_usd - 1e-9:
         action = "CLOSE -- TARGET HIT"
-    elif pnl <= -cfg.daily_target_stop_usd + 1e-9:
+    elif pnl <= -stop_usd + 1e-9:
         action = "CLOSE -- STOP HIT"
+    elif level_hit:
+        action = "CLOSE -- LEVEL STOP"
     elif days_held >= cfg.daily_target_max_hold_days:
         action = "CLOSE -- TIME STOP"
     else:
@@ -472,6 +527,8 @@ def evaluate_position(entry_price: float, current_price: float, days_held: int, 
         target_option_price=round(target_px, 2),
         stop_option_price=round(stop_px, 2),
         days_held=days_held,
+        level=level if level_mode else None,
+        last_hourly_close=last_hourly_close,
     )
 
 
@@ -489,6 +546,7 @@ def _usd(x: Optional[float]) -> str:
 
 def _leg_table(leg: LegPlan, cfg: Config) -> list[str]:
     c = leg.contract
+    level_active = cfg.daily_target_stop_mode == "first_hour_level" and leg.level_stop_underlying is not None
     side = "CALL" if c.option_type == "call" else "PUT"
     lines = [
         f"| | |",
@@ -515,8 +573,26 @@ def _leg_table(leg: LegPlan, cfg: Config) -> list[str]:
         f"(QQQ ~{_usd(leg.target_underlying)}, a {_usd(leg.move_to_target)} move after the spread"
         + (f", {leg.move_to_target_atr:.2f}x ATR" if leg.move_to_target_atr is not None else "")
         + ") |",
-        f"| **Stop** | sell all at {_usd(leg.stop_option_price)} = **-{_usd(cfg.daily_target_stop_usd)}** "
+        f"| **Stop{' (active)' if not level_active else ''}** | sell all at {_usd(leg.stop_option_price)} = "
+        f"**-{_usd(cfg.daily_target_stop_usd)}** "
         f"(QQQ ~{_usd(leg.stop_underlying)}, a {_usd(leg.move_to_stop)} move against) |",
+    ]
+    if leg.level_stop_underlying is not None:
+        below = "below" if c.option_type == "call" else "above"
+        which = "low" if c.option_type == "call" else "high"
+        lines.append(
+            f"| **Level stop{' (active)' if level_active else ''}** | exit if an hourly bar *closes* {below} "
+            f"{_usd(leg.level_stop_underlying)} (the first hour's {which}; about {_usd(leg.level_stop_loss_usd)} "
+            f"if stopped right there), with a hard stop at **-{_usd(cfg.daily_target_backstop_usd)}** "
+            f"(QQQ ~{_usd(leg.backstop_underlying)})"
+            + (
+                " -- the level is beyond the hard stop, so the hard stop would trigger first"
+                if leg.level_stop_loss_usd is not None and -leg.level_stop_loss_usd > cfg.daily_target_backstop_usd
+                else ""
+            )
+            + ". Backtest: +$53k vs +$24k for the fixed stop, but bigger losses when it hits (avg ~$2,600). |"
+        )
+    lines += [
         f"| **Time stop** | close at the end of session {cfg.daily_target_max_hold_days} if neither level hits |",
         f"| **Theta** | ~{_usd(leg.theta_per_day_usd)}/day for the whole position |",
     ]
@@ -560,6 +636,14 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
             lines.append(f"| Supply/demand | **{says}** -- {plan.sd.detail} |")
         else:
             lines.append(f"| Supply/demand | **not ready** -- {plan.sd.detail or 'waits for the first hour'} |")
+    if plan.breadth is not None:
+        if plan.breadth.ready:
+            lines.append(
+                f"| Mega-cap breadth | **{plan.breadth.up}/{plan.breadth.total} up** -- {plan.breadth.detail} "
+                "Context only: as a filter it didn't improve the backtest. |"
+            )
+        else:
+            lines.append(f"| Mega-cap breadth | **not ready** -- {plan.breadth.detail} |")
     if plan.signal_bias is not None:
         score = f" (score {plan.signal_score:+.2f})" if plan.signal_score is not None else ""
         lines.append(f"| Directional signal | **{plan.signal_bias}**{score} |")
@@ -608,8 +692,14 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
         lines.append(
             f"**Right after the fill:** place a GTC limit *sell to close* for all {n} at your actual fill + "
             f"{_usd(move_per_share)} -- that's what closes the day at +{_usd(cfg.daily_target_profit_usd)} "
-            "automatically. Set a price alert on QQQ at the stop level (option stop orders on wide "
-            "spreads fill badly) and exit when it triggers."
+            "automatically. "
+            + (
+                "For the level stop, check QQQ at each hourly close (10:30, 11:30, ...) and exit if it closed "
+                "past the level; set a QQQ price alert at the hard stop as the backstop."
+                if cfg.daily_target_stop_mode == "first_hour_level"
+                else "Set a price alert on QQQ at the stop level (option stop orders on wide spreads fill badly) "
+                "and exit when it triggers."
+            )
         )
         lines.append("")
     elif plan.bias == "NO TRADE":
@@ -633,8 +723,14 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
         "",
         "1. **One position at a time.** If yesterday's position is still open, don't open another -- "
         "run `--check` on it instead. Ten more contracts every day would stack risk fast.",
-        f"2. **Exit on whichever comes first:** +{_usd(cfg.daily_target_profit_usd)}, "
-        f"-{_usd(cfg.daily_target_stop_usd)}, or the end of session {cfg.daily_target_max_hold_days}.",
+        (
+            f"2. **Exit on whichever comes first:** +{_usd(cfg.daily_target_profit_usd)}, an hourly *close* past the "
+            f"first hour's low (calls) / high (puts), a -{_usd(cfg.daily_target_backstop_usd)} hard stop, or the end "
+            f"of session {cfg.daily_target_max_hold_days}."
+            if cfg.daily_target_stop_mode == "first_hour_level"
+            else f"2. **Exit on whichever comes first:** +{_usd(cfg.daily_target_profit_usd)}, "
+            f"-{_usd(cfg.daily_target_stop_usd)}, or the end of session {cfg.daily_target_max_hold_days}."
+        ),
         "3. **Don't enter on hard-gate days** (FOMC/CPI, a big opening gap, VIX spike) -- the plan returns NO TRADE.",
         "4. **Enter at ~10:30 ET** (after the first hour), with a limit at or near the mid -- "
         "deep-ITM spreads can be wide; paying $0.30 over mid is 30% of the day's target, and the "
@@ -662,10 +758,21 @@ def render_status(status: PositionStatus, side: str, strike: float, expiration: 
             "",
             f"- **Position:** QQQ {expiration} ${strike:g} {side.upper()}",
             f"- **Current mid:** {_usd(status.current_price)}  |  **P&L:** {_usd(status.pnl_usd)}",
-            f"- **Take profit at:** {_usd(status.target_option_price)}  |  **Stop at:** {_usd(status.stop_option_price)}",
-            f"- **Sessions held:** {status.days_held} of {cfg.daily_target_max_hold_days}",
-            "",
+            f"- **Take profit at:** {_usd(status.target_option_price)}  |  **Hard stop at:** {_usd(status.stop_option_price)}",
         ]
+        + (
+            [
+                f"- **Level stop:** exit if an hourly bar closes {'below' if side == 'call' else 'above'} "
+                f"{_usd(status.level)} (last completed hourly close: {_usd(status.last_hourly_close)})"
+            ]
+            if status.level is not None
+            else (
+                ["- **Level stop:** pass `--level <first-hour low for a call / high for a put>` to check it too"]
+                if cfg.daily_target_stop_mode == "first_hour_level"
+                else []
+            )
+        )
+        + [f"- **Sessions held:** {status.days_held} of {cfg.daily_target_max_hold_days}", ""]
     )
 
 
@@ -741,6 +848,17 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     except Exception as exc:
         sd = SupplyDemandRead(False, None, detail=f"hourly bars unavailable ({exc})")
 
+    breadth: Optional[BreadthRead] = None
+    if first_hour.ready:
+        try:
+            from .breadth import breadth_read, fetch_hourly, first_bar_moves
+
+            breadth = breadth_read(first_bar_moves(fetch_hourly(), dt.date.today()))
+        except Exception as exc:
+            breadth = BreadthRead(False, detail=f"mega-cap bars unavailable ({exc})")
+    else:
+        breadth = BreadthRead(False, detail="waits for the first hour")
+
     bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour, sd)
     chains = providers.pick_expirations_for_targets(cfg.symbol, (cfg.daily_target_expiration,))
     reference_hv = daily.hv20_pct / 100.0 if daily.hv20_pct == daily.hv20_pct else None
@@ -749,7 +867,7 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     plan = build_plan(
         daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, bias_source, cfg,
         signal_score=score, reference_hv=reference_hv, notes=notes, model_iv=model_iv, signal_bias=signal_bias,
-        first_hour=first_hour, sd=sd,
+        first_hour=first_hour, sd=sd, breadth=breadth,
     )
     return render_plan(plan, cfg), plan
 
@@ -820,6 +938,7 @@ def main(argv=None) -> int:
     parser.add_argument("--entry", type=float, help="Your fill price per share")
     parser.add_argument("--opened", help="Entry date YYYY-MM-DD (default: today)")
     parser.add_argument("--contracts", type=int, help="Contracts held (default: config)")
+    parser.add_argument("--level", type=float, help="Level stop to check: the entry day's first-hour low (call) / high (put)")
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--self-test", action="store_true", help="Run on synthetic data (no network)")
     args = parser.parse_args(argv)
@@ -836,7 +955,20 @@ def main(argv=None) -> int:
         except Exception as exc:
             print(f"Quote failed: {exc}", file=sys.stderr)
             return 1
-        status = evaluate_position(args.entry, mid, sessions_held(opened, dt.date.today()), cfg, args.contracts)
+        last_close = None
+        if args.level is not None:
+            try:
+                from .data import get_intraday_history
+
+                hourly = get_intraday_history(cfg.symbol, "1h", "5d")
+                # The newest bar is usually still forming; use the one before it.
+                last_close = float(hourly["Close"].iloc[-2]) if len(hourly) > 1 else None
+            except Exception as exc:
+                print(f"Hourly bars unavailable ({exc}); level stop not checked.", file=sys.stderr)
+        status = evaluate_position(
+            args.entry, mid, sessions_held(opened, dt.date.today()), cfg, args.contracts,
+            side=args.side, level=args.level, last_hourly_close=last_close,
+        )
         print(render_status(status, args.side, args.strike, args.expiration, cfg))
         return 0
 

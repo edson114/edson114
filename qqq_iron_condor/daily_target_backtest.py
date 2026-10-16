@@ -134,6 +134,9 @@ def simulate(
     entry_bar: int = 0,
     direction: Optional[Callable[[int, pd.DataFrame], Optional[str]]] = None,
     atr_exits: Optional[tuple] = None,
+    structure_stop: bool = False,
+    stop_on_close: bool = False,
+    backstop: bool = False,
 ) -> list[TargetTrade]:
     """Replay the rules. With `intraday` bars (e.g. hourly), each session
     is walked bar by bar so the order of the target and stop touches is
@@ -152,7 +155,17 @@ def simulate(
       - `direction`: `f(day_index, bars_before_entry) -> "call"/"put"/None`
         replaces `mode`'s direction (None = no trade that day).
       - `atr_exits`: `(target_atr, stop_atr)` fixes the exits as QQQ levels
-        at entry +/- that many ATR14s instead of the $ target/stop."""
+        at entry +/- that many ATR14s instead of the $ target/stop.
+      - `structure_stop`: the stop is a QQQ price level -- the low of the
+        bars before entry for a call, their high for a put (with
+        entry_bar=1, the first hour's low/high) -- instead of -$ stop. The
+        $ target is unchanged, so the loss on a stop varies with how far
+        that level is.
+      - `stop_on_close`: the stop only triggers when a bar *closes* beyond
+        its level (exiting at that close), not when a wick touches it.
+      - `backstop`: alongside a structure stop, also keep the -$ stop
+        (`daily_target_stop_usd`) as a hard touch stop, capping the loss
+        when the structure level is far away or a bar closes far past it."""
     df = price_history[["Open", "High", "Low", "Close", "Volume"]].copy()
     vix = vix_history["Close"].reindex(df.index).ffill()
     atr = ind.atr(df["High"], df["Low"], df["Close"], 14)
@@ -199,6 +212,7 @@ def simulate(
             if side is None:
                 continue
             entry_px = float(bars["Open"].iloc[entry_bar])
+            before_entry = bars.iloc[:entry_bar]
             bars = bars.iloc[entry_bar:]
             expiry = date + dt.timedelta(days=DTE)
             t = DTE / 365.0
@@ -210,6 +224,11 @@ def simulate(
                 prev_atr = float(atr.iloc[i - 1])
                 pos["target_u"] = entry_px + sign * atr_exits[0] * prev_atr
                 pos["stop_u"] = entry_px - sign * atr_exits[1] * prev_atr
+            if structure_stop and len(before_entry):
+                level = float(before_entry["Low"].min()) if side == "call" else float(before_entry["High"].max())
+                # A level already on the wrong side of entry would stop out instantly.
+                if (side == "call" and level < entry_px) or (side == "put" and level > entry_px):
+                    pos["stop_u"] = level
             entry_day = True
 
         pos["sessions"] += 1
@@ -217,34 +236,52 @@ def simulate(
         t = max((pos["expiry"] - date).days, 1) / 365.0
         value = lambda s: bs_price(s, strike, t, r, iv, side)  # noqa: E731
         # Exits sell at model mid - slip, so the mid has to clear the level by `slip`.
-        fixed_levels = "target_u" in pos
-        if fixed_levels:
-            target_u, stop_u = pos["target_u"], pos["stop_u"]
-        else:
-            target_u = underlying_for_option_price(fill + gain + slip, strike, t, r, iv, side)
-            stop_u = underlying_for_option_price(max(fill - loss + slip, 0.01), strike, t, r, iv, side)
+        fixed_target = "target_u" in pos
+        fixed_stop = "stop_u" in pos
+        target_u = pos["target_u"] if fixed_target else underlying_for_option_price(fill + gain + slip, strike, t, r, iv, side)
+        stop_u = pos["stop_u"] if fixed_stop else underlying_for_option_price(max(fill - loss + slip, 0.01), strike, t, r, iv, side)
+        hard_u = (
+            underlying_for_option_price(max(fill - loss + slip, 0.01), strike, t, r, iv, side)
+            if backstop and fixed_stop
+            else None
+        )
 
         up = side == "call"
         beyond = lambda px, lvl, favourable: lvl is not None and ((px >= lvl) == (up == favourable))  # noqa: E731
 
         outcome = exit_fill = None
-        if not entry_day and (beyond(day_open, target_u, True) or beyond(day_open, stop_u, False)):
+        if not entry_day and (
+            beyond(day_open, target_u, True) or beyond(day_open, stop_u, False) or beyond(day_open, hard_u, False)
+        ):
             # Gapped through a level overnight: exit at the open's value.
             exit_fill = value(day_open) - slip
             outcome = "target" if exit_fill >= fill else "stop"
         else:
             for _, bar in bars.iterrows():
                 hit_target = beyond(bar["High"] if up else bar["Low"], target_u, True)
-                hit_stop = beyond(bar["Low"] if up else bar["High"], stop_u, False)
+                stop_px = bar["Close"] if stop_on_close else (bar["Low"] if up else bar["High"])
+                hit_stop = beyond(stop_px, stop_u, False)
+                hit_hard = beyond(bar["Low"] if up else bar["High"], hard_u, False)
+                if hit_hard and hit_target:
+                    low_first = bar["Close"] >= bar["Open"]
+                    if tie_rule == "stop" or (low_first == up):
+                        hit_target = False
+                if hit_hard and not hit_target:
+                    outcome, exit_fill = "stop", fill - loss
+                    break
                 if hit_stop and hit_target:
                     low_first = bar["Close"] >= bar["Open"]
                     stop_first = tie_rule == "stop" or (low_first == up)
                     hit_target, hit_stop = not stop_first, stop_first
                 if hit_stop:
-                    outcome, exit_fill = "stop", (value(stop_u) - slip) if fixed_levels else fill - loss
+                    if stop_on_close:
+                        exit_fill = value(float(bar["Close"])) - slip
+                    else:
+                        exit_fill = (value(stop_u) - slip) if fixed_stop else fill - loss
+                    outcome = "stop"
                     break
                 if hit_target:
-                    outcome, exit_fill = "target", (value(target_u) - slip) if fixed_levels else fill + gain
+                    outcome, exit_fill = "target", (value(target_u) - slip) if fixed_target else fill + gain
                     break
             if outcome is None and pos["sessions"] >= cfg.daily_target_max_hold_days:
                 outcome, exit_fill = "time", value(float(bars["Close"].iloc[-1])) - slip

@@ -90,7 +90,7 @@ def test_plan_without_chain_notes_it():
     ],
 )
 def test_evaluate_position(current, days, action):
-    status = dtg.evaluate_position(50.00, current, days, CFG)
+    status = dtg.evaluate_position(50.00, current, days, dataclasses.replace(CFG, daily_target_stop_mode="fixed"))
     assert status.action == action
     assert status.pnl_usd == pytest.approx((current - 50.00) * 1000)
     assert status.target_option_price == 51.00
@@ -441,3 +441,121 @@ def test_plan_config_pins_daily_target_symbol():
     spx_cfg = dataclasses.replace(CFG, symbol="^SPX")
     assert dtg.plan_config(spx_cfg).symbol == "QQQ"
     assert dtg.plan_config(dataclasses.replace(spx_cfg, daily_target_symbol="SPY")).symbol == "SPY"
+
+
+# --- level stop (first-hour low/high) and backstop ---------------------------
+
+def _hourly_day(bars):
+    return _intraday([START], [bars])
+
+
+def test_level_stop_survives_dip_that_hits_fixed_stop():
+    # First hour (bar 0) low $399.0. Entry ~$400.5 at 10:30, a dip to $399.3
+    # (fixed $1,000 stop ~ $1.1 below entry trips; the first-hour low holds),
+    # then a rally to the target.
+    daily, vix = _daily(1)
+    bars = [
+        (PRICE, PRICE + 0.6, PRICE - 1.0, PRICE + 0.5),
+        (PRICE + 0.5, PRICE + 0.6, PRICE - 0.7, PRICE - 0.6),
+        (PRICE - 0.6, PRICE + 3.0, PRICE - 0.6, PRICE + 2.9),
+    ]
+    fh = lambda i, b: "call"  # noqa: E731
+    fixed = bt.simulate(daily, vix, CFG, intraday=_hourly_day(bars), entry_bar=1, direction=fh)
+    level = bt.simulate(daily, vix, CFG, intraday=_hourly_day(bars), entry_bar=1, direction=fh, structure_stop=True)
+    assert [t.outcome for t in fixed] == ["stop"]
+    assert [t.outcome for t in level] == ["target"]
+    assert level[0].pnl_usd == pytest.approx(1000.0)
+
+
+def test_level_stop_on_close_ignores_wick_but_exits_on_close():
+    daily, vix = _daily(1)
+    fh = lambda i, b: "call"  # noqa: E731
+    wick = [(PRICE, PRICE + 0.6, PRICE - 1.0, PRICE + 0.5), (PRICE + 0.5, PRICE + 0.6, PRICE - 1.5, PRICE + 0.4),
+            (PRICE + 0.4, PRICE + 3.0, PRICE + 0.3, PRICE + 2.9)]
+    trades = bt.simulate(daily, vix, CFG, intraday=_hourly_day(wick), entry_bar=1, direction=fh,
+                         structure_stop=True, stop_on_close=True)
+    assert [t.outcome for t in trades] == ["target"]  # wick to $398.5 < $399 low, but closed back above
+    close_below = [(PRICE, PRICE + 0.6, PRICE - 1.0, PRICE + 0.5), (PRICE + 0.5, PRICE + 0.6, PRICE - 1.6, PRICE - 1.5)]
+    trades = bt.simulate(daily, vix, CFG, intraday=_hourly_day(close_below), entry_bar=1, direction=fh,
+                         structure_stop=True, stop_on_close=True)
+    assert [t.outcome for t in trades] == ["stop"]
+    # Exited at the $398.50 close: ~$2 x ~0.8 delta x 1,000 shares, plus $0.05/share slippage each way.
+    assert -1800 < trades[0].pnl_usd < -1500
+
+
+def test_backstop_caps_a_far_level_stop():
+    # Wide first hour (low $395) -> the level stop is far; a drop to $397.5
+    # doesn't reach it but trips a -$1,000 backstop.
+    daily, vix = _daily(1)
+    fh = lambda i, b: "call"  # noqa: E731
+    bars = [(PRICE, PRICE + 1.0, PRICE - 5.0, PRICE + 0.5), (PRICE + 0.5, PRICE + 0.6, PRICE - 2.5, PRICE - 2.4)]
+    no_cap = bt.simulate(daily, vix, CFG, intraday=_hourly_day(bars), entry_bar=1, direction=fh, structure_stop=True)
+    capped = bt.simulate(daily, vix, CFG, intraday=_hourly_day(bars), entry_bar=1, direction=fh,
+                         structure_stop=True, backstop=True)
+    assert no_cap == [] or no_cap[0].outcome != "stop" or no_cap[0].exit_date != START
+    assert [t.outcome for t in capped] == ["stop"]
+    assert capped[0].pnl_usd == pytest.approx(-1000.0)
+
+
+def test_leg_plan_level_stop_fields():
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    leg = dtg.build_leg_plan(chain, 750.0, 9.5, "call", CFG, model_iv=0.20, level=747.0)
+    assert leg.level_stop_underlying == 747.0
+    assert -3000 < leg.level_stop_loss_usd < -2000  # ~$3 x ~0.8 delta x 1,000 shares + spread
+    assert leg.backstop_underlying < 747.0  # -$4,000 is further away than the level
+    # A level on the wrong side of the price is ignored.
+    assert dtg.build_leg_plan(chain, 750.0, 9.5, "call", CFG, model_iv=0.20, level=752.0).level_stop_underlying is None
+
+
+def test_ticket_marks_active_stop():
+    fh = dtg.FirstHourRead(True, "call", 748.0, 750.0, 2.0, "up", high=751.0, low=747.0)
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    fixed_cfg = dataclasses.replace(CFG, daily_target_stop_mode="fixed")
+    plan = dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", fixed_cfg, first_hour=fh)
+    fixed = dtg.render_plan(plan, fixed_cfg)
+    assert "**Stop (active)**" in fixed and "**Level stop**" in fixed
+    level_cfg = dataclasses.replace(CFG, daily_target_stop_mode="first_hour_level")
+    level = dtg.render_plan(dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", level_cfg, first_hour=fh), level_cfg)
+    assert "**Level stop (active)**" in level and "**Stop (active)**" not in level
+
+
+def test_first_hour_read_records_high_low():
+    bars = _session_bars(20, step=0.1)
+    fh = dtg.first_hour_read(bars)
+    assert fh.high == pytest.approx(round(float(bars.iloc[:12]["High"].max()), 2))
+    assert fh.low == pytest.approx(round(float(bars.iloc[:12]["Low"].min()), 2))
+
+
+# --- mega-cap breadth ------------------------------------------------------------
+
+def test_breadth_read_and_direction():
+    from qqq_iron_condor import breadth as br
+
+    read = br.breadth_read({"NVDA": 1.0, "MSFT": 0.5, "AAPL": 0.2, "AMZN": 0.1, "META": 0.3, "GOOGL": -0.2, "AVGO": -0.1})
+    assert (read.up, read.down, read.total) == (5, 2, 7)
+    assert read.side(5) == "call" and read.side(6) is None
+
+    idx = pd.DatetimeIndex([pd.Timestamp(START) + pd.Timedelta(hours=9.5)])
+    up_bar = pd.DataFrame({"Open": [100.0], "High": [101.0], "Low": [99.5], "Close": [100.8]}, index=idx)
+    down_bar = up_bar.assign(Close=[99.6])
+    hourly = {s: (up_bar if i < 5 else down_bar) for i, s in enumerate(br.MEGACAPS)}
+    qqq_up = pd.DataFrame({"Open": [400.0], "High": [401.0], "Low": [399.5], "Close": [400.6]}, index=idx)
+    qqq_down = qqq_up.assign(Close=[399.6])
+    assert br.make_backtest_direction(hourly, 5)(0, qqq_up) == "call"
+    assert br.make_backtest_direction(hourly, 5)(0, qqq_down) is None  # QQQ disagrees with breadth
+    assert br.make_backtest_direction(hourly, 5, with_first_hour=False)(0, qqq_down) == "call"
+    assert br.make_backtest_direction(hourly, 6)(0, qqq_up) is None
+
+
+def test_evaluate_position_level_mode():
+    # Level mode (default): the $ stop is the -$4,000 backstop, and an hourly
+    # close past the first-hour level closes the trade.
+    assert dtg.evaluate_position(50.00, 49.00, 0, CFG).action == "HOLD"  # -$1,000 no longer stops it
+    assert dtg.evaluate_position(50.00, 46.00, 0, CFG).action == "CLOSE -- STOP HIT"
+    hold = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="call", level=747.0, last_hourly_close=747.5)
+    assert hold.action == "HOLD" and hold.level == 747.0
+    hit = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="call", level=747.0, last_hourly_close=746.9)
+    assert hit.action == "CLOSE -- LEVEL STOP"
+    put_hit = dtg.evaluate_position(50.00, 49.50, 0, CFG, side="put", level=751.0, last_hourly_close=751.2)
+    assert put_hit.action == "CLOSE -- LEVEL STOP"
+    assert "Level stop" in dtg.render_status(hit, "call", 700.0, "2026-12-18", CFG)
