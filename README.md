@@ -831,6 +831,25 @@ Each run (`python -m qqq_iron_condor.daily_target`):
    contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
    session, whichever comes first.
 
+**Supply/demand read (second opinion):** every plan also shows a
+supply/demand read from hourly bars (`supply_demand.py`):
+- **Zones:** the quiet base right before a strong hourly move. Price
+  near a demand zone leans CALL, near a supply zone leans PUT. A zone
+  broken today flips its meaning.
+- **Volume pressure:** Chaikin Money Flow over the last ~7 hourly bars.
+
+The two are combined into one score, 60% zones and 40% pressure.
+`--direction-source supply-demand` uses it as the direction, and
+`sd-first-hour` trades only when it agrees with first-hour momentum.
+**It isn't the default because it lost money in the backtest:** a 40%
+win rate and about −$23k over 122 trades from Nov 2023 to Oct 2026.
+Trading the zones as breakouts instead of bounces lost too (−$5k).
+Requiring agreement with the first hour cut the loss to −$6k over 75
+trades, which is still negative. It's re-tested in
+`daily_target_experiments.py`. These are rules applied to price and
+volume, not order-book data; free sources don't publish actual resting
+bids and offers.
+
 **Better data (optional):** set the `TRADIER_TOKEN` repo secret (plus
 `TRADIER_BASE_URL=https://sandbox.tradier.com/v1` for a sandbox token,
 see [Data providers](#data-providers)). The plan then takes price
@@ -970,6 +989,7 @@ qqq_iron_condor/
   daily_target.py         # daily $ target plan (0.80-delta ~60 DTE, +$1,000 exit) + position check
   daily_target_backtest.py # replays the daily $ target rules over ~730 sessions of hourly bars
   daily_target_experiments.py # entry/direction/exit/hold variants, half-split + stress tests
+  supply_demand.py        # supply/demand zones + volume pressure read (hourly bars)
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)

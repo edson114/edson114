@@ -269,6 +269,11 @@ class Config:
     signals_output_dir: str = "reports/signals"
 
     # --- Daily $ target (0.80-delta ~60 DTE calls/puts, daily_target.py) ---
+    # The daily plan always trades this symbol, whatever `symbol` above is set
+    # to for the iron condor scan -- daily_target.py overrides `symbol` with
+    # it before fetching anything. (On Oct 10 `symbol` was switched to "^SPX"
+    # for the iron condor, and the daily plan silently followed it.)
+    daily_target_symbol: str = "QQQ"
     # Deep-ITM single-leg buy: at 0.80 delta the option moves ~$0.80 per $1
     # QQQ move, with far less theta/IV sensitivity than near-ATM short-dated
     # contracts. ~60 DTE keeps daily theta small relative to the target.
@@ -291,7 +296,10 @@ class Config:
     # its open after the first `daily_target_first_hour_minutes`, puts if
     # below -- the only rule that made money in daily_target_experiments.py,
     # and fragile: negative at 2x slippage, so paper-trade it) or "signal"
-    # (the directional signal's score). Hard skip-day gates apply to both.
+    # (the directional signal's score), "supply_demand" (supply/demand zones +
+    # volume pressure, supply_demand.py -- it lost money in the backtest, so
+    # it's opt-in) or "sd_first_hour" (only when supply/demand and the first
+    # hour agree). Hard skip-day gates apply to all of them.
     daily_target_direction_source: str = "first_hour"
     daily_target_first_hour_minutes: int = 60
 

@@ -145,6 +145,15 @@ def run_experiments(
     for name in ("strong daily signal only", "first-hour momentum", "first-hour fade", "daily + first hour agree"):
         add("Direction", f"{name[0].upper()}{name[1:]}, 10:30 entry", direction=dirs[name], entry_bar=1)
 
+    # Supply/demand zones + volume pressure (supply_demand.py), alone and
+    # gated on the first hour agreeing.
+    from .supply_demand import make_backtest_direction
+
+    add("Direction", "Supply/demand zones + volume pressure, 10:30 entry",
+        direction=make_backtest_direction(intraday), entry_bar=1)
+    add("Direction", "Supply/demand + first hour agree, 10:30 entry",
+        direction=make_backtest_direction(intraday, require_first_hour=True), entry_bar=1)
+
     # 3. Target / stop sizes (daily signal, 9:30 entry).
     for target, stop in ((1000, 500), (1000, 600), (1000, 750), (1500, 750), (500, 500)):
         add("Target / stop", f"+${target:,} / -${stop:,}", direction=dirs["daily signal"], cfg=stops(target, stop))
