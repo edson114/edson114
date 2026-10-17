@@ -872,6 +872,30 @@ momentum, ~730 sessions of hourly bars):
   first hour) is shown in each plan for context, but as a filter it made
   results worse at every threshold tried.
 
+**Key levels + reaction setups** (`key_levels.py`, tested Oct 2026):
+a rules-based version of a "levels, confirmation, invalidation,
+context" framework.
+- **Levels:** multi-touch levels from hourly swing highs and lows.
+- **Setups:** reclaim, flip-and-retest and rejection, each confirmed by
+  an hourly close and scanned 10:30–2:30.
+- **Stop:** an hourly close back through the level.
+- **Size:** full, half or pass, depending on QQQ's daily trend and how
+  extended the day's move already is.
+
+It lost to first-hour momentum + level stop (+$53k on the same window,
+−$4,000 backstop for both):
+
+| Variant | Trades | Win rate | Total | 2× costs |
+|---|---|---|---|---|
+| The original three setups, context sizing | 202 | 62% | −$12k | −$30k |
+| All six setups (with mirrors), context sizing | 249 | 63% | +$3k | −$9k |
+| All six, no context (always full size) | 257 | 63% | +$2k | −$14k |
+| Levels with ≥3 touches, all six, context | 155 | 62% | −$20k | −$28k |
+
+Context sizing cut the average loss (−$1,344 vs −$1,841 at full size)
+but didn't create an edge. It's kept as a research tool and isn't used
+by the live plan.
+
 **Better data (optional):** set the `TRADIER_TOKEN` repo secret (plus
 `TRADIER_BASE_URL=https://sandbox.tradier.com/v1` for a sandbox token,
 see [Data providers](#data-providers)). The plan then takes price
@@ -897,6 +921,9 @@ python -m qqq_iron_condor.daily_target --check --side call --strike 684 \
 
 # Backtest these exact rules (~730 sessions of real hourly QQQ bars)
 python -m qqq_iron_condor.daily_target_backtest
+
+# Same signal on QQQ shares -- no option modeling (see below)
+python -m qqq_iron_condor.shares_backtest
 ```
 
 All of it lives in `Config` (`daily_target_*` fields in
@@ -974,6 +1001,37 @@ Conclusion: nothing tested here shows a reliable edge after costs.
 First-hour momentum is the only lead worth paper-trading, with real fills
 tracked, before any money goes on it.
 
+### Signal check on QQQ shares (no option modeling)
+
+The option backtests price 60 DTE options with Black-Scholes, because
+free historical option quotes don't exist. `shares_backtest.py` replays
+the live rules on real QQQ hourly prices instead, so it tests only the
+*signal*: first-hour direction, entry at 10:30, +$1.25/share target, a
+stop on an hourly close past the first hour's low/high, a −$5/share hard
+stop, the skip-day rules and a 5-session time stop. 800 shares stands in
+for 10 contracts at 0.80 delta, with $0.03/share costs each way
+(`reports/backtests/shares-2026-10-17.md`, Nov 2023 to Oct 2026):
+
+| Variant | Trades | Win rate | Total | 1st half | 2nd half |
+|---|---|---|---|---|---|
+| Live rules | 417 | 77% | +$88k | +$56k | +$32k |
+| ...ties scored as stops | 417 | 76% | +$83k | +$56k | +$27k |
+| ...3× costs | 417 | 77% | +$48k | +$35k | +$13k |
+| Level stop on any touch | 431 | 70% | +$44k | +$16k | +$28k |
+| Fixed −$1.25/share stop (the old −$1,000) | 456 | 57% | +$42k | +$24k | +$18k |
+| Live rules without the skip-day rules | 654 | 76% | +$59k | +$67k | −$9k |
+
+- **The signal holds up on shares.** It's positive in both halves, with
+  worst-case ties, and at 3× costs. Longs (+$52k) and shorts (+$36k)
+  both made money.
+- **The gap between shares and options is the option cost.** The same
+  rules made +$53k in the options backtest. Spread and theta take the
+  rest, so the contract you pick and the fill you get matter.
+- **The skip-day rules earn their place.** Without them the second half
+  lost money and the worst trade doubled (−$10.6k vs −$5.6k).
+- **Caveat:** the level stop was chosen on this same window, so these
+  results are partly in-sample. Live paper trading is the real test.
+
 ### Limitations & caveats
 
 - The exit levels are Black-Scholes estimates at constant IV. An IV move
@@ -1013,6 +1071,8 @@ qqq_iron_condor/
   daily_target_experiments.py # entry/direction/exit/hold variants, half-split + stress tests
   supply_demand.py        # supply/demand zones + volume pressure read (hourly bars)
   breadth.py              # mega-cap first-hour breadth (NVDA, MSFT, AAPL, AMZN, META, GOOGL, AVGO)
+  key_levels.py           # multi-touch levels + reclaim/flip/rejection setups + context sizing (research)
+  shares_backtest.py      # the daily $ target signal replayed on QQQ shares (no option modeling)
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
@@ -1028,6 +1088,7 @@ tests/
   test_directional_backtest.py  # directional backtest mechanics (touch detection, gating, aggregation)
   test_journal.py         # trade journal CSV persistence & realized-performance stats
   test_daily_target.py    # daily $ target levels, exit rules, and backtest mechanics
+  test_shares_backtest.py # shares backtest exits, skip rules, costs, and report
 smallcap_options/
   config.py               # all tunable parameters (universe filters, score weights, contract selection)
   data.py                 # yfinance-backed screener, price/intraday history, option chains, float, news
