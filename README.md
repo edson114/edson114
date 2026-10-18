@@ -23,6 +23,9 @@ data:
 > is, or claims to be, close to "99% profitable" — no legitimate
 > day-trading system is.** These structure the same inputs a discretionary
 > trader would check, consistently; they don't promise a win rate.
+> The one exception to "never places orders" is the optional
+> [NinjaTrader 8 strategy](#ninjatrader-8-strategy-ninjascript), which
+> trades once you enable it in NinjaTrader. Run it on a sim account first.
 
 ## SPX Iron Condor Scanner
 
@@ -1032,6 +1035,74 @@ for 10 contracts at 0.80 delta, with $0.03/share costs each way
 - **Caveat:** the level stop was chosen on this same window, so these
   results are partly in-sample. Live paper trading is the real test.
 
+### NinjaTrader 8 strategy (NinjaScript)
+
+`ninjatrader/QqqDailyTarget.cs` is the same signal as a NinjaTrader 8
+strategy. NinjaTrader 8 doesn't trade options, so, like the
+[shares backtest](#signal-check-on-qqq-shares-no-option-modeling), it
+trades the underlying: 800 QQQ shares by default, or NQ/MNQ futures with
+the levels scaled. **Unlike the rest of this repo, it places orders once
+enabled.** Run it on the Sim101 account first.
+
+Rules (the shares backtest's live rules, same defaults):
+
+- **Skip days:** an opening gap of 0.8% or more vs the prior close, a
+  prior VIX close of 20 or more, or a listed FOMC/CPI day. The date list
+  is the same 2026 list as `config.py`; extend both for 2027.
+- **Entry:** first-hour close vs open (9:30-10:30 ET). Up means buy, down
+  means sell short, flat means no trade. Market order at 10:30.
+- **Exits:** +$1.25/share limit; −$5/share hard stop; an hourly close past
+  the first hour's low (long) / high (short); or the close of the 5th
+  session. A later session that opens past that level exits at the open.
+  One position at a time, and no new entry on a day that began with one
+  open.
+
+**Install:**
+
+1. Copy `ninjatrader/QqqDailyTarget.cs` to
+   `Documents\NinjaTrader 8\bin\Custom\Strategies\`.
+2. In NinjaTrader: **New > NinjaScript Editor**, then press **F5** to
+   compile.
+3. Open a **1 Minute** chart with RTH trading hours, then right-click
+   **Strategies** and add **QqqDailyTarget**. The Strategy Analyzer works
+   too.
+
+| Setting | QQQ shares | NQ | MNQ |
+|---|---|---|---|
+| Quantity | 800 | 1 | 10 |
+| Points per QQQ $1 | 1 | ~41 (NQ ÷ QQQ price) | ~41 |
+| Trading hours | US Equities RTH | CME US Index Futures RTH | CME US Index Futures RTH |
+
+At ~41 points per QQQ dollar, 1 NQ ($20/point) or 10 MNQ ($2/point)
+moves about the same as 820 QQQ shares. QQQ bars need a data connection
+that carries US stocks; if yours is futures-only, use NQ or MNQ. The VIX
+rule reads `^VIX` daily bars. If your feed names VIX differently, set
+**VIX symbol**. If it has no VIX, turn the **VIX filter** off. The
+strategy prints a warning when it finds no VIX data.
+
+For a backtest closest to the Python one, set **Slippage** to 3 ticks
+($0.03/share each way on QQQ) and add your broker's commissions. The
+Output window (**New > NinjaScript Output**) logs every day's decision
+and every exit.
+
+**How close it is to the Python:** the C# was run against a stub of the
+NinjaTrader API with a simple fill engine on synthetic 1-minute data. It
+was compared with `simulate_shares` on the same data grouped into hourly
+bars, over 6 random seeds of ~280 sessions each. Every entry matched (day,
+side and price), and the fixed-stop variant matched exactly. The only
+differences:
+
+- **The session's last hourly close is read at 15:59, not 16:00,** so the
+  exit can fill before the bell. A few trades per year that close past
+  the level only in the last minute, or only before it, end differently.
+- **A gap past the level exits at the end of the first minute,** not at
+  the opening print.
+- Target and hard stop are real working orders, filled on 1-minute bars
+  instead of the Python's hourly bars with a tie rule.
+
+None of that has been run inside NinjaTrader itself. Compile it and run
+the Strategy Analyzer before turning it on.
+
 ### Limitations & caveats
 
 - The exit levels are Black-Scholes estimates at constant IV. An IV move
@@ -1073,6 +1144,8 @@ qqq_iron_condor/
   breadth.py              # mega-cap first-hour breadth (NVDA, MSFT, AAPL, AMZN, META, GOOGL, AVGO)
   key_levels.py           # multi-touch levels + reclaim/flip/rejection setups + context sizing (research)
   shares_backtest.py      # the daily $ target signal replayed on QQQ shares (no option modeling)
+ninjatrader/
+  QqqDailyTarget.cs       # NinjaTrader 8 strategy: the daily $ target signal on QQQ shares or NQ/MNQ (places orders)
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
@@ -1089,6 +1162,7 @@ tests/
   test_journal.py         # trade journal CSV persistence & realized-performance stats
   test_daily_target.py    # daily $ target levels, exit rules, and backtest mechanics
   test_shares_backtest.py # shares backtest exits, skip rules, costs, and report
+  test_ninjatrader.py     # the NinjaScript strategy's defaults and skip dates match the Python
 smallcap_options/
   config.py               # all tunable parameters (universe filters, score weights, contract selection)
   data.py                 # yfinance-backed screener, price/intraday history, option chains, float, news
