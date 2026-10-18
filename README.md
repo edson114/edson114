@@ -823,11 +823,21 @@ Each run (`python -m qqq_iron_condor.daily_target`):
    says **Skip today** and shows the least-bad one for reference. Right
    after the open, when there are no live quotes at all, it falls back to
    a model strike and labels the price as stale.
-3. **Order ticket:** bid/ask and spread cost, 10 contracts (limit at the
+3. **Entry, take profit, stop loss:** on a CALL or PUT day, the report
+   opens with one table. Each level appears as an option price, a QQQ
+   price and a $ result:
+   - entry at 10:30 (limit at the mid, max the ask);
+   - take profit at fill + $1.00 (+$1,000);
+   - stop loss on an hourly close past the first hour's low/high;
+   - hard stop at fill − $4.00 (−$4,000);
+   - the session-5 time stop.
+
+   It ends with the reward-to-risk ratio.
+4. **Order ticket:** bid/ask and spread cost, 10 contracts (limit at the
    mid, planned at the ask), the take-profit price (fill + $1.00), the
    stop price (fill − $1.00), the QQQ levels those correspond to *after*
    paying the spread, the total premium, and the daily theta.
-4. **Rules:** only one position open at a time (no stacking 10 more
+5. **Rules:** only one position open at a time (no stacking 10 more
    contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
    session, whichever comes first.
 

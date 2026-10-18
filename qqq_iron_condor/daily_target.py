@@ -601,6 +601,70 @@ def _leg_table(leg: LegPlan, cfg: Config) -> list[str]:
     return lines
 
 
+def _trade_levels(leg: LegPlan, cfg: Config) -> list[str]:
+    """The entry / take profit / stop loss summary at the top of the plan:
+    each level as an option price, a QQQ price and a $ result."""
+    c = leg.contract
+    n = leg.contracts
+    side = "CALLS" if c.option_type == "call" else "PUTS"
+    below = "below" if c.option_type == "call" else "above"
+    gain = per_share(cfg.daily_target_profit_usd, n)
+    if leg.spread is not None:
+        buy = f"buy {n} QQQ {c.expiration} ${c.strike:g} {side}, limit {_usd(c.mid_price)} (max {_usd(leg.ask)})"
+    else:
+        buy = f"buy {n} QQQ {c.expiration} ${c.strike:g} {side} at ~{_usd(leg.entry_price)} (no live quote: re-check)"
+    lines = [
+        "| | Option (per share) | QQQ | Result |",
+        "|---|---|---|---|",
+        f"| **Entry** (10:30 ET) | {buy} | ~{_usd(leg.spot)} | costs {_usd(leg.cost_usd)} |",
+        f"| **Take profit** | sell all at {_usd(leg.target_option_price)} (fill + {_usd(gain)}) | "
+        f"~{_usd(leg.target_underlying)} | **+{_usd(cfg.daily_target_profit_usd)}** |",
+    ]
+    if cfg.daily_target_stop_mode == "first_hour_level":
+        back = per_share(cfg.daily_target_backstop_usd, n)
+        back_px = max(leg.entry_price - back, 0.01)
+        risk = None
+        if leg.level_stop_underlying is not None:
+            lines.append(
+                f"| **Stop loss** | sell all if an hourly bar *closes* {below} the QQQ level | "
+                f"{_usd(leg.level_stop_underlying)} (first hour's {'low' if c.option_type == 'call' else 'high'}) | "
+                f"~{_usd(leg.level_stop_loss_usd)} |"
+            )
+            risk = leg.level_stop_loss_usd
+        lines.append(
+            f"| **Hard stop** | sell all at {_usd(back_px)} (fill - {_usd(back)}) | ~{_usd(leg.backstop_underlying)} | "
+            f"**-{_usd(cfg.daily_target_backstop_usd)}** |"
+        )
+        if risk is None or -risk > cfg.daily_target_backstop_usd:
+            risk = -cfg.daily_target_backstop_usd
+    else:
+        lines.append(
+            f"| **Stop loss** | sell all at {_usd(leg.stop_option_price)} (fill - "
+            f"{_usd(per_share(cfg.daily_target_stop_usd, n))}) | ~{_usd(leg.stop_underlying)} | "
+            f"**-{_usd(cfg.daily_target_stop_usd)}** |"
+        )
+        risk = -cfg.daily_target_stop_usd
+    lines += [
+        f"| **Time stop** | sell all at the close of session {cfg.daily_target_max_hold_days} | | whatever it is then |",
+        "",
+    ]
+    if cfg.daily_target_stop_mode == "first_hour_level":
+        if leg.level_stop_underlying is None:
+            lines.append(
+                f"QQQ is already {below} the first hour's {'low' if c.option_type == 'call' else 'high'}, "
+                "so only the hard stop applies."
+            )
+        elif leg.level_stop_loss_usd is not None and -leg.level_stop_loss_usd > cfg.daily_target_backstop_usd:
+            lines.append("The level is beyond the hard stop, so the hard stop would trigger first.")
+    if risk < 0:
+        lines.append(
+            f"Reward +{_usd(cfg.daily_target_profit_usd)} vs risk ~{_usd(risk)} at the stop "
+            f"({cfg.daily_target_profit_usd / -risk:.2f} : 1). The option prices assume a fill at the ask; "
+            "reset them to your actual fill. QQQ levels are estimates at today's IV."
+        )
+    return lines
+
+
 def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] = None) -> str:
     now = now or dt.datetime.now()
     n = cfg.daily_target_contracts
@@ -625,6 +689,14 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
     lines.append("")
     lines.append(f"_Direction source: {plan.bias_source}_")
     lines.append("")
+    if plan.chosen is not None:
+        if plan.chosen.tradeable is False:
+            lines.append("### ⛔ Entry, take profit, stop loss (reference only: spread too wide)")
+        else:
+            lines.append("### 🎯 Entry, take profit, stop loss")
+        lines.append("")
+        lines.extend(_trade_levels(plan.chosen, cfg))
+        lines.append("")
     lines += ["| Read | Says |", "|---|---|"]
     if plan.first_hour is not None:
         fh = plan.first_hour
