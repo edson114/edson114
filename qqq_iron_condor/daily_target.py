@@ -43,6 +43,7 @@ from .data import OptionChain
 from .direction import SuggestedContract, _mid_price
 from .options_math import bs_delta, bs_price, time_to_expiration_years
 from .breadth import BreadthRead
+from .rates import TenYearRead
 from .supply_demand import SupplyDemandRead, hourly_bars_before, supply_demand_read
 
 DISCLAIMER = (
@@ -213,6 +214,7 @@ class DailyTargetPlan:
     first_hour: Optional[FirstHourRead] = None
     sd: Optional[SupplyDemandRead] = None
     breadth: Optional[BreadthRead] = None
+    ten_year: Optional[TenYearRead] = None
 
     @property
     def chosen(self) -> Optional[LegPlan]:
@@ -446,6 +448,7 @@ def build_plan(
     first_hour: Optional[FirstHourRead] = None,
     sd: Optional[SupplyDemandRead] = None,
     breadth: Optional[BreadthRead] = None,
+    ten_year: Optional[TenYearRead] = None,
 ) -> DailyTargetPlan:
     notes = list(notes or [])
     legs: dict = {"call": None, "put": None}
@@ -462,7 +465,7 @@ def build_plan(
             legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv, model_iv, level)
     return DailyTargetPlan(
         bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs,
-        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd, breadth=breadth,
+        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd, breadth=breadth, ten_year=ten_year,
     )
 
 
@@ -601,6 +604,70 @@ def _leg_table(leg: LegPlan, cfg: Config) -> list[str]:
     return lines
 
 
+def _trade_levels(leg: LegPlan, cfg: Config) -> list[str]:
+    """The entry / take profit / stop loss summary at the top of the plan:
+    each level as an option price, a QQQ price and a $ result."""
+    c = leg.contract
+    n = leg.contracts
+    side = "CALLS" if c.option_type == "call" else "PUTS"
+    below = "below" if c.option_type == "call" else "above"
+    gain = per_share(cfg.daily_target_profit_usd, n)
+    if leg.spread is not None:
+        buy = f"buy {n} QQQ {c.expiration} ${c.strike:g} {side}, limit {_usd(c.mid_price)} (max {_usd(leg.ask)})"
+    else:
+        buy = f"buy {n} QQQ {c.expiration} ${c.strike:g} {side} at ~{_usd(leg.entry_price)} (no live quote: re-check)"
+    lines = [
+        "| | Option (per share) | QQQ | Result |",
+        "|---|---|---|---|",
+        f"| **Entry** (10:30 ET) | {buy} | ~{_usd(leg.spot)} | costs {_usd(leg.cost_usd)} |",
+        f"| **Take profit** | sell all at {_usd(leg.target_option_price)} (fill + {_usd(gain)}) | "
+        f"~{_usd(leg.target_underlying)} | **+{_usd(cfg.daily_target_profit_usd)}** |",
+    ]
+    if cfg.daily_target_stop_mode == "first_hour_level":
+        back = per_share(cfg.daily_target_backstop_usd, n)
+        back_px = max(leg.entry_price - back, 0.01)
+        risk = None
+        if leg.level_stop_underlying is not None:
+            lines.append(
+                f"| **Stop loss** | sell all if an hourly bar *closes* {below} the QQQ level | "
+                f"{_usd(leg.level_stop_underlying)} (first hour's {'low' if c.option_type == 'call' else 'high'}) | "
+                f"~{_usd(leg.level_stop_loss_usd)} |"
+            )
+            risk = leg.level_stop_loss_usd
+        lines.append(
+            f"| **Hard stop** | sell all at {_usd(back_px)} (fill - {_usd(back)}) | ~{_usd(leg.backstop_underlying)} | "
+            f"**-{_usd(cfg.daily_target_backstop_usd)}** |"
+        )
+        if risk is None or -risk > cfg.daily_target_backstop_usd:
+            risk = -cfg.daily_target_backstop_usd
+    else:
+        lines.append(
+            f"| **Stop loss** | sell all at {_usd(leg.stop_option_price)} (fill - "
+            f"{_usd(per_share(cfg.daily_target_stop_usd, n))}) | ~{_usd(leg.stop_underlying)} | "
+            f"**-{_usd(cfg.daily_target_stop_usd)}** |"
+        )
+        risk = -cfg.daily_target_stop_usd
+    lines += [
+        f"| **Time stop** | sell all at the close of session {cfg.daily_target_max_hold_days} | | whatever it is then |",
+        "",
+    ]
+    if cfg.daily_target_stop_mode == "first_hour_level":
+        if leg.level_stop_underlying is None:
+            lines.append(
+                f"QQQ is already {below} the first hour's {'low' if c.option_type == 'call' else 'high'}, "
+                "so only the hard stop applies."
+            )
+        elif leg.level_stop_loss_usd is not None and -leg.level_stop_loss_usd > cfg.daily_target_backstop_usd:
+            lines.append("The level is beyond the hard stop, so the hard stop would trigger first.")
+    if risk < 0:
+        lines.append(
+            f"Reward +{_usd(cfg.daily_target_profit_usd)} vs risk ~{_usd(risk)} at the stop "
+            f"({cfg.daily_target_profit_usd / -risk:.2f} : 1). The option prices assume a fill at the ask; "
+            "reset them to your actual fill. QQQ levels are estimates at today's IV."
+        )
+    return lines
+
+
 def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] = None) -> str:
     now = now or dt.datetime.now()
     n = cfg.daily_target_contracts
@@ -625,6 +692,14 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
     lines.append("")
     lines.append(f"_Direction source: {plan.bias_source}_")
     lines.append("")
+    if plan.chosen is not None:
+        if plan.chosen.tradeable is False:
+            lines.append("### ⛔ Entry, take profit, stop loss (reference only: spread too wide)")
+        else:
+            lines.append("### 🎯 Entry, take profit, stop loss")
+        lines.append("")
+        lines.extend(_trade_levels(plan.chosen, cfg))
+        lines.append("")
     lines += ["| Read | Says |", "|---|---|"]
     if plan.first_hour is not None:
         fh = plan.first_hour
@@ -644,10 +719,30 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
             )
         else:
             lines.append(f"| Mega-cap breadth | **not ready** -- {plan.breadth.detail} |")
+    if plan.ten_year is not None:
+        ty = plan.ten_year
+        says = ty.state.upper() if ty.ready else "unavailable"
+        lines.append(f"| 10-yr Treasury yield | **{says}** -- {ty.detail} |")
     if plan.signal_bias is not None:
         score = f" (score {plan.signal_score:+.2f})" if plan.signal_score is not None else ""
         lines.append(f"| Directional signal | **{plan.signal_bias}**{score} |")
     lines.append("")
+    if plan.ten_year is not None and plan.ten_year.ready and plan.ten_year.spiking_at_prior_close:
+        ty = plan.ten_year
+        if plan.bias == "PUT":
+            lines.append(
+                f"⚠️ **10-yr yield spiking** (+{ty.prior_5d_bp:.0f}bp in 5 days at yesterday's close). In the "
+                "backtest, first-hour puts taken on spike days lost money: 13 trades, about -$12k on options and "
+                "-$9k on shares, while calls on those days did fine. That fits the \"bond put\" idea (a yield "
+                "spike tends to draw market-friendly news), but it's a small sample. Consider sitting this one out "
+                "or sizing down."
+            )
+        else:
+            lines.append(
+                f"_10-yr yield spiking (+{ty.prior_5d_bp:.0f}bp in 5 days at yesterday's close). In the backtest, "
+                "first-hour calls on spike days did fine; puts lost money (13 trades)._"
+            )
+        lines.append("")
     if plan.sd is not None and plan.sd.ready and plan.sd.zones:
         zone_list = ", ".join(f"{z.kind} ${z.low:,.2f}-${z.high:,.2f}" for z in plan.sd.zones)
         lines.append(f"_Live supply/demand zones near the price: {zone_list}._")
@@ -859,6 +954,15 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     else:
         breadth = BreadthRead(False, detail="waits for the first hour")
 
+    try:
+        from .data import get_price_history
+        from .rates import ten_year_read
+
+        # Yahoo only: Tradier doesn't quote the ^TNX index.
+        ten_year = ten_year_read(get_price_history(cfg.ten_year_symbol, "2y"), dt.date.today())
+    except Exception as exc:
+        ten_year = TenYearRead(False, detail=f"10-year yield unavailable ({exc})")
+
     bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour, sd)
     chains = providers.pick_expirations_for_targets(cfg.symbol, (cfg.daily_target_expiration,))
     reference_hv = daily.hv20_pct / 100.0 if daily.hv20_pct == daily.hv20_pct else None
@@ -867,7 +971,7 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     plan = build_plan(
         daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, bias_source, cfg,
         signal_score=score, reference_hv=reference_hv, notes=notes, model_iv=model_iv, signal_bias=signal_bias,
-        first_hour=first_hour, sd=sd, breadth=breadth,
+        first_hour=first_hour, sd=sd, breadth=breadth, ten_year=ten_year,
     )
     return render_plan(plan, cfg), plan
 
@@ -905,9 +1009,13 @@ def _self_test_report() -> tuple[str, DailyTargetPlan]:
     bars = pd.DataFrame({"Open": closes - 0.1, "High": closes + 0.2, "Low": closes - 0.3, "Close": closes}, index=idx)
     first_hour = first_hour_read(bars, cfg.daily_target_first_hour_minutes)
     bias, source = choose_bias("first_hour", None, [], "CALL", first_hour)
+    from .rates import ten_year_read
+
+    tnx_idx = pd.bdate_range(end=dt.date.today(), periods=30)
+    tnx = pd.DataFrame({"Close": np.linspace(4.80, 5.10, len(tnx_idx))}, index=tnx_idx)
     plan = build_plan(
         spot, 9.5, _synthetic_chain(spot, 60, cfg), bias, f"{source} (synthetic self-test)", cfg,
-        signal_score=0.42, signal_bias="CALL", first_hour=first_hour,
+        signal_score=0.42, signal_bias="CALL", first_hour=first_hour, ten_year=ten_year_read(tnx, dt.date.today()),
     )
     return render_plan(plan, cfg), plan
 

@@ -271,9 +271,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     from . import providers
+    from .daily_target import plan_config
     from .data import get_intraday_history
 
-    cfg = Config()
+    cfg = plan_config(Config())  # QQQ, whatever the iron condor's `symbol` is
     try:
         price_history = providers.get_price_history(cfg.symbol, args.period)
         vix_history = providers.get_vix_history(args.period, cfg.vix_symbol, cfg.tradier_vix_symbol)

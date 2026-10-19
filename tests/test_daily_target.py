@@ -519,6 +519,28 @@ def test_ticket_marks_active_stop():
     assert "**Level stop (active)**" in level and "**Stop (active)**" not in level
 
 
+def test_report_leads_with_entry_take_profit_stop():
+    fh = dtg.FirstHourRead(True, "call", 748.0, 750.0, 2.0, "up", high=751.0, low=747.0)
+    chain = dtg._synthetic_chain(750.0, 60, CFG)
+    level_cfg = dataclasses.replace(CFG, daily_target_stop_mode="first_hour_level")
+    plan = dtg.build_plan(750.0, 9.5, chain, "CALL", "first-hour momentum", level_cfg, first_hour=fh)
+    report = dtg.render_plan(plan, level_cfg)
+    leg = plan.chosen
+    block = report[report.index("Entry, take profit, stop loss"): report.index("| Read | Says |")]
+    assert f"| **Take profit** | sell all at {dtg._usd(leg.target_option_price)}" in block
+    assert "+$1,000.00" in block
+    assert "closes* below the QQQ level | $747.00" in block
+    assert f"| **Hard stop** | sell all at {dtg._usd(leg.entry_price - 4.0)} (fill - $4.00)" in block
+    assert "Reward +$1,000.00 vs risk ~-$" in block
+
+    fixed_cfg = dataclasses.replace(CFG, daily_target_stop_mode="fixed")
+    fixed = dtg.render_plan(dtg.build_plan(750.0, 9.5, chain, "PUT", "first-hour momentum", fixed_cfg, first_hour=fh), fixed_cfg)
+    assert "**-$1,000.00** |" in fixed and "**Hard stop**" not in fixed and "(1.00 : 1)" in fixed
+
+    wait = dtg.build_plan(750.0, 9.5, chain, "WAIT", "first hour not finished yet", CFG)
+    assert "Entry, take profit, stop loss" not in dtg.render_plan(wait, CFG)
+
+
 def test_first_hour_read_records_high_low():
     bars = _session_bars(20, step=0.1)
     fh = dtg.first_hour_read(bars)

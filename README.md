@@ -823,11 +823,21 @@ Each run (`python -m qqq_iron_condor.daily_target`):
    says **Skip today** and shows the least-bad one for reference. Right
    after the open, when there are no live quotes at all, it falls back to
    a model strike and labels the price as stale.
-3. **Order ticket:** bid/ask and spread cost, 10 contracts (limit at the
+3. **Entry, take profit, stop loss:** on a CALL or PUT day, the report
+   opens with one table. Each level appears as an option price, a QQQ
+   price and a $ result:
+   - entry at 10:30 (limit at the mid, max the ask);
+   - take profit at fill + $1.00 (+$1,000);
+   - stop loss on an hourly close past the first hour's low/high;
+   - hard stop at fill − $4.00 (−$4,000);
+   - the session-5 time stop.
+
+   It ends with the reward-to-risk ratio.
+4. **Order ticket:** bid/ask and spread cost, 10 contracts (limit at the
    mid, planned at the ask), the take-profit price (fill + $1.00), the
    stop price (fill − $1.00), the QQQ levels those correspond to *after*
    paying the spread, the total premium, and the daily theta.
-4. **Rules:** only one position open at a time (no stacking 10 more
+5. **Rules:** only one position open at a time (no stacking 10 more
    contracts every day). Exit on +$1,000, −$1,000, or the end of the 5th
    session, whichever comes first.
 
@@ -924,6 +934,9 @@ python -m qqq_iron_condor.daily_target_backtest
 
 # Same signal on QQQ shares -- no option modeling (see below)
 python -m qqq_iron_condor.shares_backtest
+
+# Does the 10-year Treasury yield help? (see below)
+python -m qqq_iron_condor.rates_backtest
 ```
 
 All of it lives in `Config` (`daily_target_*` fields in
@@ -1010,19 +1023,19 @@ the live rules on real QQQ hourly prices instead, so it tests only the
 stop on an hourly close past the first hour's low/high, a −$5/share hard
 stop, the skip-day rules and a 5-session time stop. 800 shares stands in
 for 10 contracts at 0.80 delta, with $0.03/share costs each way
-(`reports/backtests/shares-2026-10-17.md`, Nov 2023 to Oct 2026):
+(`reports/backtests/shares-2026-10-19.md`, Nov 2023 to Oct 2026):
 
 | Variant | Trades | Win rate | Total | 1st half | 2nd half |
 |---|---|---|---|---|---|
-| Live rules | 417 | 77% | +$88k | +$56k | +$32k |
-| ...ties scored as stops | 417 | 76% | +$83k | +$56k | +$27k |
-| ...3× costs | 417 | 77% | +$48k | +$35k | +$13k |
-| Level stop on any touch | 431 | 70% | +$44k | +$16k | +$28k |
-| Fixed −$1.25/share stop (the old −$1,000) | 456 | 57% | +$42k | +$24k | +$18k |
-| Live rules without the skip-day rules | 654 | 76% | +$59k | +$67k | −$9k |
+| Live rules | 417 | 76% | +$83k | +$56k | +$27k |
+| ...ties scored as stops | 417 | 76% | +$78k | +$56k | +$22k |
+| ...3× costs | 417 | 76% | +$43k | +$35k | +$8k |
+| Level stop on any touch | 432 | 70% | +$41k | +$16k | +$25k |
+| Fixed −$1.25/share stop (the old −$1,000) | 457 | 57% | +$39k | +$24k | +$15k |
+| Live rules without the skip-day rules | 653 | 76% | +$53k | +$67k | −$14k |
 
 - **The signal holds up on shares.** It's positive in both halves, with
-  worst-case ties, and at 3× costs. Longs (+$52k) and shorts (+$36k)
+  worst-case ties, and at 3× costs. Longs (+$52k) and shorts (+$31k)
   both made money.
 - **The gap between shares and options is the option cost.** The same
   rules made +$53k in the options backtest. Spread and theta take the
@@ -1031,6 +1044,91 @@ for 10 contracts at 0.80 delta, with $0.03/share costs each way
   lost money and the worst trade doubled (−$10.6k vs −$5.6k).
 - **Caveat:** the level stop was chosen on this same window, so these
   results are partly in-sample. Live paper trading is the real test.
+
+### The 10-year Treasury yield
+
+Every plan shows a **10-yr Treasury yield** row (`rates.py`, Yahoo's
+`^TNX`). It gives the level, the change today and over 5 and 20 sessions
+in basis points, and a state:
+- **spiking:** up ≥20bp in 5 sessions;
+- **rising / falling:** a ≥8bp move either way;
+- **calm:** anything smaller.
+
+It also flags a 52-week high. The idea being tested: fast yield rises
+trigger Nasdaq pullbacks, and a disorderly bond market tends to draw a
+market-friendly response. The April 9, 2025 tariff pause came after the
+10-year jumped ~50bp in a week.
+
+`rates_backtest.py` (`reports/backtests/rates-2026-10-19.md`) tests it
+two ways:
+
+**1. Event study, QQQ since 2000.** An event is a ≥20bp 5-session rise in
+the 10-year:
+
+| Period | Events | QQQ during the spike | Next 20 days | Normal 20 days |
+|---|---|---|---|---|
+| 2000-2016 | 83 | +2.09% | +0.24% | +0.42% |
+| Trump 1st term | 7 | −0.10% | +4.24% | +2.05% |
+| Biden | 33 | −1.31% (64% fell) | +0.24% | +1.17% |
+| Trump 2nd term | 6 | +0.68% (67% fell) | +1.27% | +1.82% |
+
+- **"Yields up, stocks down" held mainly in the Biden years** (2022's
+  inflation shock). The weekly correlation was −0.24 then, but positive
+  in every other period (+0.25 in Trump's second term). Yields often rise
+  *with* stocks when growth is strong.
+- **The bounce shows up only after the biggest spikes.** After ≥25bp
+  spikes under Trump, QQQ rose +8.6% (1st term) and +6.1% (2nd term) over
+  the next 20 days, about 2% normally. That's only 3 events each. After
+  ordinary 20bp spikes there was no bounce.
+
+**2. As a filter on first-hour momentum + level stop** (Nov 2023 to Oct
+2026, prior-close yield read, so no look-ahead):
+
+| Filter | Shares total | Options total |
+|---|---|---|
+| None (baseline) | +$83k | +$53k |
+| Skip **puts** when spiking (the "bond put") | +$92k | +$65k |
+| Skip all trades when spiking | +$89k | +$61k |
+| Skip calls when spiking | +$79k | +$49k |
+| Skip calls when rising (≥8bp) | +$58k | +$34k |
+| Skip all at a 52-week high | +$84k | +$54k |
+
+- **Puts on spike days lost money.** There were 13 of them, worth about
+  −$9k on shares and −$12k on options, while calls on those days did
+  fine. That's the bond-put pattern.
+- **Skipping those puts never hurt at any threshold from 10 to 25bp.**
+  But the gain ranged from +$0.3k to +$12k depending on the threshold.
+  It rests on 13 trades, two of them −$4k hard stops.
+- **Yields as a bearish signal made things worse.** Skipping calls when
+  yields were rising cost $25k on shares and $19k on options.
+
+**3. The bond put as a trade** (QQQ daily since 2000). The rule: after
+a spike, buy at the next open and hold 5, 10 or 20 sessions. Each result
+is compared with random entries in the same years.
+
+| Test | Trades | QQQ after the spike | Random entry | Chance it's luck | 0.80-delta call: avg / win rate |
+|---|---|---|---|---|---|
+| All years, ≥20bp, 20 sessions | 97 | +0.57% | +0.80% | 64% | +2% / 54% |
+| Biden, ≥20bp, 20 sessions | 26 | −0.10% | +1.08% | 86% | −1% / 46% |
+| Both Trump terms, ≥20bp, 20 sessions | 11 | +4.4% (82% up) | +1.9% (71% up) | 6% | +36% / 82% |
+| Both Trump terms, ≥25bp, 20 sessions | 5 | +7.8% | +1.9% | 1% | +31% / 80% |
+
+- **Across 2000–2026, buying after a spike had no edge.** No threshold
+  (15–30bp) or hold (5–20 sessions) beat random entries.
+- **Under Trump it worked: 9 of 11 trades rose.** That includes the
+  2025-04-10 entry (+7.7%), the day after the tariff pause. It's still
+  11 trades and only borderline (6%). One of the two losers was the
+  biggest: Feb 13, 2025, −11.6% (the call lost 86%). In Trump's second
+  term alone it's 5 trades, 4 winners, and not distinguishable from luck
+  (43%).
+- **2022 shows the risk.** In the Biden-era rate-hike bear market, rising
+  yields kept pushing stocks down, and the same trade lost on 6 of 9
+  entries that year.
+
+So the plan **warns** rather than skips: on a PUT day with the 10-year
+spiking (as of the prior close), it shows ⚠️ and suggests sitting out or
+sizing down. Trump's posts themselves aren't in any free, backtestable
+feed, so this tests the yield side of the idea only.
 
 ### Limitations & caveats
 
@@ -1073,6 +1171,8 @@ qqq_iron_condor/
   breadth.py              # mega-cap first-hour breadth (NVDA, MSFT, AAPL, AMZN, META, GOOGL, AVGO)
   key_levels.py           # multi-touch levels + reclaim/flip/rejection setups + context sizing (research)
   shares_backtest.py      # the daily $ target signal replayed on QQQ shares (no option modeling)
+  rates.py                # 10-year Treasury yield read (^TNX): level, bp changes, spiking/rising/calm
+  rates_backtest.py       # bond-put event study since 2000 + yield filters on the daily $ target signal
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)
@@ -1089,6 +1189,7 @@ tests/
   test_journal.py         # trade journal CSV persistence & realized-performance stats
   test_daily_target.py    # daily $ target levels, exit rules, and backtest mechanics
   test_shares_backtest.py # shares backtest exits, skip rules, costs, and report
+  test_rates.py           # 10-year yield read, no-look-ahead states, event study, plan warning
 smallcap_options/
   config.py               # all tunable parameters (universe filters, score weights, contract selection)
   data.py                 # yfinance-backed screener, price/intraday history, option chains, float, news
