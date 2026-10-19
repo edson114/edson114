@@ -43,7 +43,7 @@ import pandas as pd
 from . import indicators as ind
 from .analysis import build_snapshot
 from .config import Config
-from .daily_target import per_share, strike_for_delta, underlying_for_option_price
+from .daily_target import per_share, plan_config, strike_for_delta, underlying_for_option_price
 from .direction import _macd_component, _rsi_component, _trend_component
 from .options_math import bs_price
 
@@ -521,7 +521,7 @@ def main(argv=None) -> int:
 
     from . import providers
 
-    cfg = Config()
+    cfg = plan_config(Config())  # QQQ, whatever the iron condor's `symbol` is
     try:
         price_history = providers.get_price_history(cfg.symbol, args.period)
         vix_history = providers.get_vix_history(args.period, cfg.vix_symbol, cfg.tradier_vix_symbol)

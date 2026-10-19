@@ -35,7 +35,7 @@ import datetime as dt
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -68,9 +68,12 @@ def simulate_shares(
     skip_rules: bool = True,
     tie_rule: str = "path",
     max_hold: int = 5,
+    skip_day: Optional[Callable[[dt.date, int], bool]] = None,
 ) -> list[ShareTrade]:
     """daily / vix: daily OHLC with a date-like index; intraday: hourly bars
-    (index = ET wall time, first bar of each session = 9:30)."""
+    (index = ET wall time, first bar of each session = 9:30). `skip_day(date,
+    side)` -> True skips that day's entry (side +1 long, -1 short); it must
+    only use information known by the entry."""
     closes = pd.Series(daily["Close"].to_numpy(float), index=pd.to_datetime(daily.index).date)
     vix_closes = pd.Series(vix["Close"].to_numpy(float), index=pd.to_datetime(vix.index).date)
     close_dates = np.array(closes.index)
@@ -102,6 +105,8 @@ def simulate_shares(
             if move == 0:
                 continue
             side = 1 if move > 0 else -1
+            if skip_day is not None and skip_day(d, side):
+                continue
             entry = float(bars["Open"].iloc[1])
             level = float(first["Low"]) if side > 0 else float(first["High"])
             if (side > 0 and level >= entry) or (side < 0 and level <= entry):

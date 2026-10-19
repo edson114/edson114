@@ -335,3 +335,7 @@ class Config:
     daily_target_slippage: float = 0.05
 
     daily_target_output_dir: str = "reports/daily_target"
+
+    # 10-year Treasury yield (rates.py): Yahoo's ^TNX, in percent. Shown in
+    # the daily plan as context; rates_backtest.py tests whether it helps.
+    ten_year_symbol: str = "^TNX"

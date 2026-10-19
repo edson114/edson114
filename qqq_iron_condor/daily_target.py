@@ -43,6 +43,7 @@ from .data import OptionChain
 from .direction import SuggestedContract, _mid_price
 from .options_math import bs_delta, bs_price, time_to_expiration_years
 from .breadth import BreadthRead
+from .rates import TenYearRead
 from .supply_demand import SupplyDemandRead, hourly_bars_before, supply_demand_read
 
 DISCLAIMER = (
@@ -213,6 +214,7 @@ class DailyTargetPlan:
     first_hour: Optional[FirstHourRead] = None
     sd: Optional[SupplyDemandRead] = None
     breadth: Optional[BreadthRead] = None
+    ten_year: Optional[TenYearRead] = None
 
     @property
     def chosen(self) -> Optional[LegPlan]:
@@ -446,6 +448,7 @@ def build_plan(
     first_hour: Optional[FirstHourRead] = None,
     sd: Optional[SupplyDemandRead] = None,
     breadth: Optional[BreadthRead] = None,
+    ten_year: Optional[TenYearRead] = None,
 ) -> DailyTargetPlan:
     notes = list(notes or [])
     legs: dict = {"call": None, "put": None}
@@ -462,7 +465,7 @@ def build_plan(
             legs[option_type] = build_leg_plan(chain, spot, atr14, option_type, cfg, reference_hv, model_iv, level)
     return DailyTargetPlan(
         bias=bias, bias_source=bias_source, signal_score=signal_score, spot=spot, atr14=atr14, legs=legs,
-        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd, breadth=breadth,
+        notes=notes, signal_bias=signal_bias, first_hour=first_hour, sd=sd, breadth=breadth, ten_year=ten_year,
     )
 
 
@@ -716,10 +719,30 @@ def render_plan(plan: DailyTargetPlan, cfg: Config, now: Optional[dt.datetime] =
             )
         else:
             lines.append(f"| Mega-cap breadth | **not ready** -- {plan.breadth.detail} |")
+    if plan.ten_year is not None:
+        ty = plan.ten_year
+        says = ty.state.upper() if ty.ready else "unavailable"
+        lines.append(f"| 10-yr Treasury yield | **{says}** -- {ty.detail} |")
     if plan.signal_bias is not None:
         score = f" (score {plan.signal_score:+.2f})" if plan.signal_score is not None else ""
         lines.append(f"| Directional signal | **{plan.signal_bias}**{score} |")
     lines.append("")
+    if plan.ten_year is not None and plan.ten_year.ready and plan.ten_year.spiking_at_prior_close:
+        ty = plan.ten_year
+        if plan.bias == "PUT":
+            lines.append(
+                f"⚠️ **10-yr yield spiking** (+{ty.prior_5d_bp:.0f}bp in 5 days at yesterday's close). In the "
+                "backtest, first-hour puts taken on spike days lost money: 13 trades, about -$12k on options and "
+                "-$9k on shares, while calls on those days did fine. That fits the \"bond put\" idea (a yield "
+                "spike tends to draw market-friendly news), but it's a small sample. Consider sitting this one out "
+                "or sizing down."
+            )
+        else:
+            lines.append(
+                f"_10-yr yield spiking (+{ty.prior_5d_bp:.0f}bp in 5 days at yesterday's close). In the backtest, "
+                "first-hour calls on spike days did fine; puts lost money (13 trades)._"
+            )
+        lines.append("")
     if plan.sd is not None and plan.sd.ready and plan.sd.zones:
         zone_list = ", ".join(f"{z.kind} ${z.low:,.2f}-${z.high:,.2f}" for z in plan.sd.zones)
         lines.append(f"_Live supply/demand zones near the price: {zone_list}._")
@@ -931,6 +954,15 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     else:
         breadth = BreadthRead(False, detail="waits for the first hour")
 
+    try:
+        from .data import get_price_history
+        from .rates import ten_year_read
+
+        # Yahoo only: Tradier doesn't quote the ^TNX index.
+        ten_year = ten_year_read(get_price_history(cfg.ten_year_symbol, "2y"), dt.date.today())
+    except Exception as exc:
+        ten_year = TenYearRead(False, detail=f"10-year yield unavailable ({exc})")
+
     bias, bias_source = choose_bias(source, direction, forced, signal_bias, first_hour, sd)
     chains = providers.pick_expirations_for_targets(cfg.symbol, (cfg.daily_target_expiration,))
     reference_hv = daily.hv20_pct / 100.0 if daily.hv20_pct == daily.hv20_pct else None
@@ -939,7 +971,7 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
     plan = build_plan(
         daily.spot, daily.atr14, chains.get(cfg.daily_target_expiration.label), bias, bias_source, cfg,
         signal_score=score, reference_hv=reference_hv, notes=notes, model_iv=model_iv, signal_bias=signal_bias,
-        first_hour=first_hour, sd=sd, breadth=breadth,
+        first_hour=first_hour, sd=sd, breadth=breadth, ten_year=ten_year,
     )
     return render_plan(plan, cfg), plan
 
@@ -977,9 +1009,13 @@ def _self_test_report() -> tuple[str, DailyTargetPlan]:
     bars = pd.DataFrame({"Open": closes - 0.1, "High": closes + 0.2, "Low": closes - 0.3, "Close": closes}, index=idx)
     first_hour = first_hour_read(bars, cfg.daily_target_first_hour_minutes)
     bias, source = choose_bias("first_hour", None, [], "CALL", first_hour)
+    from .rates import ten_year_read
+
+    tnx_idx = pd.bdate_range(end=dt.date.today(), periods=30)
+    tnx = pd.DataFrame({"Close": np.linspace(4.80, 5.10, len(tnx_idx))}, index=tnx_idx)
     plan = build_plan(
         spot, 9.5, _synthetic_chain(spot, 60, cfg), bias, f"{source} (synthetic self-test)", cfg,
-        signal_score=0.42, signal_bias="CALL", first_hour=first_hour,
+        signal_score=0.42, signal_bias="CALL", first_hour=first_hour, ten_year=ten_year_read(tnx, dt.date.today()),
     )
     return render_plan(plan, cfg), plan
 
