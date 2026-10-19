@@ -1102,6 +1102,29 @@ the 10-year:
 - **Yields as a bearish signal made things worse.** Skipping calls when
   yields were rising cost $25k on shares and $19k on options.
 
+**3. The bond put as a trade** (QQQ daily since 2000). The rule: after
+a spike, buy at the next open and hold 5, 10 or 20 sessions. Each result
+is compared with random entries in the same years.
+
+| Test | Trades | QQQ after the spike | Random entry | Chance it's luck | 0.80-delta call: avg / win rate |
+|---|---|---|---|---|---|
+| All years, ≥20bp, 20 sessions | 97 | +0.57% | +0.80% | 64% | +2% / 54% |
+| Biden, ≥20bp, 20 sessions | 26 | −0.10% | +1.08% | 86% | −1% / 46% |
+| Both Trump terms, ≥20bp, 20 sessions | 11 | +4.4% (82% up) | +1.9% (71% up) | 6% | +36% / 82% |
+| Both Trump terms, ≥25bp, 20 sessions | 5 | +7.8% | +1.9% | 1% | +31% / 80% |
+
+- **Across 2000–2026, buying after a spike had no edge.** No threshold
+  (15–30bp) or hold (5–20 sessions) beat random entries.
+- **Under Trump it worked: 9 of 11 trades rose.** That includes the
+  2025-04-10 entry (+7.7%), the day after the tariff pause. It's still
+  11 trades and only borderline (6%). One of the two losers was the
+  biggest: Feb 13, 2025, −11.6% (the call lost 86%). In Trump's second
+  term alone it's 5 trades, 4 winners, and not distinguishable from luck
+  (43%).
+- **2022 shows the risk.** In the Biden-era rate-hike bear market, rising
+  yields kept pushing stocks down, and the same trade lost on 6 of 9
+  entries that year.
+
 So the plan **warns** rather than skips: on a PUT day with the 10-year
 spiking (as of the prior close), it shows ⚠️ and suggests sitting out or
 sizing down. Trump's posts themselves aren't in any free, backtestable

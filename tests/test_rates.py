@@ -93,3 +93,32 @@ def test_plan_shows_yield_row_and_warns_on_spike_puts():
     assert "⚠️ **10-yr yield spiking**" not in call and "calls on spike days did fine" in call
     calm = dtg.render_plan(dtg.build_plan(750.0, 9.5, chain, "PUT", "first-hour momentum", Config(), ten_year=CALM), Config())
     assert "**CALM**" in calm and "spiking" not in calm
+
+
+def _bond_put_inputs():
+    idx = pd.bdate_range("2025-02-03", periods=60)
+    tnx = pd.DataFrame({"Close": [4.0] * 30 + [4.3] * 30}, index=idx)  # spike close on idx[30]
+    px = np.linspace(100, 159, 60)
+    qqq = pd.DataFrame({"Open": px - 0.5, "Close": px}, index=idx)
+    vix = pd.DataFrame({"Close": 15.0}, index=idx)
+    return idx, tnx, qqq, vix
+
+
+def test_bond_put_trade_enters_next_open_and_holds():
+    idx, tnx, qqq, vix = _bond_put_inputs()
+    trades = rb.bond_put_trades(qqq, tnx, vix, 20.0, 5, Config())
+    assert len(trades) == 1
+    t = trades[0]
+    assert t["signal"] == idx[30].date() and t["entry"] == idx[31].date() and t["exit"] == idx[35].date()
+    assert t["qqq"] == pytest.approx((135.0 / 130.5 - 1) * 100)  # open of idx[31] -> close of idx[35]
+    assert t["option"] > t["qqq"]  # ~0.8 delta on a smaller premium: leverage
+
+
+def test_bond_put_summary_vs_random_entries():
+    idx, tnx, qqq, vix = _bond_put_inputs()
+    trades = rb.bond_put_trades(qqq, tnx, vix, 20.0, 5, Config())
+    s = rb.bond_put_summary(trades, qqq, 5, [(dt.date(2025, 1, 20), dt.date(2100, 1, 1))])
+    assert s["trades"] == 1 and s["qqq_up"] == 1.0
+    pool = rb.random_entry_returns(qqq, 5, [(dt.date(2025, 1, 20), dt.date(2100, 1, 1))])
+    assert len(pool) == 56 and s["random_avg"] == pytest.approx(pool.mean())
+    assert rb._bootstrap_p(1e9, pool, 3) == 0.0 and rb._bootstrap_p(-1e9, pool, 3) == 1.0

@@ -16,6 +16,12 @@
    (Black-Scholes at a VIX-based IV, +$1,000 target, level stop on an
    hourly close, -$4,000 backstop), each with a half-window split.
 
+3. **The bond put as a trade** (QQQ daily since 2000). After each spike,
+   buy at the next session's open and hold 5 / 10 / 20 sessions, on QQQ
+   itself and on a 0.80-delta ~60 DTE call. Compared with a random entry
+   in the same period: a bootstrap p-value gives the chance that luck alone
+   matches the result.
+
 Usage:
     python -m qqq_iron_condor.rates_backtest     # report to reports/backtests/
 """
@@ -203,6 +209,124 @@ def _summarize_options(trades, midpoint: dt.date) -> dict:
     }
 
 
+# --- 3. The bond put as a trade -----------------------------------------------
+
+def _daily_arrays(df: pd.DataFrame) -> pd.DataFrame:
+    out = df[["Open", "Close"]].astype(float).copy()
+    out.index = pd.to_datetime(out.index).normalize()
+    return out
+
+
+def bond_put_trades(qqq, tnx, vix, threshold_bp: float, hold: int, cfg: Config) -> list[dict]:
+    """Buy after each 10-yr spike: enter at the open of the first QQQ session
+    after the spike close, exit at the close `hold` sessions later (the entry
+    session counts as one). One position at a time (cool-down = `hold`).
+    Each trade is priced two ways: QQQ itself, and a 0.80-delta ~60 DTE call
+    (Black-Scholes at VIX x the backtest's IV multiple, the actual VIX at
+    exit, and the backtest's slippage on both fills)."""
+    from .daily_target import strike_for_delta
+    from .options_math import bs_price
+
+    q = _daily_arrays(qqq)
+    v = vix["Close"].astype(float).copy()
+    v.index = pd.to_datetime(v.index).normalize()
+    v = v.reindex(q.index).ffill()
+    states = daily_states(tnx)
+    states = states[states.index >= q.index[0]]
+    dates = q.index
+    opens, closes, vixes = q["Open"].to_numpy(), q["Close"].to_numpy(), v.to_numpy()
+    r, slip, mult, dte = cfg.risk_free_rate, cfg.daily_target_slippage, cfg.daily_target_iv_vix_multiple, 60
+
+    trades = []
+    for e in spike_events(states, threshold_bp, cooldown=hold):
+        k = int(np.searchsorted(dates.values, e.to_datetime64(), side="right"))
+        x = k + hold - 1
+        if x >= len(dates) or k < 1 or vixes[k - 1] != vixes[k - 1]:
+            continue
+        entry, exit_ = opens[k], closes[x]
+        iv_in, iv_out = vixes[k - 1] / 100 * mult, vixes[x] / 100 * mult
+        t_in = dte / 365.0
+        t_out = max(dte - (dates[x] - dates[k]).days, 1) / 365.0
+        strike = strike_for_delta(entry, t_in, r, iv_in, "call", cfg.daily_target_delta)
+        fill = bs_price(entry, strike, t_in, r, iv_in, "call") + slip
+        out = bs_price(exit_, strike, t_out, r, iv_out, "call") - slip
+        trades.append(
+            {
+                "signal": e.date(),
+                "entry": dates[k].date(),
+                "exit": dates[x].date(),
+                "bp": float(states.loc[e, "change_5d_bp"]),
+                "qqq": (exit_ / entry - 1.0) * 100.0,
+                "option": (out / fill - 1.0) * 100.0,
+            }
+        )
+    return trades
+
+
+def _in_ranges(d, ranges) -> bool:
+    return any(lo <= d <= hi for lo, hi in ranges)
+
+
+def random_entry_returns(qqq: pd.DataFrame, hold: int, ranges) -> np.ndarray:
+    """QQQ % return from every session's open to the close `hold` sessions
+    later, for entries inside `ranges` ([(lo, hi), ...]) -- what a random
+    entry would have got."""
+    q = _daily_arrays(qqq)
+    o, c = q["Open"].to_numpy(), q["Close"].to_numpy()
+    rets = c[hold - 1:] / o[: len(o) - hold + 1] - 1.0
+    d = q.index[: len(o) - hold + 1].date
+    mask = np.array([_in_ranges(x, ranges) for x in d], dtype=bool)
+    return rets[mask] * 100.0
+
+
+def _bootstrap_p(sample_mean: float, pool: np.ndarray, n: int, draws: int = 20000, seed: int = 7) -> float:
+    """Share of random same-size samples from `pool` whose mean is at least
+    `sample_mean`: the chance luck alone matches the result."""
+    if n == 0 or len(pool) == 0:
+        return float("nan")
+    rng = np.random.default_rng(seed)
+    means = rng.choice(pool, size=(draws, n), replace=True).mean(axis=1)
+    return float((means >= sample_mean).mean())
+
+
+def bond_put_summary(trades: list[dict], qqq: pd.DataFrame, hold: int, ranges) -> dict:
+    t = [x for x in trades if _in_ranges(x["entry"], ranges)]
+    pool = random_entry_returns(qqq, hold, ranges)
+    q = np.array([x["qqq"] for x in t])
+    o = np.array([x["option"] for x in t])
+    mean = float(q.mean()) if len(q) else float("nan")
+    return {
+        "trades": len(t),
+        "qqq_avg": mean,
+        "qqq_up": float((q > 0).mean()) if len(q) else float("nan"),
+        "random_avg": float(pool.mean()) if len(pool) else float("nan"),
+        "random_up": float((pool > 0).mean()) if len(pool) else float("nan"),
+        "p": _bootstrap_p(mean, pool, len(q)) if len(q) else float("nan"),
+        "opt_avg": float(o.mean()) if len(o) else float("nan"),
+        "opt_win": float((o > 0).mean()) if len(o) else float("nan"),
+        "opt_worst": float(o.min()) if len(o) else float("nan"),
+    }
+
+
+GRID_THRESHOLDS = (15.0, 20.0, 25.0, 30.0)
+GRID_HOLDS = (5, 10, 20)
+
+
+def run_bond_put(qqq, tnx, vix, cfg: Config) -> dict:
+    full = [(dt.date(2000, 1, 1), dt.date(2100, 1, 1))]
+    trades = {(th, h): bond_put_trades(qqq, tnx, vix, th, h, cfg) for th in GRID_THRESHOLDS for h in GRID_HOLDS}
+    grid = [(th, h, bond_put_summary(trades[(th, h)], qqq, h, full)) for th in GRID_THRESHOLDS for h in GRID_HOLDS]
+    periods = [(name, [(lo, hi)]) for name, lo, hi in PERIODS]
+    periods.append(("Both Trump terms", [(lo, hi) for name, lo, hi in PERIODS if name.startswith("Trump")]))
+    by_period = [
+        (th, name, bond_put_summary(trades[(th, 20)], qqq, 20, ranges))
+        for th in (20.0, 25.0)
+        for name, ranges in periods
+    ]
+    recent = [x for x in trades[(20.0, 20)] if x["entry"] >= PERIODS[1][1]]
+    return {"grid": grid, "by_period": by_period, "recent": recent}
+
+
 # --- Report -----------------------------------------------------------------
 
 def _money(x: float) -> str:
@@ -213,7 +337,7 @@ def _pct(x: float) -> str:
     return "n/a" if x != x else f"{x:+.2f}%"
 
 
-def render_report(study, corr, threshold_bp, share_rows, option_rows, first, midpoint, last, latest) -> str:
+def render_report(study, corr, threshold_bp, share_rows, option_rows, first, midpoint, last, latest, bond_put=None) -> str:
     lines = [
         f"# 10-Year Yield Backtest -- {dt.date.today():%Y-%m-%d}",
         "",
@@ -261,6 +385,8 @@ def render_report(study, corr, threshold_bp, share_rows, option_rows, first, mid
             f"{_money(s['second_half'])} | {o['trades']} | {_money(o['total'])} | {_money(o['first_half'])} | "
             f"{_money(o['second_half'])} | {_money(o['worst'])} |"
         )
+    if bond_put is not None:
+        lines += _render_bond_put(bond_put)
     lines += [
         "",
         "**Caveats:** few spike episodes per period (especially the last two years), so these averages "
@@ -269,6 +395,48 @@ def render_report(study, corr, threshold_bp, share_rows, option_rows, first, mid
         "idea -- whether stocks fall during spikes and bounce after -- not the posts.",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _render_bond_put(res: dict) -> list[str]:
+    def row(label, s):
+        if not s["trades"]:
+            return f"| {label} | 0 | | | | | | |"
+        return (
+            f"| {label} | {s['trades']} | {_pct(s['qqq_avg'])} ({s['qqq_up']:.0%} up) | "
+            f"{_pct(s['random_avg'])} ({s['random_up']:.0%} up) | {s['p']:.2f} | {_pct(s['opt_avg'])} | "
+            f"{s['opt_win']:.0%} | {_pct(s['opt_worst'])} |"
+        )
+
+    head = (
+        "| {} | Trades | QQQ after the spike | Random entry | p (luck) | Call: avg | Call: win | Call: worst |",
+        "|---|---|---|---|---|---|---|---|",
+    )
+    lines = [
+        "",
+        "## 3. The bond put as a trade (QQQ daily, 2000 onward)",
+        "",
+        "Buy at the open of the session after a spike close, exit at the close N sessions later, one position "
+        "at a time. \"Random entry\" is QQQ over the same holding period from every session in the same "
+        "years; p is the chance that random entries match the spike entries' average (low = unlikely to be "
+        "luck). Calls: 0.80-delta ~60 DTE, Black-Scholes at VIX x the backtest's IV multiple (actual VIX at "
+        "exit), $0.05/share slippage per fill; returns are % of the premium paid.",
+        "",
+        head[0].format("Spike / hold"),
+        head[1],
+    ]
+    for th, h, s in res["grid"]:
+        lines.append(row(f">= {th:.0f}bp, {h} sessions", s))
+    lines += ["", "By period, 20-session hold:", "", head[0].format("Period"), head[1]]
+    for th, name, s in res["by_period"]:
+        lines.append(row(f"{name}, >= {th:.0f}bp", s))
+    if res["recent"]:
+        lines += [
+            "",
+            "Trades since 2017 (>= 20bp, 20 sessions): "
+            + "; ".join(f"{t['entry']} {t['qqq']:+.1f}% (call {t['option']:+.0f}%)" for t in res["recent"])
+            + ".",
+        ]
+    return lines
 
 
 def main(argv=None) -> int:
@@ -291,11 +459,12 @@ def main(argv=None) -> int:
         vix = get_vix_history("5y")
         intraday = get_intraday_history(sym, "1h", "730d")
         share_rows, option_rows, first, mid, last = run_filters(daily, vix, intraday, tnx, cfg)
+        bond_put = run_bond_put(qqq_long, tnx, get_vix_history("max"), cfg)
     except Exception as exc:
         print(f"Rates backtest failed: {exc}", file=sys.stderr)
         return 1
     report = render_report(study, corr, args.threshold_bp, share_rows, option_rows, first, mid, last,
-                           ten_year_read(tnx).detail)
+                           ten_year_read(tnx).detail, bond_put)
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"rates-{dt.date.today():%Y-%m-%d}.md"
