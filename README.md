@@ -951,6 +951,37 @@ rather than an option stop order, since deep-ITM spreads are wide. Ten
 contracts at 0.80 delta is tens of thousands of dollars of premium (about
 $53k-$76k at QQQ ~$750), so check buying power first.
 
+### On a TradingView chart
+
+`tradingview/qqq_daily_target.pine` draws the same plan on a QQQ chart
+(1–60 minute bars). To install it, open TradingView on the web or desktop
+(the phone app can't edit scripts), open the Pine Editor, paste the file,
+and click **Add to chart**.
+
+At 10:30 it labels the chart **BUY CALLS**, **BUY PUTS** or **NO
+TRADE** (gap, VIX, FOMC/CPI, flat first hour), then draws:
+- the entry (blue);
+- take profit (green);
+- the stop on an hourly close past the first hour's low/high (orange);
+- the hard stop (red).
+
+It marks the exit when one is hit, or at the session-5 time stop. A
+table shows today's levels in dollars, the reward:risk, the 10-year's
+5-day move (with the spike warning on PUT days), VIX and the gap.
+
+In the settings:
+- Set **Option delta** and **Bid-ask spread** to the contract the daily
+  plan picked. The option's dollar results are converted to QQQ prices
+  with them.
+- If you got in after 10:30, put your QQQ entry price in **My actual
+  entry**.
+
+For alerts, create one on the indicator with **Any alert() function
+call**. Each alert message carries the levels.
+
+The FOMC/CPI dates are an input. Keep them in step with
+`Config.macro_event_dates`.
+
 ### What the backtest says
 
 `daily_target_backtest.py` replays the rules over Nov 2023 to Oct 2026
@@ -1173,6 +1204,8 @@ qqq_iron_condor/
   shares_backtest.py      # the daily $ target signal replayed on QQQ shares (no option modeling)
   rates.py                # 10-year Treasury yield read (^TNX): level, bp changes, spiking/rising/calm
   rates_backtest.py       # bond-put event study since 2000 + yield filters on the daily $ target signal
+tradingview/
+  qqq_daily_target.pine   # the daily $ target plan as a TradingView indicator (levels, exits, alerts)
 tests/
   test_pipeline.py        # iron condor offline smoke test (synthetic data)
   test_signal_pipeline.py # directional signal offline smoke test (synthetic data)

@@ -1,0 +1,252 @@
+//@version=5
+// QQQ Daily $ Target Plan -- the repo's daily plan (qqq_iron_condor/daily_target.py) drawn on a
+// TradingView chart, with the same rules the backtests use:
+//   - Skip the day: opening gap vs the prior close >= 0.8%, prior VIX close >= 20, or an FOMC/CPI date.
+//   - Direction at 10:30 ET: first hour (9:30-10:30) up -> BUY CALLS, down -> BUY PUTS, flat -> no trade.
+//   - Entry at the 10:30 open. Exit on the first of: take profit (+$1,000), an hourly CLOSE past the
+//     first hour's low (calls) / high (puts), the hard stop (-$4,000), or the close of session 5.
+//   - One position at a time; no new entry on a day a position was open.
+//   - On a PUT day with the 10-year yield up >= 20bp in 5 sessions, a warning (the "bond put").
+// Option dollars are turned into QQQ prices with the delta and spread inputs -- set them to the
+// contract the plan picked (0.66 / $0.20 on Oct 20, 2026). That's linear: it ignores gamma, theta
+// and IV changes, so treat the lines as close estimates.
+// Use a 1-60 minute QQQ chart. Decision support only: it never places trades.
+indicator("QQQ Daily $ Target Plan", shorttitle = "QQQ $1k Plan", overlay = true, max_labels_count = 500)
+
+grpTrade = "Position (match the plan's contract)"
+contracts   = input.int(10, "Contracts", minval = 1, group = grpTrade)
+optDelta    = input.float(0.80, "Option delta", minval = 0.05, maxval = 1.0, step = 0.01, group = grpTrade,
+     tooltip = "The delta of the contract the daily plan picked. 0.80 is the target; when deep strikes are quoted too wide the plan picks a lower one (0.66 on Oct 20, 2026).")
+spread      = input.float(0.20, "Bid-ask spread ($/share)", minval = 0.0, step = 0.01, group = grpTrade)
+profitUsd   = input.float(1000, "Take profit ($)", minval = 1, group = grpTrade)
+backstopUsd = input.float(4000, "Hard stop ($)", minval = 1, group = grpTrade)
+maxHold     = input.int(5, "Time stop (sessions)", minval = 1, group = grpTrade)
+myEntry     = input.float(0, "My actual entry (QQQ price, today only)", minval = 0, step = 0.01, group = grpTrade,
+     tooltip = "If you entered after 10:30, put the QQQ price you got in at and today's lines are drawn from it. 0 = the 10:30 open, like the backtest.")
+
+grpSkip = "Skip-day rules"
+gapMax     = input.float(0.8, "Max opening gap (%)", step = 0.1, group = grpSkip)
+vixMax     = input.float(20, "Max prior VIX close", group = grpSkip)
+vixSym     = input.symbol("TVC:VIX", "VIX symbol", group = grpSkip)
+macroDates = input.string("2026-10-28,2026-11-10,2026-12-09,2026-12-10", "FOMC/CPI dates (yyyy-MM-dd, comma-separated)", group = grpSkip)
+
+grpRates = "10-year yield"
+tnySym  = input.symbol("TVC:US10Y", "10-year yield symbol", group = grpRates)
+spikeBp = input.float(20, "Spike = 5-session rise of at least (bp)", group = grpRates)
+
+showTable = input.bool(true, "Show the plan table")
+
+TZ = "America/New_York"
+
+// --- Levels in QQQ terms --------------------------------------------------------
+// The option has to gain profit/(contracts x 100) per share after paying the spread, and the hard
+// stop is backstop/(contracts x 100) per share including the spread.
+targetMove = (profitUsd / (contracts * 100) + spread) / optDelta
+hardMove   = math.max(backstopUsd / (contracts * 100) - spread, 0.01) / optDelta
+
+usdAt(px, entry, dir) => ((px - entry) * dir * optDelta - spread) * contracts * 100
+money(x) => (x < 0 ? "-$" : "+$") + str.tostring(math.abs(x), "#,###")
+price(x) => na(x) ? "n/a" : "$" + str.tostring(x, "#.00")
+
+// --- Clock and daily context ------------------------------------------------------
+okTF   = timeframe.isintraday and timeframe.in_seconds() <= 3600
+inRTH  = not na(time(timeframe.period, "0930-1600", TZ))
+mins   = hour(time, TZ) * 60 + minute(time, TZ) - 570
+int slot = inRTH ? math.floor(mins / 60) : na  // 0 = 9:30-10:30, 1 = 10:30-11:30, ...
+dayKey = year(time, TZ) * 10000 + month(time, TZ) * 100 + dayofmonth(time, TZ)
+dayStr = str.format_time(time, "yyyy-MM-dd", TZ)
+isToday = str.format_time(timenow, "yyyy-MM-dd", TZ) == dayStr
+
+// Prior-session values only (close[1] + lookahead_on is the non-repainting pattern).
+prevClose = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+vixPrev   = request.security(vixSym, "D", close[1], lookahead = barmerge.lookahead_on)
+y10Prev   = request.security(tnySym, "D", close[1], lookahead = barmerge.lookahead_on)
+y10Prev6  = request.security(tnySym, "D", close[6], lookahead = barmerge.lookahead_on)
+y10Bp5    = (y10Prev - y10Prev6) * 100
+y10Spike  = y10Bp5 >= spikeBp
+
+// --- State ------------------------------------------------------------------------
+var int   lastDay     = na
+var int   lastSlot    = na
+var float lastClose   = na
+var int   lastExitDay = na
+var float fhOpen  = na
+var float fhHigh  = na
+var float fhLow   = na
+var float fhClose = na
+var float dayOpen = na
+var bool  decided = false
+var string todayNote = "Waiting for the first hour (10:30 ET)"
+
+var int   side     = 0  // +1 calls, -1 puts, 0 flat
+var float entryPx  = na
+var float tpPx     = na
+var float hardPx   = na
+var float levelPx  = na
+var int   held     = 0
+
+entryCall = false
+entryPut  = false
+exitTp    = false
+exitStop  = false
+float  exitPx  = na
+string exitWhy = ""
+int    exitBar = bar_index
+
+if inRTH and okTF
+    newDay = dayKey != lastDay
+
+    // 1. An hourly bar just closed (the previous RTH bar ended its hour): level stop on that close.
+    if side != 0 and not na(levelPx) and not na(lastSlot) and slot != lastSlot
+        if (side > 0 and lastClose < levelPx) or (side < 0 and lastClose > levelPx)
+            exitPx  := lastClose
+            exitWhy := "STOP: hourly close past the level"
+            exitBar := bar_index - 1
+
+    // 2. New session: reset the first hour; an open position ages a session and can gap out.
+    if newDay
+        lastDay := dayKey
+        decided := false
+        todayNote := "Waiting for the first hour (10:30 ET)"
+        dayOpen := open
+        fhOpen  := slot == 0 ? open : na
+        fhHigh  := high
+        fhLow   := low
+        fhClose := close
+        if side != 0 and na(exitPx)
+            held += 1
+            if (open - tpPx) * side >= 0
+                exitPx  := open
+                exitWhy := "TAKE PROFIT (gap at the open)"
+            else if (open - hardPx) * side <= 0 or (not na(levelPx) and (open - levelPx) * side < 0)
+                exitPx  := open
+                exitWhy := "STOP: gapped past it at the open"
+    else if slot == 0
+        fhHigh  := math.max(fhHigh, high)
+        fhLow   := math.min(fhLow, low)
+        fhClose := close
+
+    // 3. 10:30: decide.
+    if not decided and slot >= 1 and not na(fhOpen)
+        decided := true
+        if side != 0 or not na(exitPx) or lastExitDay == dayKey
+            todayNote := "Position open today -- no new entry"
+        else
+            gapPct = math.abs(dayOpen / prevClose - 1) * 100
+            reason = gapPct >= gapMax ? "gap " + str.tostring(gapPct, "#.##") + "%" :
+                 vixPrev >= vixMax ? "VIX " + str.tostring(vixPrev, "#.#") :
+                 str.contains(macroDates, dayStr) ? "FOMC/CPI day" :
+                 fhClose == fhOpen ? "flat first hour" : ""
+            if reason != ""
+                todayNote := "NO TRADE: " + reason
+                label.new(bar_index, high, "NO TRADE\n" + reason, yloc = yloc.abovebar, color = color.new(color.gray, 20),
+                     style = label.style_label_down, textcolor = color.white, size = size.small)
+            else
+                side    := fhClose > fhOpen ? 1 : -1
+                entryPx := myEntry > 0 and isToday ? myEntry : open
+                tpPx    := entryPx + side * targetMove
+                hardPx  := entryPx - side * hardMove
+                lvl      = side > 0 ? fhLow : fhHigh
+                levelPx := (side > 0 and lvl < entryPx) or (side < 0 and lvl > entryPx) ? lvl : na
+                held    := 1
+                entryCall := side > 0
+                entryPut  := side < 0
+                warn = side < 0 and y10Spike ? "\n⚠️ 10-yr spiking +" + str.tostring(y10Bp5, "#") + "bp: puts on spike days lost money in the backtest" : ""
+                stopTxt = na(levelPx) ? "stop: hard stop only" : "stop: hourly close " + (side > 0 ? "< " : "> ") + price(levelPx)
+                msg = (side > 0 ? "BUY CALLS" : "BUY PUTS") + " @ " + price(entryPx) +
+                     "\nTP " + price(tpPx) + " (" + money(profitUsd) + ")" +
+                     "\n" + stopTxt +
+                     "\nhard " + price(hardPx) + " (" + money(-backstopUsd) + ")" + warn
+                todayNote := (side > 0 ? "BUY CALLS" : "BUY PUTS") + (warn != "" ? " ⚠️ 10-yr spiking" : "")
+                label.new(bar_index, side > 0 ? low : high, msg, yloc = side > 0 ? yloc.belowbar : yloc.abovebar,
+                     color = side > 0 ? color.new(color.green, 10) : color.new(color.red, 10),
+                     style = side > 0 ? label.style_label_up : label.style_label_down, textcolor = color.white, size = size.small)
+                alert("QQQ plan: " + msg, alert.freq_once_per_bar)
+
+    // 4. Take profit / hard stop touches (same-bar ties: an up bar went low first, a down bar high first).
+    if side != 0 and na(exitPx)
+        hitT = side > 0 ? high >= tpPx : low <= tpPx
+        hitH = side > 0 ? low <= hardPx : high >= hardPx
+        if hitT and hitH
+            stopFirst = (close >= open) == (side > 0)
+            hitT := not stopFirst
+            hitH := stopFirst
+        if hitH
+            exitPx  := hardPx
+            exitWhy := "HARD STOP"
+        else if hitT
+            exitPx  := tpPx
+            exitWhy := "TAKE PROFIT"
+
+    // 5. The session's last bar: its close is an hourly close too; then the time stop.
+    lastBar = session.islastbar_regular and barstate.isconfirmed
+    if side != 0 and na(exitPx) and lastBar
+        if not na(levelPx) and ((side > 0 and close < levelPx) or (side < 0 and close > levelPx))
+            exitPx  := close
+            exitWhy := "STOP: hourly close past the level"
+        else if held >= maxHold
+            exitPx  := close
+            exitWhy := "TIME STOP (session " + str.tostring(maxHold) + ")"
+
+    // 6. Close the position.
+    if side != 0 and not na(exitPx)
+        pnl = usdAt(exitPx, entryPx, side)
+        exitTp   := pnl > 0
+        exitStop := pnl <= 0
+        label.new(exitBar, exitPx, exitWhy + "\n" + price(exitPx) + " (~" + money(pnl) + ")", yloc = yloc.price,
+             color = pnl > 0 ? color.new(color.teal, 10) : color.new(color.maroon, 10),
+             style = label.style_label_left, textcolor = color.white, size = size.small)
+        alert("QQQ plan: " + exitWhy + " at " + price(exitPx) + " (~" + money(pnl) + ")", alert.freq_once_per_bar)
+        todayNote := exitWhy
+        lastExitDay := dayKey
+        side    := 0
+        entryPx := na
+        tpPx    := na
+        hardPx  := na
+        levelPx := na
+        held    := 0
+
+    lastClose := close
+    lastSlot  := lastBar ? na : slot
+
+// --- Drawing ------------------------------------------------------------------------
+afterFH = inRTH and slot >= 1
+plot(afterFH ? fhHigh : na, "First-hour high", color.new(color.gray, 50), 1, plot.style_linebr)
+plot(afterFH ? fhLow : na, "First-hour low", color.new(color.gray, 50), 1, plot.style_linebr)
+plot(side != 0 ? entryPx : na, "Entry", color.new(color.blue, 0), 1, plot.style_linebr)
+plot(side != 0 ? tpPx : na, "Take profit", color.new(color.green, 0), 2, plot.style_linebr)
+plot(side != 0 ? levelPx : na, "Stop (hourly close)", color.new(color.orange, 0), 2, plot.style_linebr)
+plot(side != 0 ? hardPx : na, "Hard stop", color.new(color.red, 0), 2, plot.style_linebr)
+
+alertcondition(entryCall, "QQQ plan: BUY CALLS", "QQQ plan: BUY CALLS at 10:30. Check the chart for entry / take profit / stop.")
+alertcondition(entryPut, "QQQ plan: BUY PUTS", "QQQ plan: BUY PUTS at 10:30. Check the chart for entry / take profit / stop.")
+alertcondition(exitTp, "QQQ plan: closed with a profit", "QQQ plan: take profit (or a profitable exit) hit.")
+alertcondition(exitStop, "QQQ plan: stop / losing exit", "QQQ plan: a stop or losing exit hit.")
+
+var table tbl = table.new(position.top_right, 2, 9, bgcolor = color.new(color.black, 25), border_width = 1)
+cell(r, a, b, col) =>
+    table.cell(tbl, 0, r, a, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+    table.cell(tbl, 1, r, b, text_color = col, text_size = size.small, text_halign = text.align_left)
+
+if showTable and barstate.islast
+    if not okTF
+        cell(0, "QQQ $1k plan", "Use a 1-60 minute chart", color.orange)
+    else
+        noteCol = str.contains(todayNote, "CALLS") ? color.lime : str.contains(todayNote, "PUTS") ? color.red : color.white
+        cell(0, "Today", todayNote, noteCol)
+        if side != 0
+            lvlUsd = na(levelPx) ? na : usdAt(levelPx, entryPx, side)
+            beyond = not na(lvlUsd) and -lvlUsd > backstopUsd
+            risk = na(lvlUsd) or beyond ? backstopUsd : -lvlUsd
+            cell(1, "Entry", price(entryPx) + " (" + (side > 0 ? "calls" : "puts") + ", session " + str.tostring(held) + " of " + str.tostring(maxHold) + ")", color.white)
+            cell(2, "Take profit", price(tpPx) + "  " + money(profitUsd), color.lime)
+            cell(3, "Stop (hourly close)", na(levelPx) ? "none: past the level at entry" : price(levelPx) + "  ~" + money(lvlUsd) + (beyond ? " (hard stop hits first)" : ""), color.orange)
+            cell(4, "Hard stop", price(hardPx) + "  " + money(-backstopUsd), color.red)
+            cell(5, "Reward : risk", str.tostring(profitUsd / risk, "#.00") + " : 1", color.white)
+        else
+            for r = 1 to 5
+                cell(r, "", "", color.white)
+        cell(6, "10-yr (5 days)", na(y10Prev) ? "n/a" : str.tostring(y10Prev, "#.00") + "% " + (y10Bp5 >= 0 ? "+" : "") + str.tostring(y10Bp5, "#") + "bp" + (y10Spike ? " SPIKING" : ""), y10Spike ? color.orange : color.white)
+        cell(7, "VIX (prior close)", na(vixPrev) ? "n/a" : str.tostring(vixPrev, "#.0"), vixPrev >= vixMax ? color.red : color.white)
+        gapNow = (dayOpen / prevClose - 1) * 100
+        cell(8, "Gap today", na(gapNow) ? "n/a" : str.tostring(gapNow, "#.00") + "%", math.abs(gapNow) >= gapMax ? color.red : color.white)
