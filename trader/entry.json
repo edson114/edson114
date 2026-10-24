@@ -1,0 +1,22 @@
+{
+  "created_by": "trader-entry",
+  "symbol": "QQQ",
+  "setup": "orb",
+  "side": "buy",
+  "date": "2026-10-23",
+  "status": "triggered",
+  "time": "9:50 AM",
+  "bar_start": "09:45",
+  "bar_index": 3,
+  "price": 704.59,
+  "level": 704.5,
+  "interval": "5m",
+  "opening_range": {
+    "high": 704.5,
+    "low": 701.16,
+    "minutes": 15
+  },
+  "source": "yahoo",
+  "checked_at": "2026-10-23T19:31:00Z",
+  "reason": "the 9:45 bar closed above the range high"
+}
