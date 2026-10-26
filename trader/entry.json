@@ -1,22 +1,22 @@
 {
   "created_by": "trader-entry",
-  "symbol": "TSLA",
+  "symbol": "QQQ",
   "setup": "orb",
   "side": "buy",
-  "date": "2026-10-23",
+  "date": "2026-10-26",
   "status": "triggered",
-  "time": "11:20 AM",
-  "bar_start": "11:15",
-  "bar_index": 21,
-  "price": 377.14,
-  "level": 375.93,
+  "time": "10:20 AM",
+  "bar_start": "10:15",
+  "bar_index": 9,
+  "price": 710.52,
+  "level": 709.57,
   "interval": "5m",
   "opening_range": {
-    "high": 375.93,
-    "low": 367.78,
+    "high": 709.57,
+    "low": 705.58,
     "minutes": 15
   },
   "source": "yahoo",
-  "checked_at": "2026-10-23T15:20:02Z",
-  "reason": "the 11:15 bar closed above the range high"
+  "checked_at": "2026-10-26T15:09:45Z",
+  "reason": "the 10:15 bar closed above the range high"
 }
