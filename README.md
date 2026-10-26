@@ -15,8 +15,12 @@ data:
    — a daily plan to buy 10 deep-ITM (0.80 delta, ~60 DTE) QQQ calls or
    puts and close at +$1,000, with a stop, a time stop, a position
    checker, and a backtest of those exact rules.
+5. **[Daily Options Signal](#daily-options-signal-callsputs-30-premium-target)**
+   — every morning after the opening range, the opening-range breakout on
+   a list of liquid names as a call (up) or a put (down), ranked by how
+   often a +30% premium gain came before the stop in 10,000 replays.
 
-> **Not financial advice.** All four are decision-support tools, not
+> **Not financial advice.** All five are decision-support tools, not
 > auto-traders — none of them ever places orders. Always verify strikes,
 > prices, and greeks against your broker's live quotes before trading, and
 > see each tool's own limitations section below. **No signal in this repo
@@ -1171,6 +1175,64 @@ feed, so this tests the yield side of the idea only.
   on a gap, can be worse.
 - This tool never places trades.
 
+## Daily Options Signal (Calls/Puts, +30% premium target)
+
+The trader skills' one-trade day (scanner -> entry -> exit -> time machine
+-> budget -> risk), expressed in options instead of shares, run once each
+morning:
+
+1. **Setup** (trader-scanner / trader-entry): the 15-minute opening range
+   (9:30-9:45) on 5-minute bars. The first close above the range high is a
+   **call** setup, the first close below the range low a **put** setup. A
+   setup whose price is back inside the range is "faded" and skipped.
+2. **Contract**: about a week out (1-10 days, nearest to 7), the
+   nearest-the-money strike with a two-sided quote, a spread of at most
+   10% of the mid and at least 500 open interest. Implied volatility is
+   solved from the contract's own mid, not read from the feed.
+3. **Exit** (trader-exit): stop at the range midpoint on the stock; target
+   the option's **bid** at **+30%** over the **ask** you paid; out by 3:55 PM.
+4. **Odds** (trader-timemachine): 10,000 replays (seed 19) of the rest of
+   the session, each bar drawn from the stock's own 5-minute bars at the
+   same time of day (+-2 bars) over its last ~59 full sessions, with the
+   option re-priced by Black-Scholes at each bar's time to expiry. The stop
+   is checked first in every bar. Plus the same rule on every one of those
+   real sessions (the stock's real path; the option at today's volatility).
+5. **Gates**: the repo's FOMC/CPI calendar (`macro_event_dates`) and VIX
+   threshold skip the whole day; earnings today skips a stock; earnings
+   before expiry is flagged.
+6. **Size** (trader-budget / trader-risk): contracts within your
+   `trader/config.json` max loss per trade (the loss per contract if the
+   stop fills at the stop), position cap, max order and cash buffer.
+7. **The pick**: the candidate most likely to reach +30% first **among
+   those whose average replay result is positive**. When none is positive
+   it says "No pick" -- that is a real answer, not an error.
+
+```bash
+python -m options_signal.scan                                  # the 14 default tickers
+python -m options_signal.scan --watchlist trader/watchlist.json --watchlist-top 10
+python -m options_signal.scan --symbols QQQ,TSLA --target 30 --json
+python -m options_signal.scan --self-test                      # offline, synthetic data
+```
+
+Reports land in `reports/options_signals/<stamp>.md` and `.json`. The
+`options-signal.yml` workflow runs it at 9:52 AM ET on weekdays (GitHub can
+start scheduled runs late; the report says when it really ran).
+
+**Limitations, plainly:**
+
+- **No target is guaranteed.** +30% is where the plan takes profit, not a
+  forecast. On most days most setups fail to reach it before the stop or
+  the close, and the report shows exactly how often.
+- Implied volatility is held at today's level through each replay: an IV
+  drop (after earnings, or as fear fades) or spike is not modeled.
+- The history line prices past options at today's volatility (free data has
+  no historical option quotes); the stock's path in it is real.
+- Your $50 max loss per trade often allows **zero** contracts: a $5 option
+  that loses 40% at the stop risks $200 per contract. The report says so
+  rather than shrinking the stop.
+- `allow_options` is false in `trader/config.json`, so trader-broker will
+  not place these; any options trade is placed by you, in your broker.
+
 ## Project layout
 
 ```
@@ -1241,15 +1303,30 @@ tests/
   test_smallcap_strategy.py # contract selection unit tests
   test_smallcap_gates.py    # per-candidate gate unit tests
   test_smallcap_scan.py     # offline smoke test (synthetic data) + GitHub issue error handling
+options_signal/
+  config.py               # universe, setup, target, contract and replay settings
+  bars.py                 # 5-minute session bars: today's closed bars, past full sessions
+  setup.py                # opening-range trigger both ways (call above, put below), midpoint stop
+  options.py              # vectorized Black-Scholes, implied vol from the mid, contract pick
+  simulate.py             # 10,000-replay time machine on the option, plus the rule's history
+  rules.py                # FOMC/CPI/VIX day gates, earnings gate, trader-budget sizing in contracts
+  market.py               # every network call (yfinance bars, provider option chains, VIX, earnings)
+  pipeline.py             # one run: evaluate, rank, pick
+  report.py               # Markdown/JSON rendering
+  scan.py                 # CLI entrypoint (+ --self-test synthetic market)
+tests/
+  test_options_signal.py  # math, setup, contracts, replays, gates, sizing, synthetic end-to-end
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
 reports/smallcap/         # daily small-cap momentum options scan reports land here
 reports/daily_target/     # daily $ target plans land here
+reports/options_signals/  # daily options signal reports land here
 journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml
   smallcap-options-scan.yml
   qqq-daily-target.yml
+  options-signal.yml
 ```

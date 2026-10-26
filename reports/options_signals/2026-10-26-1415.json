@@ -1,0 +1,1722 @@
+{
+  "created_by": "options_signal",
+  "now": "2026-10-26T14:15",
+  "status": "ok",
+  "message": "No pick: nothing triggered, or nothing had a positive average in the replays.",
+  "gates": [],
+  "vix": 18.260000228881836,
+  "target_pct": 30.0,
+  "pick": null,
+  "ranked": [
+    {
+      "symbol": "BE",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 53 bars ago at 202.14; evaluated from the latest close, 207.88.",
+        "No earnings date found; check before trading."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 212.68,
+      "setup": {
+        "status": "triggered",
+        "or_high": 198.92999267578125,
+        "or_low": 192.14999389648438,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 202.14,
+        "last_slot": 56,
+        "last_close": 207.8800048828125,
+        "stop": 195.53,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 210.0,
+        "bid": 7.8,
+        "ask": 7.95,
+        "open_interest": 1797,
+        "iv": 1.0053473716414487,
+        "delta": 0.484957850518817
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0835,
+        "p_stop": 0.0,
+        "p_neither": 0.9165,
+        "p_green": 0.4312,
+        "avg_return_pct": -1.7000980056004629,
+        "median_return_pct": -2.9860669122966144,
+        "p5_return_pct": -27.44852263174302,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -60.13821763622917
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 53,
+        "target": 15,
+        "stop": 21,
+        "neither": 17,
+        "avg_return_pct": -2.6035011801292836
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 478.1,
+        "cost_per_contract": 795.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 4,
+          "max order": 5,
+          "cash": 5
+        },
+        "note": "1 contract would lose about $478 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "PLTR",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 39 bars ago at 198.57; evaluated from the latest close, 199.38."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 201.9,
+      "setup": {
+        "status": "triggered",
+        "or_high": 198.1999969482422,
+        "or_low": 192.91000366210938,
+        "option_type": "call",
+        "trigger_slot": 17,
+        "trigger_price": 198.57,
+        "last_slot": 56,
+        "last_close": 199.375,
+        "stop": 195.55,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 200.0,
+        "bid": 4.3,
+        "ask": 4.35,
+        "open_interest": 14844,
+        "iv": 0.5447616115656597,
+        "delta": 0.49326182176116695
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0819,
+        "p_stop": 0.0098,
+        "p_neither": 0.9083,
+        "p_green": 0.4378,
+        "avg_return_pct": -1.4656042970338956,
+        "median_return_pct": -2.421021259915479,
+        "p5_return_pct": -26.589122811327627,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -38.703680440776786
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 53,
+        "target": 17,
+        "stop": 25,
+        "neither": 11,
+        "avg_return_pct": -3.0498147979342294
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 168.36,
+        "cost_per_contract": 435.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 8,
+          "max order": 9,
+          "cash": 10
+        },
+        "note": "1 contract would lose about $168 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "TSLA",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 52 bars ago at 393.82; evaluated from the latest close, 395.28.",
+        "No earnings date found; check before trading."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 399.98,
+      "setup": {
+        "status": "triggered",
+        "or_high": 393.739990234375,
+        "or_low": 383.8406066894531,
+        "option_type": "call",
+        "trigger_slot": 4,
+        "trigger_price": 393.82,
+        "last_slot": 56,
+        "last_close": 395.2799987792969,
+        "stop": 388.79,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 400.0,
+        "bid": 6.8,
+        "ask": 6.95,
+        "open_interest": 1111,
+        "iv": 0.40281825700612395,
+        "delta": 0.4332524929715327
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0721,
+        "p_stop": 0.013,
+        "p_neither": 0.9149,
+        "p_green": 0.4491,
+        "avg_return_pct": -1.090157916440682,
+        "median_return_pct": -2.0494867233908254,
+        "p5_return_pct": -26.34396046250096,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -37.33453051427197
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 52,
+        "target": 12,
+        "stop": 24,
+        "neither": 16,
+        "avg_return_pct": -3.9644197782251784
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 259.47,
+        "cost_per_contract": 695.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 5,
+          "max order": 5,
+          "cash": 6
+        },
+        "note": "1 contract would lose about $259 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "NFLX",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 39 bars ago at 64.75; evaluated from the latest close, 63.10."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 62.51,
+      "setup": {
+        "status": "triggered",
+        "or_high": 65.48999786376953,
+        "or_low": 64.86000061035156,
+        "option_type": "put",
+        "trigger_slot": 17,
+        "trigger_price": 64.75,
+        "last_slot": 56,
+        "last_close": 63.09709930419922,
+        "stop": 65.18,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "put",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 63.0,
+        "bid": 0.88,
+        "ask": 0.91,
+        "open_interest": 3588,
+        "iv": 0.36066455487713456,
+        "delta": -0.4710412879246193
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0649,
+        "p_stop": 0.0,
+        "p_neither": 0.9351,
+        "p_green": 0.4126,
+        "avg_return_pct": -2.5991999980761937,
+        "median_return_pct": -3.371677054622013,
+        "p5_return_pct": -27.56068609867389,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -75.01243303015572
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 52,
+        "target": 22,
+        "stop": 15,
+        "neither": 15,
+        "avg_return_pct": 5.060512015618721
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 68.26,
+        "cost_per_contract": 91.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 41,
+          "max order": 43,
+          "cash": 49
+        },
+        "note": "1 contract would lose about $68 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "AMAT",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 53 bars ago at 385.42; evaluated from the latest close, 392.00."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 399.63,
+      "setup": {
+        "status": "triggered",
+        "or_high": 384.2799987792969,
+        "or_low": 378.20001220703125,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 385.42,
+        "last_slot": 56,
+        "last_close": 392.0,
+        "stop": 381.24,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 392.5,
+        "bid": 10.65,
+        "ask": 11.5,
+        "open_interest": 1028,
+        "iv": 0.6794248002964742,
+        "delta": 0.5100208423034344
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0119,
+        "p_stop": 0.0005,
+        "p_neither": 0.9876,
+        "p_green": 0.2702,
+        "avg_return_pct": -7.349338086962455,
+        "median_return_pct": -7.771652995269285,
+        "p5_return_pct": -28.30551061524247,
+        "p95_return_pct": 15.62714797003364,
+        "return_at_stop_pct": -47.97525102963841
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 55,
+        "target": 8,
+        "stop": 29,
+        "neither": 18,
+        "avg_return_pct": -9.980375101319424
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 551.72,
+        "cost_per_contract": 1150.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 3,
+          "max order": 3,
+          "cash": 3
+        },
+        "note": "1 contract would lose about $552 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "NVDA",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 42 bars ago at 215.84; evaluated from the latest close, 216.27."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 219.1,
+      "setup": {
+        "status": "triggered",
+        "or_high": 215.72999572753906,
+        "or_low": 212.61000061035156,
+        "option_type": "call",
+        "trigger_slot": 14,
+        "trigger_price": 215.84,
+        "last_slot": 56,
+        "last_close": 216.27499389648438,
+        "stop": 214.16,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 215.0,
+        "bid": 4.75,
+        "ask": 5.0,
+        "open_interest": 898,
+        "iv": 0.3427530195239936,
+        "delta": 0.5659432477692681
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0101,
+        "p_stop": 0.1025,
+        "p_neither": 0.8874,
+        "p_green": 0.2737,
+        "avg_return_pct": -7.483288451542534,
+        "median_return_pct": -7.925578238182995,
+        "p5_return_pct": -27.569706964566475,
+        "p95_return_pct": 14.06349679251775,
+        "return_at_stop_pct": -27.214522958021515
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 58,
+        "target": 9,
+        "stop": 27,
+        "neither": 22,
+        "avg_return_pct": -5.875021605544472
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 136.07,
+        "cost_per_contract": 500.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 7,
+          "max order": 8,
+          "cash": 9
+        },
+        "note": "1 contract would lose about $136 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "QQQ",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 47 bars ago at 710.52; evaluated from the latest close, 713.78."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 718.76,
+      "setup": {
+        "status": "triggered",
+        "or_high": 709.5700073242188,
+        "or_low": 705.5800170898438,
+        "option_type": "call",
+        "trigger_slot": 9,
+        "trigger_price": 710.52,
+        "last_slot": 56,
+        "last_close": 713.780029296875,
+        "stop": 707.57,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 715.0,
+        "bid": 8.73,
+        "ask": 8.78,
+        "open_interest": 613,
+        "iv": 0.22822856778482764,
+        "delta": 0.49584335541635716
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0067,
+        "p_stop": 0.0013,
+        "p_neither": 0.992,
+        "p_green": 0.458,
+        "avg_return_pct": -0.8023591654957989,
+        "median_return_pct": -0.9990041587200849,
+        "p5_return_pct": -17.57007207029058,
+        "p95_return_pct": 16.725151656515024,
+        "return_at_stop_pct": -31.793421877534843
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 59,
+        "target": 10,
+        "stop": 37,
+        "neither": 12,
+        "avg_return_pct": -0.6041369586958744
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 279.15,
+        "cost_per_contract": 878.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 4,
+          "max order": 4,
+          "cash": 5
+        },
+        "note": "1 contract would lose about $279 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "IWM",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 53 bars ago at 276.86; evaluated from the latest close, 277.42."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 279.42,
+      "setup": {
+        "status": "triggered",
+        "or_high": 276.7699890136719,
+        "or_low": 276.0,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 276.86,
+        "last_slot": 56,
+        "last_close": 277.4200134277344,
+        "stop": 276.38,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 276.0,
+        "bid": 3.95,
+        "ask": 4.02,
+        "open_interest": 826,
+        "iv": 0.20077336481863345,
+        "delta": 0.5904840119555652
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0028,
+        "p_stop": 0.1296,
+        "p_neither": 0.8676,
+        "p_green": 0.3838,
+        "avg_return_pct": -2.425965557196413,
+        "median_return_pct": -2.752558273093364,
+        "p5_return_pct": -16.64134647579306,
+        "p95_return_pct": 14.07366854090004,
+        "return_at_stop_pct": -16.33664968548978
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 59,
+        "target": 9,
+        "stop": 34,
+        "neither": 16,
+        "avg_return_pct": -2.8177518649788698
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 65.67,
+        "cost_per_contract": 402.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 9,
+          "max order": 9,
+          "cash": 11
+        },
+        "note": "1 contract would lose about $66 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "SPY",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 48 bars ago at 764.67; evaluated from the latest close, 765.63."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 769.78,
+      "setup": {
+        "status": "triggered",
+        "or_high": 764.02001953125,
+        "or_low": 761.6300048828125,
+        "option_type": "call",
+        "trigger_slot": 8,
+        "trigger_price": 764.67,
+        "last_slot": 56,
+        "last_close": 765.6300048828125,
+        "stop": 762.82,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 763.0,
+        "bid": 7.91,
+        "ask": 8.12,
+        "open_interest": 818,
+        "iv": 0.14682505437958787,
+        "delta": 0.5875475514715809
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0026,
+        "p_stop": 0.0713,
+        "p_neither": 0.9261,
+        "p_green": 0.3509,
+        "avg_return_pct": -3.7620620542765835,
+        "median_return_pct": -3.85030221424032,
+        "p5_return_pct": -21.903222910445052,
+        "p95_return_pct": 13.345726865837747,
+        "return_at_stop_pct": -21.694701299285768
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 59,
+        "target": 9,
+        "stop": 37,
+        "neither": 13,
+        "avg_return_pct": -1.4409049932453344
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 176.16,
+        "cost_per_contract": 812.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 4,
+          "max order": 4,
+          "cash": 5
+        },
+        "note": "1 contract would lose about $176 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "MSFT",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 42 bars ago at 529.22; evaluated from the latest close, 531.32.",
+        "Earnings 2026-10-28 before this option expires: implied volatility drops after the report."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 539.97,
+      "setup": {
+        "status": "triggered",
+        "or_high": 529.0599975585938,
+        "or_low": 521.6900024414062,
+        "option_type": "call",
+        "trigger_slot": 14,
+        "trigger_price": 529.22,
+        "last_slot": 56,
+        "last_close": 531.3200073242188,
+        "stop": 525.37,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 530.0,
+        "bid": 14.8,
+        "ask": 15.25,
+        "open_interest": 2079,
+        "iv": 0.47929851789752864,
+        "delta": 0.5333572559547813
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0002,
+        "p_stop": 0.0084,
+        "p_neither": 0.9914,
+        "p_green": 0.3417,
+        "avg_return_pct": -2.992831106228736,
+        "median_return_pct": -3.0673321327247316,
+        "p5_return_pct": -15.096932154845287,
+        "p95_return_pct": 9.721055875192341,
+        "return_at_stop_pct": -22.451057266825025
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 53,
+        "target": 4,
+        "stop": 22,
+        "neither": 27,
+        "avg_return_pct": -3.2863550619227064
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 342.38,
+        "cost_per_contract": 1525.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 2,
+          "max order": 2,
+          "cash": 2
+        },
+        "note": "1 contract would lose about $342 at the stop, over your $50 max loss per trade."
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "symbol": "QQQ",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 47 bars ago at 710.52; evaluated from the latest close, 713.78."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 718.76,
+      "setup": {
+        "status": "triggered",
+        "or_high": 709.5700073242188,
+        "or_low": 705.5800170898438,
+        "option_type": "call",
+        "trigger_slot": 9,
+        "trigger_price": 710.52,
+        "last_slot": 56,
+        "last_close": 713.780029296875,
+        "stop": 707.57,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 715.0,
+        "bid": 8.73,
+        "ask": 8.78,
+        "open_interest": 613,
+        "iv": 0.22822856778482764,
+        "delta": 0.49584335541635716
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0067,
+        "p_stop": 0.0013,
+        "p_neither": 0.992,
+        "p_green": 0.458,
+        "avg_return_pct": -0.8023591654957989,
+        "median_return_pct": -0.9990041587200849,
+        "p5_return_pct": -17.57007207029058,
+        "p95_return_pct": 16.725151656515024,
+        "return_at_stop_pct": -31.793421877534843
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 59,
+        "target": 10,
+        "stop": 37,
+        "neither": 12,
+        "avg_return_pct": -0.6041369586958744
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 279.15,
+        "cost_per_contract": 878.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 4,
+          "max order": 4,
+          "cash": 5
+        },
+        "note": "1 contract would lose about $279 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "SPY",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 48 bars ago at 764.67; evaluated from the latest close, 765.63."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 769.78,
+      "setup": {
+        "status": "triggered",
+        "or_high": 764.02001953125,
+        "or_low": 761.6300048828125,
+        "option_type": "call",
+        "trigger_slot": 8,
+        "trigger_price": 764.67,
+        "last_slot": 56,
+        "last_close": 765.6300048828125,
+        "stop": 762.82,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 763.0,
+        "bid": 7.91,
+        "ask": 8.12,
+        "open_interest": 818,
+        "iv": 0.14682505437958787,
+        "delta": 0.5875475514715809
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0026,
+        "p_stop": 0.0713,
+        "p_neither": 0.9261,
+        "p_green": 0.3509,
+        "avg_return_pct": -3.7620620542765835,
+        "median_return_pct": -3.85030221424032,
+        "p5_return_pct": -21.903222910445052,
+        "p95_return_pct": 13.345726865837747,
+        "return_at_stop_pct": -21.694701299285768
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 59,
+        "target": 9,
+        "stop": 37,
+        "neither": 13,
+        "avg_return_pct": -1.4409049932453344
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 176.16,
+        "cost_per_contract": 812.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 4,
+          "max order": 4,
+          "cash": 5
+        },
+        "note": "1 contract would lose about $176 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "IWM",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 53 bars ago at 276.86; evaluated from the latest close, 277.42."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 279.42,
+      "setup": {
+        "status": "triggered",
+        "or_high": 276.7699890136719,
+        "or_low": 276.0,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 276.86,
+        "last_slot": 56,
+        "last_close": 277.4200134277344,
+        "stop": 276.38,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 276.0,
+        "bid": 3.95,
+        "ask": 4.02,
+        "open_interest": 826,
+        "iv": 0.20077336481863345,
+        "delta": 0.5904840119555652
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0028,
+        "p_stop": 0.1296,
+        "p_neither": 0.8676,
+        "p_green": 0.3838,
+        "avg_return_pct": -2.425965557196413,
+        "median_return_pct": -2.752558273093364,
+        "p5_return_pct": -16.64134647579306,
+        "p95_return_pct": 14.07366854090004,
+        "return_at_stop_pct": -16.33664968548978
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 59,
+        "target": 9,
+        "stop": 34,
+        "neither": 16,
+        "avg_return_pct": -2.8177518649788698
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 65.67,
+        "cost_per_contract": 402.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 9,
+          "max order": 9,
+          "cash": 11
+        },
+        "note": "1 contract would lose about $66 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "NVDA",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 42 bars ago at 215.84; evaluated from the latest close, 216.27."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 219.1,
+      "setup": {
+        "status": "triggered",
+        "or_high": 215.72999572753906,
+        "or_low": 212.61000061035156,
+        "option_type": "call",
+        "trigger_slot": 14,
+        "trigger_price": 215.84,
+        "last_slot": 56,
+        "last_close": 216.27499389648438,
+        "stop": 214.16,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 215.0,
+        "bid": 4.75,
+        "ask": 5.0,
+        "open_interest": 898,
+        "iv": 0.3427530195239936,
+        "delta": 0.5659432477692681
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0101,
+        "p_stop": 0.1025,
+        "p_neither": 0.8874,
+        "p_green": 0.2737,
+        "avg_return_pct": -7.483288451542534,
+        "median_return_pct": -7.925578238182995,
+        "p5_return_pct": -27.569706964566475,
+        "p95_return_pct": 14.06349679251775,
+        "return_at_stop_pct": -27.214522958021515
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 58,
+        "target": 9,
+        "stop": 27,
+        "neither": 22,
+        "avg_return_pct": -5.875021605544472
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 136.07,
+        "cost_per_contract": 500.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 7,
+          "max order": 8,
+          "cash": 9
+        },
+        "note": "1 contract would lose about $136 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "TSLA",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 52 bars ago at 393.82; evaluated from the latest close, 395.28.",
+        "No earnings date found; check before trading."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 399.98,
+      "setup": {
+        "status": "triggered",
+        "or_high": 393.739990234375,
+        "or_low": 383.8406066894531,
+        "option_type": "call",
+        "trigger_slot": 4,
+        "trigger_price": 393.82,
+        "last_slot": 56,
+        "last_close": 395.2799987792969,
+        "stop": 388.79,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 400.0,
+        "bid": 6.8,
+        "ask": 6.95,
+        "open_interest": 1111,
+        "iv": 0.40281825700612395,
+        "delta": 0.4332524929715327
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0721,
+        "p_stop": 0.013,
+        "p_neither": 0.9149,
+        "p_green": 0.4491,
+        "avg_return_pct": -1.090157916440682,
+        "median_return_pct": -2.0494867233908254,
+        "p5_return_pct": -26.34396046250096,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -37.33453051427197
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 52,
+        "target": 12,
+        "stop": 24,
+        "neither": 16,
+        "avg_return_pct": -3.9644197782251784
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 259.47,
+        "cost_per_contract": 695.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 5,
+          "max order": 5,
+          "cash": 6
+        },
+        "note": "1 contract would lose about $259 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "AAPL",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 346.2149963378906,
+        "or_low": 342.05059814453125,
+        "option_type": "put",
+        "trigger_slot": 3,
+        "trigger_price": 341.28,
+        "last_slot": 56,
+        "last_close": 343.6000061035156,
+        "stop": 344.14,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "MSFT",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 42 bars ago at 529.22; evaluated from the latest close, 531.32.",
+        "Earnings 2026-10-28 before this option expires: implied volatility drops after the report."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 539.97,
+      "setup": {
+        "status": "triggered",
+        "or_high": 529.0599975585938,
+        "or_low": 521.6900024414062,
+        "option_type": "call",
+        "trigger_slot": 14,
+        "trigger_price": 529.22,
+        "last_slot": 56,
+        "last_close": 531.3200073242188,
+        "stop": 525.37,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-11-02",
+        "dte": 7,
+        "strike": 530.0,
+        "bid": 14.8,
+        "ask": 15.25,
+        "open_interest": 2079,
+        "iv": 0.47929851789752864,
+        "delta": 0.5333572559547813
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0002,
+        "p_stop": 0.0084,
+        "p_neither": 0.9914,
+        "p_green": 0.3417,
+        "avg_return_pct": -2.992831106228736,
+        "median_return_pct": -3.0673321327247316,
+        "p5_return_pct": -15.096932154845287,
+        "p95_return_pct": 9.721055875192341,
+        "return_at_stop_pct": -22.451057266825025
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 53,
+        "target": 4,
+        "stop": 22,
+        "neither": 27,
+        "avg_return_pct": -3.2863550619227064
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 342.38,
+        "cost_per_contract": 1525.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 2,
+          "max order": 2,
+          "cash": 2
+        },
+        "note": "1 contract would lose about $342 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "AMZN",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 250.48500061035156,
+        "or_low": 247.24000549316406,
+        "option_type": "call",
+        "trigger_slot": 9,
+        "trigger_price": 250.53,
+        "last_slot": 56,
+        "last_close": 249.0399932861328,
+        "stop": 248.86,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "META",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 641.7000122070312,
+        "or_low": 629.02001953125,
+        "option_type": "call",
+        "trigger_slot": 14,
+        "trigger_price": 643.53,
+        "last_slot": 56,
+        "last_close": 636.3099975585938,
+        "stop": 635.36,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "GOOGL",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "waiting",
+        "or_high": 321.3399963378906,
+        "or_low": 317.82000732421875,
+        "option_type": null,
+        "trigger_slot": null,
+        "trigger_price": null,
+        "last_slot": 56,
+        "last_close": 318.0799865722656,
+        "stop": null,
+        "note": "last close 318.08, 0.26 from the range"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "AMD",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 526.8599853515625,
+        "or_low": 519.1199951171875,
+        "option_type": "put",
+        "trigger_slot": 5,
+        "trigger_price": 517.86,
+        "last_slot": 56,
+        "last_close": 532.9149780273438,
+        "stop": 522.99,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "AVGO",
+      "skip_reason": "no strike near the money passed: 330: spread 15% of mid; 332.5: open interest 32; 327.5: spread 16% of mid; 335: spread 16% of mid; 325: spread 17% of mid; 337.5: spread 15% of mid",
+      "flags": [
+        "Late: triggered 41 bars ago at 329.08; evaluated from the latest close, 331.03."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "triggered",
+        "or_high": 327.81878662109375,
+        "or_low": 323.29998779296875,
+        "option_type": "call",
+        "trigger_slot": 15,
+        "trigger_price": 329.08,
+        "last_slot": 56,
+        "last_close": 331.0299987792969,
+        "stop": 325.55,
+        "note": ""
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "NFLX",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 39 bars ago at 64.75; evaluated from the latest close, 63.10."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 62.51,
+      "setup": {
+        "status": "triggered",
+        "or_high": 65.48999786376953,
+        "or_low": 64.86000061035156,
+        "option_type": "put",
+        "trigger_slot": 17,
+        "trigger_price": 64.75,
+        "last_slot": 56,
+        "last_close": 63.09709930419922,
+        "stop": 65.18,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "put",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 63.0,
+        "bid": 0.88,
+        "ask": 0.91,
+        "open_interest": 3588,
+        "iv": 0.36066455487713456,
+        "delta": -0.4710412879246193
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0649,
+        "p_stop": 0.0,
+        "p_neither": 0.9351,
+        "p_green": 0.4126,
+        "avg_return_pct": -2.5991999980761937,
+        "median_return_pct": -3.371677054622013,
+        "p5_return_pct": -27.56068609867389,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -75.01243303015572
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 52,
+        "target": 22,
+        "stop": 15,
+        "neither": 15,
+        "avg_return_pct": 5.060512015618721
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 68.26,
+        "cost_per_contract": 91.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 41,
+          "max order": 43,
+          "cash": 49
+        },
+        "note": "1 contract would lose about $68 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "PLTR",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 39 bars ago at 198.57; evaluated from the latest close, 199.38."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 201.9,
+      "setup": {
+        "status": "triggered",
+        "or_high": 198.1999969482422,
+        "or_low": 192.91000366210938,
+        "option_type": "call",
+        "trigger_slot": 17,
+        "trigger_price": 198.57,
+        "last_slot": 56,
+        "last_close": 199.375,
+        "stop": 195.55,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 200.0,
+        "bid": 4.3,
+        "ask": 4.35,
+        "open_interest": 14844,
+        "iv": 0.5447616115656597,
+        "delta": 0.49326182176116695
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0819,
+        "p_stop": 0.0098,
+        "p_neither": 0.9083,
+        "p_green": 0.4378,
+        "avg_return_pct": -1.4656042970338956,
+        "median_return_pct": -2.421021259915479,
+        "p5_return_pct": -26.589122811327627,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -38.703680440776786
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 53,
+        "target": 17,
+        "stop": 25,
+        "neither": 11,
+        "avg_return_pct": -3.0498147979342294
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 168.36,
+        "cost_per_contract": 435.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 8,
+          "max order": 9,
+          "cash": 10
+        },
+        "note": "1 contract would lose about $168 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "AMAT",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 53 bars ago at 385.42; evaluated from the latest close, 392.00."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 399.63,
+      "setup": {
+        "status": "triggered",
+        "or_high": 384.2799987792969,
+        "or_low": 378.20001220703125,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 385.42,
+        "last_slot": 56,
+        "last_close": 392.0,
+        "stop": 381.24,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 392.5,
+        "bid": 10.65,
+        "ask": 11.5,
+        "open_interest": 1028,
+        "iv": 0.6794248002964742,
+        "delta": 0.5100208423034344
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0119,
+        "p_stop": 0.0005,
+        "p_neither": 0.9876,
+        "p_green": 0.2702,
+        "avg_return_pct": -7.349338086962455,
+        "median_return_pct": -7.771652995269285,
+        "p5_return_pct": -28.30551061524247,
+        "p95_return_pct": 15.62714797003364,
+        "return_at_stop_pct": -47.97525102963841
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 55,
+        "target": 8,
+        "stop": 29,
+        "neither": 18,
+        "avg_return_pct": -9.980375101319424
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 551.72,
+        "cost_per_contract": 1150.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 3,
+          "max order": 3,
+          "cash": 3
+        },
+        "note": "1 contract would lose about $552 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "AMGN",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 447.17999267578125,
+        "or_low": 444.25,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 447.22,
+        "last_slot": 56,
+        "last_close": 441.30999755859375,
+        "stop": 445.71,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "BAC",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 51.249000549316406,
+        "or_low": 50.724998474121094,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 51.46,
+        "last_slot": 56,
+        "last_close": 50.73500061035156,
+        "stop": 50.98,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "BE",
+      "skip_reason": null,
+      "flags": [
+        "Late: triggered 53 bars ago at 202.14; evaluated from the latest close, 207.88.",
+        "No earnings date found; check before trading."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": 212.68,
+      "setup": {
+        "status": "triggered",
+        "or_high": 198.92999267578125,
+        "or_low": 192.14999389648438,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 202.14,
+        "last_slot": 56,
+        "last_close": 207.8800048828125,
+        "stop": 195.53,
+        "note": ""
+      },
+      "contract": {
+        "option_type": "call",
+        "expiration": "2026-10-30",
+        "dte": 4,
+        "strike": 210.0,
+        "bid": 7.8,
+        "ask": 7.95,
+        "open_interest": 1797,
+        "iv": 1.0053473716414487,
+        "delta": 0.484957850518817
+      },
+      "odds": {
+        "replays": 10000,
+        "seed": 19,
+        "bars_left": 20,
+        "p_target": 0.0835,
+        "p_stop": 0.0,
+        "p_neither": 0.9165,
+        "p_green": 0.4312,
+        "avg_return_pct": -1.7000980056004629,
+        "median_return_pct": -2.9860669122966144,
+        "p5_return_pct": -27.44852263174302,
+        "p95_return_pct": 30.000000000000004,
+        "return_at_stop_pct": -60.13821763622917
+      },
+      "history": {
+        "sessions": 59,
+        "triggered": 53,
+        "target": 15,
+        "stop": 21,
+        "neither": 17,
+        "avg_return_pct": -2.6035011801292836
+      },
+      "sizing": {
+        "contracts": 0,
+        "binding": "max loss",
+        "loss_per_contract": 478.1,
+        "cost_per_contract": 795.0,
+        "limits": {
+          "max loss": 0,
+          "position cap": 4,
+          "max order": 5,
+          "cash": 5
+        },
+        "note": "1 contract would lose about $478 at the stop, over your $50 max loss per trade."
+      }
+    },
+    {
+      "symbol": "BP",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 50.88999938964844,
+        "or_low": 50.41999816894531,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 51.01,
+        "last_slot": 56,
+        "last_close": 50.724998474121094,
+        "stop": 50.65,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "C",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 122.58000183105469,
+        "or_low": 121.48999786376953,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 123.1,
+        "last_slot": 56,
+        "last_close": 121.58000183105469,
+        "stop": 122.03,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "CCI",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 88.61479949951172,
+        "or_low": 86.0,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 88.74,
+        "last_slot": 56,
+        "last_close": 87.6449966430664,
+        "stop": 87.3,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "CIEN",
+      "skip_reason": "no strike near the money passed: 342.5: spread 18% of mid; 345: spread 17% of mid; 340: spread 14% of mid; 347.5: spread 18% of mid; 337.5: spread 16% of mid; 350: spread 20% of mid",
+      "flags": [
+        "Late: triggered 53 bars ago at 328.53; evaluated from the latest close, 343.49."
+      ],
+      "late": true,
+      "sessions": 58,
+      "spot_needed": null,
+      "setup": {
+        "status": "triggered",
+        "or_high": 326.0,
+        "or_low": 318.7699890136719,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 328.53,
+        "last_slot": 56,
+        "last_close": 343.489990234375,
+        "stop": 322.38,
+        "note": ""
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "CLS",
+      "skip_reason": "no strike near the money passed: 270: open interest 28; 272.5: open interest 217; 267.5: spread 13% of mid; 275: spread 12% of mid; 265: spread 13% of mid; 277.5: spread 19% of mid",
+      "flags": [
+        "Late: triggered 53 bars ago at 268.36; evaluated from the latest close, 270.79."
+      ],
+      "late": true,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "triggered",
+        "or_high": 267.0,
+        "or_low": 259.510009765625,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 268.36,
+        "last_slot": 56,
+        "last_close": 270.7925109863281,
+        "stop": 263.25,
+        "note": ""
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    },
+    {
+      "symbol": "CMG",
+      "skip_reason": null,
+      "flags": [],
+      "late": false,
+      "sessions": 59,
+      "spot_needed": null,
+      "setup": {
+        "status": "faded",
+        "or_high": 28.288000106811523,
+        "or_low": 27.65999984741211,
+        "option_type": "call",
+        "trigger_slot": 3,
+        "trigger_price": 28.35,
+        "last_slot": 56,
+        "last_close": 28.155000686645508,
+        "stop": 27.97,
+        "note": "the price is back inside the opening range since the trigger"
+      },
+      "contract": null,
+      "odds": null,
+      "history": null,
+      "sizing": null
+    }
+  ]
+}

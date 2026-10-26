@@ -1,0 +1,63 @@
+name: Daily Options Signal (Calls/Puts)
+
+on:
+  schedule:
+    # 9:52am ET on weekdays: the 15-minute opening range (9:30-9:45) plus
+    # the 9:45 bar have closed and Yahoo has a minute to catch up. GitHub
+    # Actions cron is UTC-only, so both the EDT (13:52 UTC) and EST (14:52
+    # UTC) times are scheduled and the "Check market time" step below skips
+    # whichever one isn't 9:50-10:49 in New York. GitHub can start scheduled
+    # runs late, so the report states the time it actually ran.
+    - cron: "52 13 * * 1-5"
+    - cron: "52 14 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check market time
+        id: clock
+        run: |
+          now=$(TZ=America/New_York date +%H%M)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$now" -ge 950 ] && [ "$now" -lt 1050 ]; }; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping: $now ET is outside the 9:50-10:49 window."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.clock.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        if: steps.clock.outputs.run == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Run the daily options signal
+        if: steps.clock.outputs.run == 'true'
+        env:
+          # Optional: the TRADIER_TOKEN repo secret switches option chains to
+          # Tradier (real bid/ask); empty falls back to free Yahoo data.
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+          TRADIER_BASE_URL: ${{ secrets.TRADIER_BASE_URL }}
+        run: python -m options_signal.scan --watchlist trader/watchlist.json --watchlist-top 10
+
+      - name: Commit generated report
+        if: steps.clock.outputs.run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/options_signals/
+          git diff --cached --quiet || git commit -m "Daily options signal report"
+          git push
