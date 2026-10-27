@@ -241,6 +241,60 @@ def test_pipeline_on_synthetic_market():
     assert "TEST" in md and "How this works" in md
 
 
+class _NoExpirations(SyntheticMarket):
+    """A feed that answers with an empty list, as Yahoo does when rate-limited."""
+
+    def expirations(self, symbol):
+        return []
+
+
+def test_empty_expirations_are_a_data_failure_not_no_options():
+    now = dt.datetime.combine(DAY, dt.time(10, 20))
+    cfg = replace(Config(), replays=500, data_retry_pause_s=0.0)
+    result = run(["TEST"], _NoExpirations(now), now, cfg, dict(TRADER_DEFAULTS))
+    (cand,) = result.candidates
+    assert cand.data_error and cand.skip_reason.startswith("data feed")
+    assert result.pick is None
+    assert "Incomplete run" in result.message and "Re-run" in result.message
+
+
+class _FlakyExpirations(SyntheticMarket):
+    """Empty on the first ask, fine after: a rate limit that lifts."""
+
+    def __init__(self, now):
+        super().__init__(now)
+        self.asks = 0
+
+    def expirations(self, symbol):
+        self.asks += 1
+        return [] if self.asks == 1 else super().expirations(symbol)
+
+
+def test_second_pass_recovers_a_symbol_the_feed_failed_on():
+    now = dt.datetime.combine(DAY, dt.time(10, 20))
+    cfg = replace(Config(), replays=500, data_retry_pause_s=0.0)
+    result = run(["TEST"], _FlakyExpirations(now), now, cfg, dict(TRADER_DEFAULTS))
+    (cand,) = result.candidates
+    assert not cand.data_error and cand.odds is not None
+    assert "Incomplete run" not in result.message
+
+
+def test_live_market_retry_raises_after_empty_answers(monkeypatch):
+    from options_signal import market as m
+
+    monkeypatch.setattr(m, "RETRY_WAITS", (0.0, 0.0))
+    calls = []
+
+    def empty():
+        calls.append(1)
+        return []
+
+    with pytest.raises(m.DataFeedError):
+        m._retry(empty, "nothing")
+    assert len(calls) == 3
+    assert m._retry(lambda: ["2026-10-30"], "nothing") == ["2026-10-30"]
+
+
 def test_pipeline_before_the_range_is_set():
     now = dt.datetime.combine(DAY, dt.time(9, 40))
     result = run(["TEST"], SyntheticMarket(now), now, Config(), dict(TRADER_DEFAULTS))

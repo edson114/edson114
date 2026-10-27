@@ -187,6 +187,7 @@ def to_json(r: RunResult) -> dict:
             "skip_reason": c.skip_reason,
             "flags": c.flags,
             "late": c.late,
+            "data_error": c.data_error,
             "sessions": c.sessions,
             "spot_needed": c.spot_needed,
         }
@@ -201,6 +202,7 @@ def to_json(r: RunResult) -> dict:
         "status": r.status,
         "message": r.message,
         "gates": r.gates,
+        "data_errors": [c.symbol for c in r.candidates if c.data_error],
         "vix": r.vix,
         "target_pct": r.cfg.profit_target_pct,
         "pick": cand(r.pick) if r.pick else None,

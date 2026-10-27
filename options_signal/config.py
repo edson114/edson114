@@ -56,6 +56,10 @@ class Config:
     seed: int = 19
     window: int = 2
 
+    # Symbols the data feed failed on get one more pass after this pause
+    # (seconds); a negative value turns the second pass off.
+    data_retry_pause_s: float = 10.0
+
     # --- Output ---
     top_n: int = 3
     output_dir: str = "reports/options_signals"

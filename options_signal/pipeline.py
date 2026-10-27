@@ -4,6 +4,7 @@ gates -> sizing, then the ranking and the pick."""
 from __future__ import annotations
 
 import datetime as dt
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -41,6 +42,7 @@ class Candidate:
     flags: list = field(default_factory=list)
     sessions: int = 0
     late: bool = False
+    data_error: bool = False  # skipped because the feed failed, not because of the rules
 
 
 @dataclass
@@ -68,6 +70,7 @@ def evaluate_symbol(symbol: str, market: Market, now: dt.datetime, cfg: Config, 
         sb = split_sessions(market.bars(symbol, cfg.history_period), today, now)
     except Exception as exc:  # data gaps are per-symbol, never fatal to the run
         cand.skip_reason = f"no bars: {exc}"
+        cand.data_error = True
         return cand
     cand.sessions = len(sb.past)
     if len(sb.today) == 0:
@@ -99,17 +102,24 @@ def evaluate_symbol(symbol: str, market: Market, now: dt.datetime, cfg: Config, 
         )
 
     try:
-        expiration = pick_expiration(market.expirations(symbol), today, cfg.min_dte, cfg.max_dte, cfg.preferred_dte)
+        expirations = market.expirations(symbol)
     except Exception as exc:
-        cand.skip_reason = f"no option expirations: {exc}"
+        cand.skip_reason = f"data feed: {exc}"
+        cand.data_error = True
         return cand
+    if not expirations:
+        cand.skip_reason = "data feed: no option expirations returned"
+        cand.data_error = True
+        return cand
+    expiration = pick_expiration(expirations, today, cfg.min_dte, cfg.max_dte, cfg.preferred_dte)
     if expiration is None:
         cand.skip_reason = f"no expiration {cfg.min_dte}-{cfg.max_dte} days out"
         return cand
     try:
         table = market.chain(symbol, expiration, setup.option_type)
     except Exception as exc:
-        cand.skip_reason = f"no option chain for {expiration}: {exc}"
+        cand.skip_reason = f"data feed: {exc}"
+        cand.data_error = True
         return cand
     when = bar_close_time(today, entry_slot)
     contract, why = select_contract(
@@ -171,6 +181,11 @@ def run(symbols: list, market: Market, now: dt.datetime, cfg: Config, trader: di
         return RunResult(now, "early", "The opening range is still forming; run after 9:50 AM ET.", gates, vix, [], None, cfg, trader)
 
     candidates = [evaluate_symbol(s, market, now, cfg, trader) for s in symbols]
+    # Yahoo's rate limit comes in bursts: the symbols that hit it early in
+    # the run usually get through once the rest have been fetched.
+    if any(c.data_error for c in candidates) and cfg.data_retry_pause_s >= 0:
+        time.sleep(cfg.data_retry_pause_s)
+        candidates = [evaluate_symbol(c.symbol, market, now, cfg, trader) if c.data_error else c for c in candidates]
     if all(c.skip_reason and c.skip_reason.startswith("no bars") for c in candidates):
         return RunResult(now, "closed", "No bars today: the market is closed or the data feed is down.",
                          gates, vix, candidates, None, cfg, trader)
@@ -185,4 +200,12 @@ def run(symbols: list, market: Market, now: dt.datetime, cfg: Config, trader: di
         "late": "Past your no-new-entries time; shown for reference only.",
         "ok": "" if pick else "No pick: nothing triggered, or nothing had a positive average in the replays.",
     }[status]
+    failed = [c.symbol for c in candidates if c.data_error]
+    if failed:
+        note = (f"Incomplete run: {len(failed)} of {len(candidates)} symbols could not be checked because the "
+                f"data feed failed ({', '.join(failed)}). Re-run in a few minutes.")
+        if status == "ok" and not pick:
+            message = "No pick among the symbols it could check. " + note
+        else:
+            message = " ".join(x for x in (message, note) if x)
     return RunResult(now, status, message, gates, vix, candidates, pick, cfg, trader)

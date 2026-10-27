@@ -10,6 +10,32 @@ import pandas as pd
 
 from .bars import to_new_york
 
+RETRY_WAITS = (2.0, 5.0)
+
+
+class DataFeedError(RuntimeError):
+    """The feed answered, but with nothing usable (rate limit, outage)."""
+
+
+def _retry(fetch, empty_message: str):
+    """fetch() until it returns something non-empty: one try plus one per
+    entry in RETRY_WAITS, sleeping that long first."""
+    import time
+
+    last_error: Optional[Exception] = None
+    for wait in (0.0, *RETRY_WAITS):
+        if wait:
+            time.sleep(wait)
+        try:
+            got = fetch()
+        except Exception as exc:  # network errors get the same retries
+            last_error = exc
+            continue
+        if got is not None and len(got) > 0:
+            return got
+    raise DataFeedError(f"{empty_message} after {1 + len(RETRY_WAITS)} tries"
+                        + (f" (last error: {last_error})" if last_error else ""))
+
 
 class Market(Protocol):
     def bars(self, symbol: str, period: str) -> pd.DataFrame: ...
@@ -33,15 +59,21 @@ class LiveMarket:
         return to_new_york(df)
 
     def expirations(self, symbol: str) -> list:
+        """Yahoo answers a rate-limited request (HTTP 429) with an empty list
+        rather than an error, so an empty answer is retried, and a final
+        empty one is raised as a data failure, never read as "no options"."""
         from qqq_iron_condor import providers
 
-        return providers.list_expirations(symbol)
+        return _retry(lambda: providers.list_expirations(symbol), f"no option expirations returned for {symbol}")
 
     def chain(self, symbol: str, expiration: str, option_type: str) -> pd.DataFrame:
         from qqq_iron_condor import providers
 
-        oc = providers.get_option_chain_for_expiration(symbol, expiration)
-        return oc.calls if option_type == "call" else oc.puts
+        def fetch():
+            oc = providers.get_option_chain_for_expiration(symbol, expiration)
+            return oc.calls if option_type == "call" else oc.puts
+
+        return _retry(fetch, f"empty {option_type} chain returned for {symbol} {expiration}")
 
     def vix(self) -> Optional[float]:
         from qqq_iron_condor import providers
