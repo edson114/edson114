@@ -64,7 +64,15 @@ def find_orb(today: np.ndarray, or_bars: int, last_entry_slot: int) -> OrbSetup:
             back_inside = last_close <= or_high if long else last_close >= or_low
             if back_inside:
                 setup.status = "faded"
-                setup.note = "the price is back inside the opening range since the trigger"
+                through = last_close < or_low if long else last_close > or_high
+                if through:
+                    setup.note = (
+                        f"the first trigger was a {option_type} at {setup.trigger_price:.2f}; the price has since "
+                        f"broken through the other side of the range (one trigger per day, so no "
+                        f"{'put' if long else 'call'} setup)"
+                    )
+                else:
+                    setup.note = "the price is back inside the opening range since the trigger"
             return setup
 
     away = min(or_high - last_close, last_close - or_low)

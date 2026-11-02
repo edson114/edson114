@@ -124,6 +124,13 @@ def test_orb_faded_when_back_inside_range():
     assert find_orb(today, 3, 70).status == "faded"
 
 
+def test_orb_failed_breakout_through_the_other_side_says_so():
+    today = _bars([100.0, 100.5, 100.2, 101.2, 100.6, 99.0])  # up through the high, then below the low
+    s = find_orb(today, 3, 70)
+    assert s.status == "faded" and s.option_type == "call"
+    assert "other side of the range" in s.note and "no put setup" in s.note
+
+
 def test_orb_waiting_and_forming():
     assert find_orb(_bars([100.0, 100.5, 100.2, 100.3]), 3, 70).status == "waiting"
     assert find_orb(_bars([100.0, 100.5]), 3, 70).status == "forming"
