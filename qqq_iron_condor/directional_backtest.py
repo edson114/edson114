@@ -431,7 +431,9 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    cfg = Config()
+    from .signal import signal_config
+
+    cfg = signal_config(Config())  # QQQ, whatever the iron condor's `symbol` is
     if args.score_threshold is not None:
         cfg = dataclasses.replace(cfg, signal_score_threshold=args.score_threshold)
     if args.zero_components:
