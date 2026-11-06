@@ -5,8 +5,9 @@
 When the user types **`run scan`** (on its own), they mean the meme coin
 scan, not the SPX/QQQ or small-cap scans:
 
-1. Run `python -m memecoin_scanner.scan` (install `requirements.txt`
-   first if `requests` is missing). It saves a report to
+1. From the repo root, run `run-scan` (the console command from
+   `pyproject.toml`; if it isn't installed, run `pip install -e .` or use
+   `python -m memecoin_scanner`). It saves a report to
    `reports/memecoins/`.
 2. Reply with the 5 picks: ticker, contract address (they paste it into
    the fomo app), score, market cap, liquidity, 1h/24h change, the main

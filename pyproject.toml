@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-tools"
+version = "0.1.0"
+description = "Decision-support scanners: SPX/QQQ options, small-cap momentum options, Solana meme coins"
+requires-python = ">=3.10"
+dependencies = [
+    "yfinance>=0.2.40",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "feedparser>=6.0",
+    "requests>=2.31",
+]
+
+[project.scripts]
+# `pip install -e .` once, then type `run-scan` for the meme coin top 5.
+run-scan = "memecoin_scanner.scan:main"
+
+[tool.setuptools]
+packages = ["qqq_iron_condor", "smallcap_options", "memecoin_scanner"]

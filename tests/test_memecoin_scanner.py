@@ -271,3 +271,32 @@ def test_falling_candle_penalty_grows_with_the_drop():
     assert pts(-10.0) == 4.0
     assert 7.5 < pts(-22.0) < 8.0
     assert pts(-60.0) == 10.0
+
+
+# --- entry points ----------------------------------------------------------------
+
+def test_run_scan_console_script_points_at_main():
+    import importlib
+    import tomllib
+    from pathlib import Path
+
+    pyproject = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text())
+    target = pyproject["project"]["scripts"]["run-scan"]
+    module_name, func_name = target.split(":")
+    from memecoin_scanner.scan import main
+
+    assert getattr(importlib.import_module(module_name), func_name) is main
+    assert "memecoin_scanner" in pyproject["tool"]["setuptools"]["packages"]
+
+
+def test_python_dash_m_package_runs_self_test():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    out = subprocess.run(
+        [sys.executable, "-m", "memecoin_scanner", "--self-test"],
+        cwd=Path(__file__).resolve().parent.parent, capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    assert "### 1. $GOOD" in out.stdout

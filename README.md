@@ -1197,14 +1197,20 @@ scan reads the same public on-chain data the app trades against:
   warnings, insider wallet clusters).
 
 Ask Claude to **`run scan`** in this repository (see `CLAUDE.md`), or
-run it yourself:
+install the `run-scan` command once and type it yourself:
 
 ```bash
-python -m memecoin_scanner.scan              # live scan, saves to reports/memecoins/
-python -m memecoin_scanner.scan --no-save    # print only
-python -m memecoin_scanner.scan --top 10     # more picks
-python -m memecoin_scanner.scan --self-test  # offline, synthetic data
+pip install -e .           # once, from the repo root: adds the run-scan command
+run-scan                   # live scan, saves to reports/memecoins/
+run-scan --no-save         # print only
+run-scan --top 10          # more picks
+run-scan --self-test       # offline, synthetic data
 ```
+
+Without installing, `python -m memecoin_scanner` (or
+`python -m memecoin_scanner.scan`) takes the same flags. Reports are
+saved under `reports/memecoins/` relative to the folder you run it from,
+so run it from the repo root or pass `--output-dir`.
 
 ### How a coin gets picked
 
@@ -1327,7 +1333,9 @@ tests/
   test_smallcap_strategy.py # contract selection unit tests
   test_smallcap_gates.py    # per-candidate gate unit tests
   test_smallcap_scan.py     # offline smoke test (synthetic data) + GitHub issue error handling
+pyproject.toml            # packaging; `pip install -e .` adds the run-scan command
 memecoin_scanner/
+  __main__.py             # `python -m memecoin_scanner`
   config.py               # gates, penalties, trade-plan rules
   data.py                 # DexScreener / GeckoTerminal discovery + pairs, RugCheck safety parsing
   scoring.py              # market + safety gates and the 0-100 score
