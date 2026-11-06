@@ -24,3 +24,28 @@ def test_self_test_report_bias_matches_header():
         assert "BUY PUTS" in report
     else:
         assert "NO TRADE" in report
+
+
+def test_signal_scores_qqq_even_when_the_condor_symbol_is_spx(monkeypatch, tmp_path):
+    import dataclasses
+
+    from qqq_iron_condor import signal as sig
+    from qqq_iron_condor.config import Config
+
+    spx = dataclasses.replace(Config(), symbol="^SPX")
+    assert sig.signal_config(spx).symbol == "QQQ"
+
+    seen = {}
+
+    def fake_run_signal(cfg):
+        seen["symbol"] = cfg.symbol
+        return sig._self_test_report()
+
+    monkeypatch.setattr(sig, "run_signal", fake_run_signal)
+    assert sig.main(["--no-issue", "--output-dir", str(tmp_path)]) == 0
+    assert seen["symbol"] == "QQQ"
+
+
+def test_self_test_report_is_titled_qqq():
+    report, _ = _self_test_report()
+    assert report.startswith("# QQQ Directional Signal")

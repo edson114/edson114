@@ -185,6 +185,12 @@ class Config:
     volume_ratio_threshold: float = 1.3
 
     # --- Directional (buy calls/puts) signal ---
+    # The directional signal and its backtest always score this symbol,
+    # whatever `symbol` above is set to for the iron condor scan -- signal.py
+    # and directional_backtest.py override `symbol` with it. (In early
+    # October 2026 `symbol` was switched to "^SPX" for the iron condor, and
+    # the QQQ signal reports silently followed it from Oct 7.)
+    signal_symbol: str = "QQQ"
     # Ticker used for the intraday relative-strength read (QQQ performance
     # vs. the broad market today) -- outperformance points to tech-specific
     # strength rather than a market-wide move.

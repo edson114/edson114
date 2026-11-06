@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime as dt
 import sys
 from pathlib import Path
@@ -34,6 +35,13 @@ from .intraday import build_intraday_snapshot, compute_relative_strength, comput
 from .news import flag_catalysts
 from .scan import maybe_create_github_issue
 from .signal_report import render_signal_report
+
+
+def signal_config(cfg: Config) -> Config:
+    """`cfg` with `symbol` pinned to `signal_symbol` (QQQ). The shared
+    `symbol` belongs to the iron condor scan and can be switched (e.g. to
+    "^SPX") without the directional signal meaning to follow."""
+    return dataclasses.replace(cfg, symbol=cfg.signal_symbol)
 
 
 def _directional_targets(cfg: Config) -> tuple:
@@ -112,7 +120,7 @@ def _self_test_report() -> tuple[str, DirectionalSignal]:
         {"Open": vix_price, "High": vix_price, "Low": vix_price, "Close": vix_price}, index=dates
     )
 
-    cfg = Config()
+    cfg = signal_config(Config())
     spot = float(price_history["Close"].iloc[-1])
     daily_snapshot = build_snapshot(price_history, vix_history, cfg.adx_trend_threshold)
 
@@ -218,7 +226,7 @@ def main(argv=None) -> int:
     parser.add_argument("--self-test", action="store_true", help="Run the full pipeline on synthetic data (no network)")
     args = parser.parse_args(argv)
 
-    cfg = Config()
+    cfg = signal_config(Config())
 
     try:
         if args.self_test:

@@ -445,7 +445,9 @@ derivation in the `qqq_iron_condor/meic_backtest.py` module docstring.
 An on-demand CALL / PUT / NO TRADE signal for buying (not selling) QQQ
 options intraday. Unlike the once-daily iron condor scan, it's meant to be
 re-run through the session — each run reads the *current* intraday bars, so
-the read can change as price action develops.
+the read can change as price action develops. It always scores
+`Config.signal_symbol` (`"QQQ"`), whatever `Config.symbol` is set to for the
+iron condor scan; so does its backtest.
 
 Each run:
 
