@@ -1,22 +1,22 @@
 {
   "created_by": "trader-entry",
-  "symbol": "QQQ",
+  "symbol": "PLTR",
   "setup": "orb",
   "side": "buy",
-  "date": "2026-10-26",
+  "date": "2026-11-06",
   "status": "triggered",
-  "time": "10:20 AM",
-  "bar_start": "10:15",
-  "bar_index": 9,
-  "price": 710.52,
-  "level": 709.57,
+  "time": "9:50 AM",
+  "bar_start": "09:45",
+  "bar_index": 3,
+  "price": 163.43,
+  "level": 161.3,
   "interval": "5m",
   "opening_range": {
-    "high": 709.57,
-    "low": 705.58,
+    "high": 161.3,
+    "low": 157.24,
     "minutes": 15
   },
   "source": "yahoo",
-  "checked_at": "2026-10-26T15:09:45Z",
-  "reason": "the 10:15 bar closed above the range high"
+  "checked_at": "2026-11-06T18:30:00Z",
+  "reason": "the 9:45 bar closed above the range high"
 }
