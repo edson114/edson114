@@ -882,6 +882,30 @@ def plan_config(cfg: Config) -> Config:
     return dataclasses.replace(cfg, symbol=cfg.daily_target_symbol)
 
 
+def hard_gates(cfg: Config, price_history, daily) -> list:
+    """The directional signal's hard skip-day rules (FOMC/CPI date, opening
+    gap, VIX spike), checked directly. Used when the signal itself can't
+    run, so a failed news feed or intraday fetch never drops them."""
+    from . import providers
+    from .gates import evaluate_gates
+
+    gap_pct, gap_confirmed = providers.get_gap_info(cfg.symbol, price_history)
+    gate = evaluate_gates(
+        today=dt.date.today(),
+        macro_event_dates=cfg.macro_event_dates,
+        gap_pct=gap_pct,
+        gap_confirmed=gap_confirmed,
+        gap_threshold_pct=cfg.gap_threshold_pct,
+        vix_level=daily.vix_level,
+        vix_spike_threshold=cfg.vix_spike_threshold,
+        snapshot=daily,
+        adx_trend_threshold=cfg.adx_trend_threshold,
+        volume_ratio_threshold=cfg.volume_ratio_threshold,
+        catalyst_hits=[],
+    )
+    return list(gate.hard_reasons)
+
+
 def _today_intraday(cfg: Config):
     from .data import get_intraday_history
 
@@ -923,6 +947,13 @@ def run_plan(cfg: Config, direction: Optional[str] = None, source: Optional[str]
             f"Directional signal could not run ({exc}). Re-run during market hours, or pass "
             "--direction call|put to use your own read."
         )
+        # The skip-day rules still apply without the signal; if they can't be
+        # checked either, fail safe to NO TRADE.
+        try:
+            forced = hard_gates(cfg, price_history, daily)
+        except Exception as gate_exc:
+            forced = [f"Skip-day rules (gap, VIX, FOMC/CPI) could not be checked ({gate_exc})"]
+        notes += [f"⛔ {r}" for r in forced]
 
     try:
         first_hour = first_hour_read(_today_intraday(cfg), cfg.daily_target_first_hour_minutes)

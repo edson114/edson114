@@ -593,3 +593,57 @@ def test_yfinance_gap_uses_todays_open_not_current_price():
     gap, confirmed = data.get_gap_info("QQQ", hist)
     assert confirmed is True
     assert gap == pytest.approx((725.48 / 728.00 - 1) * 100)  # -0.35%, not the -2.50% intraday drop
+
+
+# --- skip-day rules without the directional signal ------------------------------
+
+class _Snap:
+    """Stand-in for the daily MarketSnapshot: just what run_plan and the gates read."""
+
+    def __init__(self, vix=15.0):
+        self.spot, self.atr14, self.hv20_pct, self.vix_level = 700.0, 10.0, 18.0, vix
+        self.adx14, self.volume_ratio = 10.0, 1.0
+
+
+def test_hard_gates_checks_gap_and_vix_directly(monkeypatch):
+    from qqq_iron_condor import providers
+
+    monkeypatch.setattr(providers, "get_gap_info", lambda symbol, history: (-1.27, True))
+    reasons = dtg.hard_gates(CFG, None, _Snap(vix=25.9))
+    assert any("gap" in r.lower() for r in reasons) and any("VIX" in r for r in reasons)
+    monkeypatch.setattr(providers, "get_gap_info", lambda symbol, history: (0.1, True))
+    assert dtg.hard_gates(CFG, None, _Snap(vix=15.0)) == []
+
+
+def _run_plan_without_signal(monkeypatch, gap_info):
+    from qqq_iron_condor import analysis, data, providers
+    from qqq_iron_condor import signal as sig
+
+    def boom(*a, **k):
+        raise RuntimeError("no network in tests")
+
+    monkeypatch.setattr(providers, "get_price_history", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(providers, "get_vix_history", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(providers, "pick_expirations_for_targets", lambda *a, **k: {})
+    monkeypatch.setattr(providers, "get_gap_info", gap_info)
+    monkeypatch.setattr(analysis, "build_snapshot", lambda *a, **k: _Snap(vix=15.0))
+    monkeypatch.setattr(sig, "run_signal", lambda cfg: (_ for _ in ()).throw(ModuleNotFoundError("No module named 'feedparser'")))
+    monkeypatch.setattr(dtg, "_today_intraday", lambda cfg: pd.DataFrame())
+    monkeypatch.setattr(data, "get_intraday_history", boom)
+    monkeypatch.setattr(data, "get_price_history", boom)
+    return dtg.run_plan(Config())[1]
+
+
+def test_plan_keeps_the_gap_rule_when_the_signal_fails(monkeypatch):
+    plan = _run_plan_without_signal(monkeypatch, lambda symbol, history: (-1.27, True))
+    assert plan.bias == "NO TRADE" and plan.bias_source == "hard skip-day gate"
+    assert any("feedparser" in n for n in plan.notes) and any(n.startswith("⛔") and "gap" in n.lower() for n in plan.notes)
+
+
+def test_plan_fails_safe_when_the_gates_cannot_be_checked(monkeypatch):
+    def broken(symbol, history):
+        raise RuntimeError("quote feed down")
+
+    plan = _run_plan_without_signal(monkeypatch, broken)
+    assert plan.bias == "NO TRADE"
+    assert any("could not be checked" in n for n in plan.notes)
