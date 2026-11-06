@@ -15,8 +15,12 @@ data:
    — a daily plan to buy 10 deep-ITM (0.80 delta, ~60 DTE) QQQ calls or
    puts and close at +$1,000, with a stop, a time stop, a position
    checker, and a backtest of those exact rules.
+5. **[Meme Coin Scanner](#meme-coin-scanner-solana--fomo-app)** — an
+   on-demand scan of Solana meme coins that lists the top 5 by momentum,
+   buy pressure, liquidity and contract safety, with the contract
+   address to paste into the fomo app.
 
-> **Not financial advice.** All four are decision-support tools, not
+> **Not financial advice.** All five are decision-support tools, not
 > auto-traders — none of them ever places orders. Always verify strikes,
 > prices, and greeks against your broker's live quotes before trading, and
 > see each tool's own limitations section below. **No signal in this repo
@@ -1173,6 +1177,86 @@ feed, so this tests the yield side of the idea only.
   on a gap, can be worse.
 - This tool never places trades.
 
+## Meme Coin Scanner (Solana / fomo app)
+
+An on-demand scanner that lists the **5 Solana meme coins with the best
+setup right now**, each with the contract address to paste into the
+[fomo](https://fomo.family) app's search. fomo has no public API, so the
+scan reads the same public on-chain data the app trades against:
+
+- **Discovery:** DexScreener's top and latest boosted tokens, new token
+  profiles, community takeovers and a few free-text searches, plus
+  GeckoTerminal's trending Solana pools and most-traded PumpSwap pools
+  (GeckoTerminal is often rate-limited and is skipped when it is).
+- **Market data:** DexScreener pairs (price, market cap, liquidity,
+  volume and buy/sell counts over 5m/1h/6h/24h, pair age, socials). The
+  deepest-liquidity pair per token is used.
+- **Safety:** a RugCheck report for the best market setups (mint and
+  freeze authority, LP locked/burned, holder count, top-10 wallet
+  concentration with pools and burn addresses excluded, RugCheck
+  warnings, insider wallet clusters).
+
+Ask Claude to **`run scan`** in this repository (see `CLAUDE.md`), or
+run it yourself:
+
+```bash
+python -m memecoin_scanner.scan              # live scan, saves to reports/memecoins/
+python -m memecoin_scanner.scan --no-save    # print only
+python -m memecoin_scanner.scan --top 10     # more picks
+python -m memecoin_scanner.scan --self-test  # offline, synthetic data
+```
+
+### How a coin gets picked
+
+1. **Market gates (rejects):** liquidity under $30K, market cap outside
+   $150K-$50M, 24h volume under $100K or fewer than 500 trades, pair
+   younger than 1 hour, dumping (-25% in 1h or -40% in 6h), majors,
+   stables and impersonated tickers.
+2. **Market score** on everything that passes (see below), then a
+   RugCheck call for the 25 best.
+3. **Safety gates (rejects):** mint or freeze authority still live,
+   marked rugged, any RugCheck "danger" risk, or top-10 wallets holding
+   more than 45%. If RugCheck doesn't answer, the coin is kept but
+   flagged UNVERIFIED and ranked below every verified coin.
+4. **Rank** by final score; the top 5 are the picks and the next 5 are
+   runners-up. Picks under 60 are labeled *low conviction*.
+
+| Component | Points | What earns them |
+|---|---|---|
+| Momentum | 25 | 1h change in +5%..+60% and 6h in +15%..+250%, fading to 0 past +200% / +1000% (blow-offs) |
+| Buy pressure | 20 | buy/sell trade ratio over 1h and 6h; discounted when the average trade is bot-sized ($10-$40) |
+| Acceleration | 15 | last hour's volume vs the 6h hourly pace, and the last 5m vs the 1h pace |
+| Liquidity | 15 | liquidity as a % of market cap (3%-12%) and absolute depth ($30K-$500K) |
+| Upside room | 10 | smaller market cap scores higher ($300K-$30M, log scale) |
+| Safety | 15 | holder count, top-10 concentration, LP locked/burned |
+
+Penalties come off for 24h volume over 40x liquidity (wash trading),
+an average trade under $15 (bot micro-trades), +1500% already in 24h
+(late entry), -10% or worse in the last 5m (4-10 points, more for a
+bigger drop), a pair under 3 hours old, no
+socials, RugCheck warnings, and 25+ linked insider wallets. Paid
+DexScreener boosts are flagged, not penalized.
+
+Every pick also gets a plan: at most 2% of your portfolio per coin, a
+-35% stop, and a take-profit ladder (sell half at 2x, a quarter at 5x,
+trail the rest from 10x). All thresholds live in
+`memecoin_scanner/config.py`.
+
+### Limitations
+
+- **Most meme coins go to zero.** Passing RugCheck rules out the
+  obvious contract-level rugs, not a team dumping its supply, a bundled
+  launch, or a coin simply losing attention. Treat every pick as money
+  you can lose entirely.
+- DexScreener counts trades, not wallets. The average-trade-size check
+  catches the crudest volume bots, not all of them.
+- Boosted and profiled tokens are paid listings, so the discovery lists
+  lean toward coins someone is promoting.
+- Prices move in seconds. Check the live chart in fomo before buying;
+  the report's numbers are a snapshot.
+- The score is a rules-based checklist, not a backtested edge.
+- This tool never places trades.
+
 ## Project layout
 
 ```
@@ -1243,10 +1327,19 @@ tests/
   test_smallcap_strategy.py # contract selection unit tests
   test_smallcap_gates.py    # per-candidate gate unit tests
   test_smallcap_scan.py     # offline smoke test (synthetic data) + GitHub issue error handling
+memecoin_scanner/
+  config.py               # gates, penalties, trade-plan rules
+  data.py                 # DexScreener / GeckoTerminal discovery + pairs, RugCheck safety parsing
+  scoring.py              # market + safety gates and the 0-100 score
+  report.py               # Markdown report rendering
+  scan.py                 # CLI entrypoint / orchestration (+ offline self-test)
+tests/
+  test_memecoin_scanner.py  # parsing, gates, scoring, pipeline and report (offline)
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
 reports/smallcap/         # daily small-cap momentum options scan reports land here
+reports/memecoins/        # meme coin scan reports land here (one per run)
 reports/daily_target/     # daily $ target plans land here
 journal/                  # trade journal CSV (trades.csv) lands here
 .github/workflows/
