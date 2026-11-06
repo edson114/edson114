@@ -1243,10 +1243,31 @@ bigger drop), a pair under 3 hours old, no
 socials, RugCheck warnings, and 25+ linked insider wallets. Paid
 DexScreener boosts are flagged, not penalized.
 
-Every pick also gets a plan: at most 2% of your portfolio per coin, a
--35% stop, and a take-profit ladder (sell half at 2x, a quarter at 5x,
-trail the rest from 10x). All thresholds live in
-`memecoin_scanner/config.py`.
+### Entry point: where to buy
+
+Coins that pass the scan are usually mid-run, so the plan buys a
+pullback instead of the current candle. It pulls the pick's last 12
+hours of 5-minute candles from GeckoTerminal and finds the last up-leg
+in the most recent 3 hours (its swing low → swing high). The **buy zone**
+is the 38.2%-61.8% retracement of that leg. Each pick then gets one of:
+
+| Action | When | What to do |
+|---|---|---|
+| **BUY NOW** | price is in the zone (or up to 2% above it) | buy at the current price |
+| **WAIT** | price is above the zone | set a limit buy at the zone's midpoint; if it never pulls back, let the coin go |
+| **WAIT** | price dipped under the zone but holds the swing low | buy only if it climbs back above the zone |
+| **SKIP** | price broke below the swing low | the setup failed; the pick drops to the runners-up and the next coin takes its place |
+
+The **stop** sits 5% under the swing low, but never closer than 15% or
+further than 35% from the entry. **Take profits** are multiples of the
+entry: sell half at 2x (your stake is back), a quarter at 5x, and trail
+the rest from 10x with a 30% trailing stop. Size: at most 2% of your
+portfolio per coin. The report opens with a table of every pick's
+action, buy zone, stop and contract.
+
+If GeckoTerminal won't answer (its free tier is rate-limited), the swing
+is estimated from DexScreener's 5m/1h % changes instead, and the plan
+says so. All thresholds live in `memecoin_scanner/config.py`.
 
 ### Limitations
 
@@ -1259,7 +1280,10 @@ trail the rest from 10x). All thresholds live in
 - Boosted and profiled tokens are paid listings, so the discovery lists
   lean toward coins someone is promoting.
 - Prices move in seconds. Check the live chart in fomo before buying;
-  the report's numbers are a snapshot.
+  the report's numbers, buy zones included, are a snapshot. A WAIT
+  coin can run away without ever pulling back, and a buy zone is a
+  rule of thumb (Fibonacci retracement), not support anyone is bound
+  to defend.
 - The score is a rules-based checklist, not a backtested edge.
 - This tool never places trades.
 
@@ -1339,6 +1363,7 @@ memecoin_scanner/
   config.py               # gates, penalties, trade-plan rules
   data.py                 # DexScreener / GeckoTerminal discovery + pairs, RugCheck safety parsing
   scoring.py              # market + safety gates and the 0-100 score
+  entry.py                # entry point: 5m candles, buy zone, BUY NOW/WAIT/SKIP, stop, take-profits
   report.py               # Markdown report rendering
   scan.py                 # CLI entrypoint / orchestration (+ offline self-test)
 tests/

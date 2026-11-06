@@ -19,6 +19,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from . import data
 from .config import Config
 from .data import PairSnapshot, SafetyReport
+from .entry import Candle, fetch_candles, plan_entry
 from .report import ScanStats, render_report
 from .scoring import Scored, apply_safety, market_gate, safety_gate, score_market
 
@@ -30,8 +31,10 @@ def run_pipeline(
     fetch_safety: Callable[[str], SafetyReport],
     now: dt.datetime,
     pause_s: float = 0.0,
+    fetch_candles: Optional[Callable[[PairSnapshot], Optional[List[Candle]]]] = None,
+    candle_pause_s: float = 0.0,
 ) -> Tuple[List[Scored], List[Scored], ScanStats]:
-    """Discover → price → market gates → safety on the best → rank."""
+    """Discover → price → market gates → safety on the best → rank → entry plans."""
     stats = ScanStats()
     found, prefetched, stats.sources_ok = discover()
 
@@ -75,7 +78,26 @@ def run_pipeline(
 
     # Verified coins outrank unverified ones at any score.
     survivors.sort(key=lambda sc: (sc.safety is not None and sc.safety.available, sc.score), reverse=True)
-    return survivors[: cfg.top_n], survivors[cfg.top_n: cfg.top_n + 5], stats
+
+    # Entry plans, in rank order. A pick whose setup already failed (SKIP)
+    # drops to the runners-up and the next coin takes its place.
+    picks: List[Scored] = []
+    lookups = 0
+    for sc in survivors:
+        if len(picks) >= cfg.top_n:
+            break
+        candles = None
+        if fetch_candles is not None and lookups < cfg.max_entry_checks:
+            if lookups and candle_pause_s:
+                time.sleep(candle_pause_s)
+            candles = fetch_candles(sc.pair)
+            lookups += 1
+        sc.entry = plan_entry(sc.pair, candles, cfg)
+        if sc.entry.action != "SKIP":
+            picks.append(sc)
+    stats.entry_skips = sum(1 for sc in survivors if sc.entry is not None and sc.entry.action == "SKIP")
+    runners_up = [sc for sc in survivors if sc not in picks][:5]
+    return picks, runners_up, stats
 
 
 def run_scan(cfg: Config, now: Optional[dt.datetime] = None) -> str:
@@ -88,6 +110,8 @@ def run_scan(cfg: Config, now: Optional[dt.datetime] = None) -> str:
         fetch_safety=lambda addr: data.fetch_safety(addr, t),
         now=now,
         pause_s=cfg.rugcheck_pause_s,
+        fetch_candles=lambda pair: fetch_candles(pair, cfg),
+        candle_pause_s=cfg.candle_pause_s,
     )
     if stats.priced == 0:
         raise RuntimeError("no market data came back from DexScreener (network down or blocked?)")
@@ -109,6 +133,18 @@ def _synthetic_pair(symbol: str, address: str, now: dt.datetime, **kw) -> PairSn
     )
     base.update(kw)
     return PairSnapshot(**base)
+
+
+def _synthetic_candles(low: float, high: float, last: float, now: dt.datetime) -> List[Candle]:
+    """A 2h climb from low to high, then a 30-minute pullback to last (oldest first)."""
+    closes = [low + (high - low) * i / 23 for i in range(24)]
+    closes += [high + (last - high) * i / 6 for i in range(1, 7)]
+    start = int(now.timestamp()) - 300 * len(closes)
+    out, prev = [], low
+    for i, c in enumerate(closes):
+        out.append(Candle(start + 300 * i, prev, max(prev, c) * 1.002, min(prev, c) * 0.998, c, 2_000.0))
+        prev = c
+    return out
 
 
 def _self_test_report(now: Optional[dt.datetime] = None) -> str:
@@ -139,6 +175,10 @@ def _self_test_report(now: Optional[dt.datetime] = None) -> str:
         fetch_pairs=lambda chain, addrs: [replace(p, sources=set()) for p in pairs if p.token_address in addrs],
         fetch_safety=lambda addr: safety.get(addr, SafetyReport(available=False)),
         now=now,
+        # GOOD pulled back into its zone; FRESH has no candles (estimated levels).
+        fetch_candles=lambda pair: (
+            _synthetic_candles(0.0012, 0.0027, pair.price_usd, now) if pair.symbol == "GOOD" else None
+        ),
     )
     return render_report(picks, runners_up, stats, Config(), now)
 

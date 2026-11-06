@@ -6,6 +6,7 @@ from dataclasses import replace
 from memecoin_scanner import data
 from memecoin_scanner.config import Config
 from memecoin_scanner.data import SafetyReport, best_pair_per_token, parse_pair, parse_rugcheck_report
+from memecoin_scanner.entry import Candle, fetch_candles, parse_ohlcv, plan_entry, swing_from_candles, vwap
 from memecoin_scanner.report import _price, render_report
 from memecoin_scanner.scan import _self_test_report, _synthetic_pair, run_pipeline
 from memecoin_scanner.scoring import apply_safety, market_gate, safety_gate, score_market
@@ -17,6 +18,17 @@ ADDR = "Tok11111111111111111111111111111111111pump"
 def _pair(**kw):
     symbol = kw.pop("symbol", "TOK")
     return _synthetic_pair(symbol, ADDR, NOW, **kw)
+
+
+def _candles(low, high, last, rise=24, fall=6, volume=1_000.0):
+    """Rise from low to high, then move to last; tight wicks. Oldest first."""
+    closes = [low + (high - low) * i / (rise - 1) for i in range(rise)]
+    closes += [high + (last - high) * i / fall for i in range(1, fall + 1)]
+    out, prev = [], closes[0]
+    for i, c in enumerate(closes):
+        out.append(Candle(1_000 + 300 * i, prev, max(prev, c), min(prev, c), c, volume))
+        prev = c
+    return out
 
 
 def _safe(**kw):
@@ -231,9 +243,14 @@ def test_report_renders_contract_plan_and_low_conviction_label():
     weak.penalties.append((60, "test penalty"))
     from memecoin_scanner.report import ScanStats
 
+    sc.entry = plan_entry(sc.pair, _candles(0.0012, 0.0027, 0.0021), cfg)
+    weak.entry = plan_entry(weak.pair, None, cfg)
     md = render_report([sc, weak], [], ScanStats(sources_ok=["test"], discovered=2), cfg, NOW)
     assert f"`{ADDR}`" in md and "paste into fomo search" in md
-    assert "Stop: $0.001365 (-35%)" in md and "2x ($0.004200)" in md
+    assert "**Entry: BUY NOW.**" in md and "**Entry: WAIT.**" in md
+    assert "| 1 | $TOK | " in md and "| BUY NOW | $" in md  # summary table row
+    assert "Stop: $0.001365 (-35% from entry)" in md and "2x = $0.004200" in md
+    assert "candles unavailable" in md  # the estimated plan says so
     assert md.count("(low conviction)") == 1
     assert "Not financial advice" in md
 
@@ -300,3 +317,126 @@ def test_python_dash_m_package_runs_self_test():
     )
     assert out.returncode == 0, out.stderr
     assert "### 1. $GOOD" in out.stdout
+
+
+# --- entry plans -----------------------------------------------------------------
+
+def test_parse_ohlcv_sorts_oldest_first_and_drops_bad_rows():
+    payload = {"data": {"attributes": {"ohlcv_list": [
+        [300, 2, 3, 1, 2.5, 10], [0, 1, 2, 0.5, 1.5, 5], ["bad"], [600, 0, 0, 0, 0, 0],
+    ]}}}
+    candles = parse_ohlcv(payload)
+    assert [c.ts for c in candles] == [0, 300]
+    assert parse_ohlcv({"errors": []}) == [] and parse_ohlcv(None) == []
+
+
+def test_fetch_candles_uses_the_exact_pool_address(monkeypatch):
+    seen = {}
+
+    def fake(url, timeout, params=None, retries=2, backoff_s=1.5):
+        seen.update(url=url, params=params)
+        return None
+
+    monkeypatch.setattr(data, "_get_json", fake)
+    pair = _pair(pair_address="6wZc2vrqZKfLCa4hSabMXTLURj5GjjmkNHQL3hiJv9Zn")
+    assert fetch_candles(pair, Config()) is None
+    assert seen["url"].endswith("/networks/solana/pools/6wZc2vrqZKfLCa4hSabMXTLURj5GjjmkNHQL3hiJv9Zn/ohlcv/minute")
+    assert seen["params"] == {"aggregate": 5, "limit": 144}
+
+
+def test_swing_uses_the_low_before_the_high():
+    candles = _candles(1.0, 2.0, 1.5)
+    low, high = swing_from_candles(candles, 36)
+    assert low == 1.0 and high == 2.0
+    falling = list(reversed(_candles(1.0, 2.0, 2.0, fall=1)))  # high first, then down
+    low, high = swing_from_candles(falling, 36)
+    assert high == 2.0 and low == 1.0
+
+
+def test_vwap_weights_by_volume():
+    a = Candle(0, 1, 1, 1, 1, 100)
+    b = Candle(300, 4, 4, 4, 4, 300)
+    assert vwap([a, b]) == 3.25
+    assert vwap([Candle(0, 1, 1, 1, 1, 0)]) is None
+
+
+def test_entry_buy_now_inside_the_fib_zone():
+    cfg = Config()
+    e = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), cfg)
+    assert e.action == "BUY NOW" and e.entry == 0.0021
+    assert abs(e.zone_high - (0.0027 - 0.382 * 0.0015)) < 1e-9
+    assert abs(e.zone_low - (0.0027 - 0.618 * 0.0015)) < 1e-9
+    assert e.method.startswith("5m candles")
+
+
+def test_entry_wait_when_above_the_zone_sets_a_limit_in_it():
+    e = plan_entry(_pair(price_usd=0.0026), _candles(0.0012, 0.0027, 0.0026), Config())
+    assert e.action == "WAIT" and "above the zone" in e.note
+    assert e.zone_low < e.entry < e.zone_high and e.entry < e.price
+
+
+def test_entry_wait_when_dipped_under_the_zone():
+    e = plan_entry(_pair(price_usd=0.0014), _candles(0.0012, 0.0027, 0.0014), Config())
+    assert e.action == "WAIT" and "climbs back above" in e.note and e.entry == e.zone_low
+
+
+def test_entry_skip_when_below_the_swing_low():
+    e = plan_entry(_pair(price_usd=0.0010), _candles(0.0012, 0.0027, 0.0013), Config())
+    assert e.action == "SKIP"
+
+
+def test_stop_is_clamped_between_15_and_35_percent():
+    cfg = Config()
+    deep_leg = plan_entry(_pair(price_usd=0.0021), _candles(0.0005, 0.0027, 0.0021), cfg)
+    assert abs(deep_leg.stop_pct - 35.0) < 1e-6  # swing low far below: capped at -35%
+    flat = plan_entry(_pair(price_usd=1.00), _candles(0.99, 1.02, 1.00), cfg)
+    assert abs(flat.stop_pct - 15.0) < 1e-6  # swing low right under: at least -15%
+    mid = plan_entry(_pair(price_usd=1.00), _candles(0.80, 1.30, 1.00), cfg)
+    assert abs(mid.stop - 0.80 * 0.95) < 1e-9  # otherwise 5% under the swing low
+
+
+def test_take_profits_are_multiples_of_the_entry():
+    e = plan_entry(_pair(price_usd=0.0026), _candles(0.0012, 0.0027, 0.0026), Config())
+    assert [round(px / e.entry, 6) for _, px, _ in e.take_profits(Config())] == [2.0, 5.0, 10.0]
+
+
+def test_entry_falls_back_to_percent_changes_without_candles():
+    p = _pair(price_usd=1.20, price_change={"m5": 0.0, "h1": 20.0, "h6": 50.0, "h24": 80.0})
+    e = plan_entry(p, None, Config())
+    assert abs(e.swing_low - 1.0) < 1e-9 and abs(e.swing_high - 1.2) < 1e-9
+    assert "candles unavailable" in e.method and e.vwap is None
+
+
+def test_pipeline_replaces_skipped_picks_and_caps_candle_lookups():
+    pairs = [_synthetic_pair(f"C{i}", f"Addr{i:02d}" + "1" * 34 + "pump", NOW) for i in range(8)]
+    safety = {p.token_address: _safe() for p in pairs}
+    pairs[0] = replace(pairs[0], volume={**pairs[0].volume, "m5": 30_000.0})  # rank C0 first
+    looked_up = []
+
+    def candles_for(pair):
+        looked_up.append(pair.symbol)
+        if pair.symbol == "C0":  # already broke its swing low
+            return _candles(0.0025, 0.004, 0.0024)
+        return _candles(0.0012, 0.0027, pair.price_usd)
+
+    cfg = replace(Config(), max_entry_checks=6)
+    picks, runners_up, stats = run_pipeline(
+        cfg,
+        discover=lambda: ({"solana": {p.token_address: set() for p in pairs}}, [], []),
+        fetch_pairs=lambda chain, addrs: [replace(p) for p in pairs],
+        fetch_safety=lambda addr: safety[addr],
+        now=NOW,
+        fetch_candles=candles_for,
+    )
+    assert looked_up[0] == "C0" and "C0" not in [sc.pair.symbol for sc in picks]
+    assert len(picks) == 5 and all(sc.entry.action != "SKIP" for sc in picks)
+    assert runners_up[0].pair.symbol == "C0" and runners_up[0].entry.action == "SKIP"
+    assert stats.entry_skips == 1 and len(looked_up) == 6
+
+
+def test_momentum_reason_needs_both_windows_green():
+    cfg = Config()
+    flat = score_market(_pair(price_change={"m5": 0.0, "h1": 1.0, "h6": -1.0, "h24": 5.0}), cfg, NOW)
+    assert not any("trending up" in r or "momentum" in r for r in flat.reasons)
+    up = score_market(_pair(price_change={"m5": 0.0, "h1": 8.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
+    assert any(r.startswith("trending up") for r in up.reasons)

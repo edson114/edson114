@@ -24,7 +24,7 @@ _SESSION.headers.update({"Accept": "application/json", "User-Agent": "memecoin-s
 _NON_HOLDER_OWNERS = {"11111111111111111111111111111111", "1nc1nerator11111111111111111111111111111111"}
 
 
-def _get_json(url: str, timeout: float, params: Optional[dict] = None, retries: int = 2):
+def _get_json(url: str, timeout: float, params: Optional[dict] = None, retries: int = 2, backoff_s: float = 1.5):
     """GET a JSON document, backing off on 429/5xx. Returns None on failure."""
     for attempt in range(retries + 1):
         try:
@@ -39,7 +39,7 @@ def _get_json(url: str, timeout: float, params: Optional[dict] = None, retries: 
         retryable = resp is None or resp.status_code == 429 or resp.status_code >= 500
         if not retryable or attempt == retries:
             return None
-        time.sleep(1.5 * (attempt + 1))
+        time.sleep(backoff_s * (attempt + 1))
     return None
 
 

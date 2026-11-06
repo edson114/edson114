@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 
 from .config import Config
 from .data import PairSnapshot, SafetyReport
+from .entry import EntryPlan
 
 
 def _ramp(x: float, lo: float, hi: float) -> float:
@@ -54,6 +55,7 @@ class Scored:
     flags: List[str] = field(default_factory=list)  # informational risk notes
     reasons: List[str] = field(default_factory=list)  # why it ranks
     rejected: Optional[str] = None
+    entry: Optional[EntryPlan] = None
 
     @property
     def score(self) -> float:
@@ -117,7 +119,7 @@ def score_market(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None
 
     mom = 0.5 * _band(h1, -10, 5, 60, 200) + 0.5 * _band(h6, -20, 15, 250, 1000)
     sc.components["momentum"] = 25 * mom
-    if mom >= 0.6:
+    if mom >= 0.6 and h1 > 0 and h6 > 0:
         label = "strong momentum" if h1 >= 15 else "trending up"
         sc.reasons.append(f"{label}: {h1:+.0f}% 1h, {h6:+.0f}% 6h")
     m5 = p.price_change.get("m5", 0.0)

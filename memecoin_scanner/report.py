@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from typing import List
 
 from .config import Config
+from .entry import EntryPlan
+from .entry import fmt_price as _price
 from .scoring import Scored
 
 
@@ -19,6 +21,7 @@ class ScanStats:
     passed_market: int = 0
     safety_checked: int = 0
     passed_safety: int = 0
+    entry_skips: int = 0
     rejections: Counter = field(default_factory=Counter)
 
 
@@ -30,15 +33,6 @@ def _usd(x: float) -> str:
     if x >= 1e3:
         return f"${x / 1e3:.0f}K"
     return f"${x:,.0f}"
-
-
-def _price(x: float) -> str:
-    if x <= 0:
-        return "?"
-    if x >= 1:
-        return f"${x:,.4f}"
-    # keep 4 significant digits for sub-cent meme prices
-    return f"${x:.{max(4, 3 - int(f'{x:e}'.split('e')[1]))}f}"
 
 
 def _pct(x: float) -> str:
@@ -78,6 +72,35 @@ def _rejection_bucket(reason: str) -> str:
     return reason
 
 
+def render_entry(e: EntryPlan, cfg: Config) -> List[str]:
+    ladder = "; ".join(f"{m:g}x = {_price(px)}: {what}" for m, px, what in e.take_profits(cfg))
+    basis = f"{_price(e.swing_low)} → {_price(e.swing_high)}"
+    if e.vwap:
+        basis += f", 12h VWAP {_price(e.vwap)}"
+    return [
+        f"**Entry: {e.action}.** Buy zone {_price(e.zone_low)} – {_price(e.zone_high)}, now {_price(e.price)}: {e.note}.",
+        "",
+        f"- Entry price: {_price(e.entry)}",
+        f"- Stop: {_price(e.stop)} (-{e.stop_pct:.0f}% from entry). Also exit if liquidity drops sharply or the "
+        f"top wallets start selling.",
+        f"- Take profits: {ladder}",
+        f"- Size: at most {cfg.max_position_pct:g}% of your portfolio",
+        f"- Levels: {e.method}: {basis}",
+    ]
+
+
+def _summary_table(picks: List[Scored]) -> List[str]:
+    rows = ["| # | Coin | Score | Entry | Buy zone | Stop | Contract |", "|---|---|---|---|---|---|---|"]
+    for i, sc in enumerate(picks, 1):
+        e = sc.entry
+        zone = f"{_price(e.zone_low)} – {_price(e.zone_high)}" if e else "?"
+        rows.append(
+            f"| {i} | ${sc.pair.symbol} | {sc.score:.0f} | {e.action if e else '?'} | {zone} "
+            f"| {_price(e.stop) if e else '?'} | `{sc.pair.token_address}` |"
+        )
+    return rows
+
+
 def render_pick(rank: int, sc: Scored, cfg: Config, now: dt.datetime) -> str:
     p, s = sc.pair, sc.safety
     label = " (low conviction)" if sc.score < cfg.min_conviction_score else ""
@@ -109,14 +132,9 @@ def render_pick(rank: int, sc: Scored, cfg: Config, now: dt.datetime) -> str:
     if risks:
         lines.append("**Risk flags:** " + "; ".join(risks) + ".")
         lines.append("")
-    stop = p.price_usd * (1 - cfg.stop_loss_pct / 100)
-    ladder = ", ".join(f"{m:g}x ({_price(p.price_usd * m)}): {what}" for m, what in cfg.take_profit_ladder)
-    lines.append(
-        f"**Plan:** at most {cfg.max_position_pct:g}% of your portfolio. Don't chase a 5m candle up more than 15%; "
-        f"wait for it to cool. Stop: {_price(stop)} (-{cfg.stop_loss_pct:g}%), or exit early if liquidity drops "
-        f"sharply or the top wallets start selling. Take profits: {ladder}."
-    )
-    lines.append("")
+    if sc.entry:
+        lines.extend(render_entry(sc.entry, cfg))
+        lines.append("")
     links = [f"[DexScreener]({p.url})"] if p.url else []
     if "twitter" in p.socials:
         links.append(f"[X]({p.socials['twitter']})")
@@ -142,7 +160,8 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
     out.append("")
     out.append(
         f"Scanned {stats.discovered} tokens on {', '.join(cfg.chains)} → {stats.passed_market} passed market "
-        f"gates → {stats.safety_checked} safety-checked → {stats.passed_safety} passed safety."
+        f"gates → {stats.safety_checked} safety-checked → {stats.passed_safety} passed safety"
+        + (f" → {stats.entry_skips} dropped because the setup already failed (SKIP)." if stats.entry_skips else ".")
     )
     out.append("")
     if not picks:
@@ -151,19 +170,25 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
     else:
         out.append(f"## Top {len(picks)} picks")
         out.append("")
+        out.extend(_summary_table(picks))
+        out.append("")
+        out.append("**BUY NOW** = price is in the buy zone. **WAIT** = set a limit buy in the zone, or skip the "
+                   "coin if it never gets there. Never chase a coin above its zone.")
+        out.append("")
         for i, sc in enumerate(picks, 1):
             out.append(render_pick(i, sc, cfg, now))
 
     if runners_up:
         out.append("## Runners-up")
         out.append("")
-        out.append("| Coin | Score | Mkt cap | 1h | Contract |")
-        out.append("|---|---|---|---|---|")
+        out.append("| Coin | Score | Mkt cap | 1h | Entry | Contract |")
+        out.append("|---|---|---|---|---|---|")
         for sc in runners_up:
             p = sc.pair
+            entry = sc.entry.action if sc.entry else "not checked"
             out.append(
                 f"| ${p.symbol} | {sc.score:.0f} | {_usd(p.market_cap)} | {_pct(p.price_change.get('h1', 0))} "
-                f"| `{p.token_address}` |"
+                f"| {entry} | `{p.token_address}` |"
             )
         out.append("")
 

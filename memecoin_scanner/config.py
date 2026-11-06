@@ -68,8 +68,28 @@ class Config:
     min_conviction_score: float = 60.0
     output_dir: str = "reports/memecoins"
 
+    # --- Entry: where to buy (see entry.py) ---
+    # GeckoTerminal 5m candles; 144 = the last 12h (VWAP), of which the last
+    # 36 (3h) define the up-leg whose pullback we buy.
+    candle_aggregate_min: int = 5
+    candle_limit: int = 144
+    swing_lookback_candles: int = 36
+    entry_fib_shallow: float = 0.382  # top of the buy zone (retracement of the leg)
+    entry_fib_deep: float = 0.618  # bottom of the buy zone
+    in_zone_tolerance_pct: float = 2.0  # up to 2% above the zone still counts as in it
+    # GeckoTerminal's free tier allows ~30 calls/min. Picks that come back
+    # SKIP are replaced by the next coin, up to this many candle lookups.
+    candle_pause_s: float = 2.1
+    candle_retries: int = 2  # on a 429, wait 4s then 8s before falling back to estimates
+    candle_backoff_s: float = 4.0
+    max_entry_checks: int = 8
+
     # --- Trade plan printed under every pick (rules of thumb, not advice) ---
     max_position_pct: float = 2.0  # of total portfolio per coin
+    # Stop goes 5% under the leg's swing low, but never closer than 15% or
+    # further than 35% from the entry.
+    stop_below_swing_low_pct: float = 5.0
+    min_stop_pct: float = 15.0
     stop_loss_pct: float = 35.0
     take_profit_ladder: tuple = (
         (2.0, "sell 50% (your initial stake is back)"),
