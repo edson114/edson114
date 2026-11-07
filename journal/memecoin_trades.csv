@@ -1,0 +1,2 @@
+id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proceeds_usd,closed_at,exit_price,pnl_usd,pnl_pct,exit_estimated,followed_rules,notes
+1,CLOSED,WEALTH,8Mi9E1V2bdPeAaRkR5yxUsAvpzP6UBUEEUrYmgKNpump,2026-11-06,0.000347,200.00,576368.8761,576368.8761,536.77,2026-11-07,0.0009313,336.77,168.4,yes,yes,"Bought inside the scan's buy zone (0.0003067-0.0003495) | Sold 100% (plan said 50% at 2x); exit price = 14:50 UTC quote, replace with real fill"

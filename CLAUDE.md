@@ -17,4 +17,15 @@ scan, not the SPX/QQQ or small-cap scans:
    candles), and keep the not-financial-advice warning short.
 3. Commit the new report and push to the session's branch.
 
+## Logging the user's trades
+
+When the user says they bought or sold a coin, log it with `trade-log`
+(or `python -m memecoin_scanner.journal`): `buy --symbol --usd --price
+--contract`, `sell --id --price [--fraction 0.5] [--proceeds]`. If they
+don't give the fill price, log the latest quoted price with `--estimated`
+and ask for the real fill, then fix it with `correct --id --proceeds` (or
+`--price`). Show `trade-log stats` after each close, then
+commit `journal/memecoin_trades.csv` and push. Phase 1 of their plan is
+50 closed trades at a fixed $50-100 size before scaling.
+
 The fomo app has no API; don't claim the picks came from inside fomo.

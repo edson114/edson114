@@ -1269,6 +1269,22 @@ If GeckoTerminal won't answer (its free tier is rate-limited), the swing
 is estimated from DexScreener's 5m/1h % changes instead, and the plan
 says so. All thresholds live in `memecoin_scanner/config.py`.
 
+### Trade log
+
+Log the trades you actually take, and the plan's Phase 1 numbers (win
+rate, average win/loss, expectancy, progress to 50 trades, daily loss
+limit) come out of it. Stored in `journal/memecoin_trades.csv`.
+
+```bash
+trade-log buy --symbol WEALTH --contract <mint> --usd 200 --price 0.000347
+trade-log sell --id 1 --price 0.0007 --fraction 0.5   # take half at 2x
+trade-log sell --id 1 --price 0.0012                  # sell the rest
+trade-log sell --id 2 --price 0.0004 --estimated      # fill unknown: log the quote
+trade-log correct --id 2 --proceeds 187.50            # ...then the real dollars received
+trade-log stats --account 10000
+trade-log list
+```
+
 ### Limitations
 
 - **Most meme coins go to zero.** Passing RugCheck rules out the
@@ -1364,10 +1380,12 @@ memecoin_scanner/
   data.py                 # DexScreener / GeckoTerminal discovery + pairs, RugCheck safety parsing
   scoring.py              # market + safety gates and the 0-100 score
   entry.py                # entry point: 5m candles, buy zone, BUY NOW/WAIT/SKIP, stop, take-profits
+  journal.py              # trade log (trade-log): buys, partial sells, Phase 1 stats
   report.py               # Markdown report rendering
   scan.py                 # CLI entrypoint / orchestration (+ offline self-test)
 tests/
   test_memecoin_scanner.py  # parsing, gates, scoring, pipeline and report (offline)
+  test_memecoin_journal.py  # trade log: buys, partial sells, stats, CLI
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
@@ -1375,6 +1393,7 @@ reports/smallcap/         # daily small-cap momentum options scan reports land h
 reports/memecoins/        # meme coin scan reports land here (one per run)
 reports/daily_target/     # daily $ target plans land here
 journal/                  # trade journal CSV (trades.csv) lands here
+journal/memecoin_trades.csv  # meme coin trade log (trade-log)
 .github/workflows/
   qqq-iron-condor-scan.yml
   qqq-directional-signal.yml

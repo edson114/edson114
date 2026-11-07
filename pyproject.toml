@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 # `pip install -e .` once, then type `run-scan` for the meme coin top 5.
 run-scan = "memecoin_scanner.scan:main"
+trade-log = "memecoin_scanner.journal:main"
 
 [tool.setuptools]
 packages = ["qqq_iron_condor", "smallcap_options", "memecoin_scanner"]
