@@ -33,6 +33,7 @@ def run_pipeline(
     pause_s: float = 0.0,
     fetch_candles: Optional[Callable[[PairSnapshot], Optional[List[Candle]]]] = None,
     candle_pause_s: float = 0.0,
+    fetch_wallets: Optional[Callable[[str, List[str]], Dict[str, Dict[str, Tuple[int, int]]]]] = None,
 ) -> Tuple[List[Scored], List[Scored], ScanStats]:
     """Discover → price → market gates → safety on the best → rank → entry plans."""
     stats = ScanStats()
@@ -50,13 +51,27 @@ def run_pipeline(
     best = data.best_pair_per_token(all_pairs)
     stats.priced = len(best)
 
-    candidates: List[Scored] = []
+    passed: List[PairSnapshot] = []
     for p in best.values():
         reason = market_gate(p, cfg, now)
         if reason:
             stats.rejections[reason] += 1
             continue
-        candidates.append(score_market(p, cfg, now))
+        passed.append(p)
+
+    # Unique buyers/sellers for everything that passed, in as few calls as possible.
+    if fetch_wallets is not None and passed:
+        by_chain: Dict[str, List[str]] = {}
+        for p in passed:
+            by_chain.setdefault(p.chain, []).append(p.pair_address)
+        for chain, pools in by_chain.items():
+            counts = fetch_wallets(chain, pools)
+            for p in passed:
+                if p.chain == chain and p.pair_address in counts:
+                    p.wallets = counts[p.pair_address]
+        stats.wallet_data = sum(1 for p in passed if p.wallets)
+
+    candidates: List[Scored] = [score_market(p, cfg, now) for p in passed]
     stats.passed_market = len(candidates)
 
     # Safety calls are the slow part: only the best market setups get one.
@@ -112,6 +127,7 @@ def run_scan(cfg: Config, now: Optional[dt.datetime] = None) -> str:
         pause_s=cfg.rugcheck_pause_s,
         fetch_candles=lambda pair: fetch_candles(pair, cfg),
         candle_pause_s=cfg.candle_pause_s,
+        fetch_wallets=lambda chain, pools: data.fetch_wallet_counts(chain, pools, t),
     )
     if stats.priced == 0:
         raise RuntimeError("no market data came back from DexScreener (network down or blocked?)")
@@ -179,6 +195,11 @@ def _self_test_report(now: Optional[dt.datetime] = None) -> str:
         fetch_candles=lambda pair: (
             _synthetic_candles(0.0012, 0.0027, pair.price_usd, now) if pair.symbol == "GOOD" else None
         ),
+        # Unique wallets for every coin but FRESH, which falls back to trade counts.
+        fetch_wallets=lambda chain, pools: {
+            p.pair_address: {"h1": (260, 180), "h6": (900, 700), "h24": (2500, 2100)}
+            for p in pairs if p.symbol != "FRESH" and p.pair_address in pools
+        },
     )
     return render_report(picks, runners_up, stats, Config(), now)
 

@@ -118,6 +118,10 @@ class EntryPlan:
     vwap: Optional[float] = None
 
     @property
+    def above_vwap(self) -> Optional[bool]:
+        return None if self.vwap is None else self.price >= self.vwap
+
+    @property
     def stop_pct(self) -> float:
         return (1 - self.stop / self.entry) * 100 if self.entry > 0 else 0.0
 
@@ -155,11 +159,26 @@ def plan_entry(p: PairSnapshot, candles: Optional[List[Candle]], cfg: Config) ->
         note = "price is in the buy zone"
     elif price > zone_high * tol:
         action, entry = "WAIT", (zone_low + zone_high) / 2
-        note = (f"price is {(price / zone_high - 1) * 100:.0f}% above the zone: set a limit buy near "
-                f"{_fmt(entry)}; if it never pulls back, let it go")
+        note = (f"price is {(price / zone_high - 1) * 100:.0f}% above the zone: set a price alert at "
+                f"{_fmt(entry)} and buy only if it holds there (no new 5m lows)"
+                + (f" above the 12h VWAP {_fmt(vw)}" if vw and vw < entry else "")
+                + "; if it never pulls back, let it go")
     else:
         action, entry = "WAIT", zone_low
         note = f"price dipped under the zone: buy only if it climbs back above {_fmt(zone_low)}"
+
+    # Under the 12h VWAP (the average price paid) sellers are in control:
+    # never BUY NOW there, and only buy once price reclaims it.
+    if vw and action != "SKIP" and price < vw:
+        action = "WAIT"
+        if vw <= zone_high:
+            entry = max(zone_low, vw)
+            note = (f"price is under the 12h VWAP ({_fmt(vw)}), so sellers are in control: buy only after it "
+                    f"climbs back above {_fmt(entry)}")
+        else:
+            entry = vw
+            note = (f"the whole recent move is under the 12h VWAP ({_fmt(vw)}): a downtrend; buy only if it "
+                    f"breaks back above {_fmt(vw)}")
 
     structural = low * (1 - cfg.stop_below_swing_low_pct / 100)
     stop = min(entry * (1 - cfg.min_stop_pct / 100), max(entry * (1 - cfg.stop_loss_pct / 100), structural))

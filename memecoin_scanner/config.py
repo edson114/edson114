@@ -43,6 +43,7 @@ class Config:
     min_age_hours: float = 1.0
     max_drop_h1_pct: float = -25.0  # dumping right now
     max_drop_h6_pct: float = -40.0
+    max_drop_h24_pct: float = -50.0  # crashed today: not a momentum setup
 
     # --- Safety (RugCheck) ---
     # Only the best-scoring candidates by market data get a RugCheck call.
@@ -60,6 +61,11 @@ class Config:
     # 30%; at/above organic level it counts in full.
     bot_avg_trade_usd: float = 10.0
     organic_avg_trade_usd: float = 40.0
+    # Unique wallets (GeckoTerminal): trade counts showing this many times
+    # more buys than sells while unique buyers barely beat sellers means a
+    # few wallets are repeat-buying.
+    repeat_buy_count_ratio: float = 1.3
+    repeat_buy_wallet_ratio: float = 1.05
 
     # --- Output ---
     top_n: int = 5

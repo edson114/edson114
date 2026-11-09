@@ -2,14 +2,15 @@
 
 Score components (weights sum to 100):
   momentum      25  1h and 6h price change in a "running, not blown off" band
-  buy_pressure  20  buy/sell transaction ratio over 1h and 6h, discounted
-                    when the average trade is bot-sized
+  buy_pressure  20  unique buyers vs sellers over 1h and 6h (trade counts
+                    if wallet data is missing), discounted when the
+                    average trade is bot-sized
   acceleration  15  last hour's volume vs the 6h hourly average (+ last 5m)
   liquidity     15  liquidity/market-cap ratio and absolute depth
   upside_room   10  smaller market cap = more room to multiply
   safety        15  holder count, top-10 concentration, LP locked (RugCheck)
-Penalties then come off for wash-trading-sized volume, bot micro-trades, an
-already-15x day, a falling 5m candle, very new pairs, missing socials, RugCheck warnings and insider clusters.
+Penalties then come off for wash-trading-sized volume, bot micro-trades,
+repeat-buying wallets, an already-15x day, a falling 5m candle, very new pairs, missing socials, RugCheck warnings and insider clusters.
 """
 
 from __future__ import annotations
@@ -88,6 +89,8 @@ def market_gate(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None)
         return f"dumping: {p.price_change['h1']:+.0f}% in 1h"
     if p.price_change.get("h6", 0.0) < cfg.max_drop_h6_pct:
         return f"dumping: {p.price_change['h6']:+.0f}% in 6h"
+    if p.price_change.get("h24", 0.0) < cfg.max_drop_h24_pct:
+        return f"crashed: {p.price_change['h24']:+.0f}% in 24h"
     return None
 
 
@@ -129,9 +132,22 @@ def score_market(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None
         sc.penalties.append((pts, f"falling right now ({m5:+.0f}% in 5m): wait for it to base"))
 
     r1, r6 = p.buy_sell_ratio("h1"), p.buy_sell_ratio("h6")
-    bp = 0.6 * _ramp(r1, 0.9, 1.6) + 0.4 * _ramp(r6, 0.9, 1.6)
-    # DexScreener counts trades, not wallets: volume bots spraying $5 buys
-    # fake "buy pressure". Discount it when the average trade is tiny.
+    w1, w6 = p.wallet_ratio("h1"), p.wallet_ratio("h6")
+    if w1 is not None and w6 is not None:
+        # Unique wallets are much harder to fake than trade counts, and sit
+        # closer to 1.0, so the ramp is tighter.
+        bp = 0.6 * _ramp(w1, 0.95, 1.4) + 0.4 * _ramp(w6, 0.95, 1.4)
+        b6, s6 = p.wallets["h6"]
+        b1, s1 = p.wallets["h1"]
+        if r6 >= cfg.repeat_buy_count_ratio and w6 < cfg.repeat_buy_wallet_ratio:
+            sc.penalties.append((4, f"trade counts show {r6:.1f}x more buys, but unique wallets are even "
+                                    f"({b6:,} buyers vs {s6:,} sellers in 6h): a few wallets are repeat-buying"))
+        pressure_note = f"{b1:,} vs {s1:,} unique wallets 1h, {b6:,} vs {s6:,} 6h"
+    else:
+        # DexScreener counts trades, not wallets: fall back to those.
+        bp = 0.6 * _ramp(r1, 0.9, 1.6) + 0.4 * _ramp(r6, 0.9, 1.6)
+        pressure_note = f"{r1:.2f}x trades 1h, {r6:.2f}x 6h; wallet data unavailable"
+    # Volume bots spraying $5 buys fake both counts and volume.
     avg_trade = p.avg_trade_usd("h6")
     if avg_trade is not None:
         bp *= 0.3 + 0.7 * _ramp(avg_trade, cfg.bot_avg_trade_usd, cfg.organic_avg_trade_usd)
@@ -139,7 +155,7 @@ def score_market(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None
             sc.penalties.append((6, f"average trade only ${avg_trade:.0f}: bot micro-trades inflate buys and volume"))
     sc.components["buy_pressure"] = 20 * bp
     if bp >= 0.6:
-        sc.reasons.append(f"buyers outnumber sellers ({r1:.2f}x 1h, {r6:.2f}x 6h, avg trade ${avg_trade or 0:.0f})")
+        sc.reasons.append(f"more buyers than sellers ({pressure_note}, avg trade ${avg_trade or 0:.0f})")
 
     v1, v6, v5m = p.volume.get("h1", 0.0), p.volume.get("h6", 0.0), p.volume.get("m5", 0.0)
     accel_h1 = v1 / (v6 / 6) if v6 > 0 else 0.0

@@ -22,6 +22,7 @@ class ScanStats:
     safety_checked: int = 0
     passed_safety: int = 0
     entry_skips: int = 0
+    wallet_data: int = 0
     rejections: Counter = field(default_factory=Counter)
 
 
@@ -76,7 +77,7 @@ def render_entry(e: EntryPlan, cfg: Config) -> List[str]:
     ladder = "; ".join(f"{m:g}x = {_price(px)}: {what}" for m, px, what in e.take_profits(cfg))
     basis = f"{_price(e.swing_low)} → {_price(e.swing_high)}"
     if e.vwap:
-        basis += f", 12h VWAP {_price(e.vwap)}"
+        basis += f", 12h VWAP {_price(e.vwap)} (price {'above' if e.above_vwap else 'below'} it)"
     return [
         f"**Entry: {e.action}.** Buy zone {_price(e.zone_low)} – {_price(e.zone_high)}, now {_price(e.price)}: {e.note}.",
         "",
@@ -172,8 +173,9 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
         out.append("")
         out.extend(_summary_table(picks))
         out.append("")
-        out.append("**BUY NOW** = price is in the buy zone. **WAIT** = set a limit buy in the zone, or skip the "
-                   "coin if it never gets there. Never chase a coin above its zone.")
+        out.append("**BUY NOW** = price is in the buy zone and above its 12h VWAP. **WAIT** = set a price alert at "
+                   "the entry and buy only if it holds there; skip the coin if it never gets there. Never chase a "
+                   "coin above its zone, and don't leave a blind limit buy resting: it fills in a crash too.")
         out.append("")
         for i, sc in enumerate(picks, 1):
             out.append(render_pick(i, sc, cfg, now))
@@ -201,6 +203,9 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
         out.append(", ".join(f"{k}: {v}" for k, v in top.most_common()))
         out.append("")
 
-    out.append("Data: " + (", ".join(stats.sources_ok) if stats.sources_ok else "no source answered") + ", RugCheck.")
+    sources = ", ".join(stats.sources_ok) if stats.sources_ok else "no source answered"
+    wallets = (f", GeckoTerminal unique wallets for {stats.wallet_data} of {stats.passed_market} coins"
+               if stats.passed_market else "")
+    out.append(f"Data: {sources}{wallets}, RugCheck.")
     out.append("")
     return "\n".join(out)

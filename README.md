@@ -1191,6 +1191,10 @@ scan reads the same public on-chain data the app trades against:
 - **Market data:** DexScreener pairs (price, market cap, liquidity,
   volume and buy/sell counts over 5m/1h/6h/24h, pair age, socials). The
   deepest-liquidity pair per token is used.
+- **Unique wallets:** GeckoTerminal's count of distinct buyer and seller
+  wallets per pool over 1h/6h/24h, fetched in one call for every coin
+  that passes the market gates. Trade counts can be inflated by a few
+  wallets buying over and over; wallet counts can't.
 - **Safety:** a RugCheck report for the best market setups (mint and
   freeze authority, LP locked/burned, holder count, top-10 wallet
   concentration with pools and burn addresses excluded, RugCheck
@@ -1216,8 +1220,8 @@ so run it from the repo root or pass `--output-dir`.
 
 1. **Market gates (rejects):** liquidity under $30K, market cap outside
    $150K-$50M, 24h volume under $100K or fewer than 500 trades, pair
-   younger than 1 hour, dumping (-25% in 1h or -40% in 6h), majors,
-   stables and impersonated tickers.
+   younger than 1 hour, dumping (-25% in 1h or -40% in 6h), crashed
+   (-50% or worse in 24h), majors, stables and impersonated tickers.
 2. **Market score** on everything that passes (see below), then a
    RugCheck call for the 25 best.
 3. **Safety gates (rejects):** mint or freeze authority still live,
@@ -1230,14 +1234,16 @@ so run it from the repo root or pass `--output-dir`.
 | Component | Points | What earns them |
 |---|---|---|
 | Momentum | 25 | 1h change in +5%..+60% and 6h in +15%..+250%, fading to 0 past +200% / +1000% (blow-offs) |
-| Buy pressure | 20 | buy/sell trade ratio over 1h and 6h; discounted when the average trade is bot-sized ($10-$40) |
+| Buy pressure | 20 | unique buyer/seller wallets over 1h and 6h (trade counts if wallet data is missing); discounted when the average trade is bot-sized ($10-$40) |
 | Acceleration | 15 | last hour's volume vs the 6h hourly pace, and the last 5m vs the 1h pace |
 | Liquidity | 15 | liquidity as a % of market cap (3%-12%) and absolute depth ($30K-$500K) |
 | Upside room | 10 | smaller market cap scores higher ($300K-$30M, log scale) |
 | Safety | 15 | holder count, top-10 concentration, LP locked/burned |
 
 Penalties come off for 24h volume over 40x liquidity (wash trading),
-an average trade under $15 (bot micro-trades), +1500% already in 24h
+an average trade under $15 (bot micro-trades), trade counts showing
+1.3x+ more buys while unique buyers barely outnumber sellers (a few
+wallets repeat-buying), +1500% already in 24h
 (late entry), -10% or worse in the last 5m (4-10 points, more for a
 bigger drop), a pair under 3 hours old, no
 socials, RugCheck warnings, and 25+ linked insider wallets. Paid
@@ -1253,9 +1259,10 @@ is the 38.2%-61.8% retracement of that leg. Each pick then gets one of:
 
 | Action | When | What to do |
 |---|---|---|
-| **BUY NOW** | price is in the zone (or up to 2% above it) | buy at the current price |
-| **WAIT** | price is above the zone | set a limit buy at the zone's midpoint; if it never pulls back, let the coin go |
+| **BUY NOW** | price is in the zone (or up to 2% above it) and above the 12h VWAP | buy at the current price |
+| **WAIT** | price is above the zone | set a price alert at the zone's midpoint; buy only if it holds there (no new 5-minute lows); if it never pulls back, let the coin go |
 | **WAIT** | price dipped under the zone but holds the swing low | buy only if it climbs back above the zone |
+| **WAIT** | price is under the 12h VWAP | sellers are in control: buy only after it climbs back above the VWAP (if the VWAP is above the whole zone, that's a downtrend and the entry becomes the VWAP itself) |
 | **SKIP** | price broke below the swing low | the setup failed; the pick drops to the runners-up and the next coin takes its place |
 
 The **stop** sits 5% under the swing low, but never closer than 15% or
@@ -1264,6 +1271,13 @@ entry: sell half at 2x (your stake is back), a quarter at 5x, and trail
 the rest from 10x with a 30% trailing stop. Size: at most 2% of your
 portfolio per coin. The report opens with a table of every pick's
 action, buy zone, stop and contract.
+
+The **12h VWAP** is the volume-weighted average price everyone paid over
+the last 12 hours. Above it, buyers are in control and most recent
+buyers are in profit; below it, most are underwater and sell into every
+bounce. Use an alert rather than a resting limit buy for WAIT picks: a
+limit order fills just the same when the coin is crashing through the
+zone, which is exactly when you don't want it.
 
 If GeckoTerminal won't answer (its free tier is rate-limited), the swing
 is estimated from DexScreener's 5m/1h % changes instead, and the plan
@@ -1291,8 +1305,9 @@ trade-log list
   obvious contract-level rugs, not a team dumping its supply, a bundled
   launch, or a coin simply losing attention. Treat every pick as money
   you can lose entirely.
-- DexScreener counts trades, not wallets. The average-trade-size check
-  catches the crudest volume bots, not all of them.
+- Unique-wallet counts catch repeat-buying, but not a bot farm that
+  spreads its buys across many fresh wallets. When GeckoTerminal is
+  rate-limited the score falls back to trade counts and says so.
 - Boosted and profiled tokens are paid listings, so the discovery lists
   lean toward coins someone is promoting.
 - Prices move in seconds. Check the live chart in fomo before buying;

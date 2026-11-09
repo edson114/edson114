@@ -375,9 +375,130 @@ def test_entry_wait_when_above_the_zone_sets_a_limit_in_it():
     assert e.zone_low < e.entry < e.zone_high and e.entry < e.price
 
 
+def _low_vwap(candles):
+    """Put almost all the volume on the first (lowest) candles so VWAP sits near the swing low."""
+    return [replace(c, volume=1e6 if i < 3 else 1.0) for i, c in enumerate(candles)]
+
+
 def test_entry_wait_when_dipped_under_the_zone():
-    e = plan_entry(_pair(price_usd=0.0014), _candles(0.0012, 0.0027, 0.0014), Config())
-    assert e.action == "WAIT" and "climbs back above" in e.note and e.entry == e.zone_low
+    e = plan_entry(_pair(price_usd=0.0014), _low_vwap(_candles(0.0012, 0.0027, 0.0014)), Config())
+    assert e.above_vwap is True
+    assert e.action == "WAIT" and "dipped under the zone" in e.note and e.entry == e.zone_low
+
+
+def test_below_vwap_blocks_buy_now_and_waits_for_a_reclaim():
+    # In the fib zone, but the 12h VWAP (heavy volume near the top) is above price.
+    candles = _candles(0.0012, 0.0027, 0.0018)
+    candles = [replace(c, volume=1e6 if 0.0019 <= c.close <= 0.0021 else 1.0) for c in candles]
+    e = plan_entry(_pair(price_usd=0.0018), candles, Config())
+    assert e.zone_low < e.price < e.vwap <= e.zone_high and e.above_vwap is False
+    assert e.action == "WAIT" and "under the 12h VWAP" in e.note and "climbs back above" in e.note
+    assert e.entry == e.vwap and e.stop < e.entry
+
+
+def test_vwap_above_the_whole_zone_is_a_downtrend_breakout_entry():
+    candles = _candles(0.0012, 0.0027, 0.0018)
+    candles = [replace(c, volume=1e6 if c.close >= 0.0026 else 1.0) for c in candles]
+    e = plan_entry(_pair(price_usd=0.0018), candles, Config())
+    assert e.vwap > e.zone_high
+    assert e.action == "WAIT" and e.entry == e.vwap and "downtrend" in e.note
+
+
+def test_above_vwap_keeps_buy_now_and_skip_is_unchanged():
+    e = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), Config())
+    assert e.above_vwap is True and e.action == "BUY NOW"
+    skip = plan_entry(_pair(price_usd=0.0010), _candles(0.0012, 0.0027, 0.0013), Config())
+    assert skip.action == "SKIP"
+    estimated = plan_entry(_pair(), None, Config())
+    assert estimated.vwap is None and estimated.above_vwap is None
+
+
+def test_wait_above_zone_says_alert_not_blind_limit():
+    e = plan_entry(_pair(price_usd=0.0026), _candles(0.0012, 0.0027, 0.0026), Config())
+    assert "price alert" in e.note and "limit buy" not in e.note
+
+
+# --- 24h crash gate ----------------------------------------------------------------
+
+def test_market_gate_rejects_a_24h_crash():
+    cfg = Config()
+    crashed = _pair(price_change={"m5": 0.0, "h1": 2.0, "h6": -8.0, "h24": -79.0})
+    assert "crashed: -79% in 24h" == market_gate(crashed, cfg, NOW)
+    assert market_gate(_pair(price_change={"m5": 0.0, "h1": 2.0, "h6": 5.0, "h24": -30.0}), cfg, NOW) is None
+
+
+# --- unique wallets ----------------------------------------------------------------
+
+def test_parse_wallet_counts_keeps_exact_pool_case():
+    payload = {"data": [
+        {"attributes": {"address": "Cns3TxMp6kArSNUF", "transactions": {
+            "h1": {"buys": 97, "sells": 67, "buyers": 59, "sellers": 54},
+            "h6": {"buys": 674, "sells": 445, "buyers": 281, "sellers": 286}}}},
+        {"attributes": {"address": "NoTxns"}},
+    ]}
+    out = data.parse_wallet_counts(payload)
+    assert out == {"Cns3TxMp6kArSNUF": {"h1": (59, 54), "h6": (281, 286)}}
+    assert data.parse_wallet_counts(None) == {} and data.parse_wallet_counts({"errors": []}) == {}
+
+
+def test_fetch_wallet_counts_batches_30_pools_per_call(monkeypatch):
+    urls = []
+
+    def fake(url, timeout, params=None, retries=2, backoff_s=1.5):
+        urls.append(url)
+        pools = url.rsplit("/", 1)[1].split(",")
+        return {"data": [{"attributes": {"address": a, "transactions": {"h1": {"buyers": 1, "sellers": 1}}}}
+                         for a in pools]}
+
+    monkeypatch.setattr(data, "_get_json", fake)
+    pools = [f"Pool{i}" for i in range(45)]
+    out = data.fetch_wallet_counts("solana", pools + [""], 1)
+    assert len(urls) == 2 and "/networks/solana/pools/multi/" in urls[0]
+    assert len(out) == 45 and out["Pool44"] == {"h1": (1, 1)}
+
+
+def test_wallet_ratio_drives_buy_pressure_and_flags_repeat_buyers():
+    cfg = Config()
+    # $STOKE on Nov 9: 672 buys vs 439 sells by count, but 275 vs 282 unique wallets.
+    stoke = _pair(txns={"h24": (2438, 1709), "h6": (672, 439), "h1": (107, 68), "m5": (7, 4)},
+                  volume={"h24": 700_000.0, "h6": 70_000.0, "h1": 10_000.0, "m5": 800.0})
+    counts_only = score_market(stoke, cfg, NOW)
+    stoke.wallets = {"h1": (58, 50), "h6": (275, 282)}
+    with_wallets = score_market(stoke, cfg, NOW)
+    assert with_wallets.components["buy_pressure"] < counts_only.components["buy_pressure"]
+    assert any("repeat-buying" in r for _, r in with_wallets.penalties)
+    assert not any("repeat-buying" in r for _, r in counts_only.penalties)
+
+    real = _pair()
+    real.wallets = {"h1": (300, 180), "h6": (1000, 700)}
+    sc = score_market(real, cfg, NOW)
+    assert any("unique wallets" in r for r in sc.reasons)
+    assert not any("repeat-buying" in r for _, r in sc.penalties)
+    assert _pair().wallet_ratio("h1") is None
+
+
+def test_pipeline_fetches_wallets_once_for_gate_survivors():
+    pairs = [_synthetic_pair(f"C{i}", f"Addr{i:02d}" + "1" * 34 + "pump", NOW) for i in range(3)]
+    pairs.append(_synthetic_pair("THIN", "Thin" + "1" * 38 + "pump", NOW, liquidity_usd=1_000.0))
+    calls = []
+
+    def wallets(chain, pools):
+        calls.append(list(pools))
+        return {pool: {"h1": (300, 150), "h6": (900, 600)} for pool in pools}
+
+    picks, _, stats = run_pipeline(
+        Config(),
+        discover=lambda: ({"solana": {p.token_address: set() for p in pairs}}, [], []),
+        fetch_pairs=lambda chain, addrs: [replace(p) for p in pairs],
+        fetch_safety=lambda addr: _safe(),
+        now=NOW,
+        fetch_wallets=wallets,
+    )
+    assert len(calls) == 1 and len(calls[0]) == 3  # THIN was gated out first
+    assert stats.wallet_data == 3 and all(sc.pair.wallets for sc in picks)
+    from memecoin_scanner.report import render_report as rr
+
+    assert "GeckoTerminal unique wallets for 3 of 3 coins" in rr(picks, [], stats, Config(), NOW)
 
 
 def test_entry_skip_when_below_the_swing_low():

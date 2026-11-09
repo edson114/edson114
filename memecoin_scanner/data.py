@@ -71,6 +71,8 @@ class PairSnapshot:
     socials: Dict[str, str] = field(default_factory=dict)  # type -> url
     boosts_active: int = 0
     sources: set = field(default_factory=set)
+    # Unique wallets per window from GeckoTerminal: window -> (buyers, sellers).
+    wallets: Dict[str, Tuple[int, int]] = field(default_factory=dict)
 
     def age_hours(self, now: Optional[dt.datetime] = None) -> Optional[float]:
         if self.pair_created_at is None:
@@ -83,6 +85,13 @@ class PairSnapshot:
         if sells == 0:
             return float(buys) if buys else 0.0
         return buys / sells
+
+    def wallet_ratio(self, window: str) -> Optional[float]:
+        """Unique buyers / unique sellers, or None without wallet data."""
+        buyers, sellers = self.wallets.get(window, (0, 0))
+        if buyers + sellers == 0:
+            return None
+        return buyers / sellers if sellers else float(buyers)
 
     def avg_trade_usd(self, window: str) -> Optional[float]:
         buys, sells = self.txns.get(window, (0, 0))
@@ -217,6 +226,39 @@ def fetch_pairs(chain: str, addresses: List[str], timeout: float) -> List[PairSn
             snap = parse_pair(raw)
             if snap:
                 out.append(snap)
+    return out
+
+
+def parse_wallet_counts(payload) -> Dict[str, Dict[str, Tuple[int, int]]]:
+    """GeckoTerminal pools payload -> {pool address: {window: (buyers, sellers)}}."""
+    out: Dict[str, Dict[str, Tuple[int, int]]] = {}
+    items = (payload or {}).get("data") if isinstance(payload, dict) else None
+    if isinstance(items, dict):
+        items = [items]
+    for item in items or []:
+        attrs = item.get("attributes") or {}
+        address = attrs.get("address")
+        windows = {}
+        for window, t in (attrs.get("transactions") or {}).items():
+            try:
+                windows[window] = (int(t.get("buyers") or 0), int(t.get("sellers") or 0))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        if address and windows:
+            out[address] = windows
+    return out
+
+
+def fetch_wallet_counts(chain: str, pool_addresses: List[str], timeout: float,
+                        retries: int = 2, backoff_s: float = 4.0) -> Dict[str, Dict[str, Tuple[int, int]]]:
+    """Unique buyers/sellers for up to 30 pools per GeckoTerminal call ({} on failure)."""
+    out: Dict[str, Dict[str, Tuple[int, int]]] = {}
+    pools = [a for a in pool_addresses if a]
+    for i in range(0, len(pools), 30):
+        batch = pools[i:i + 30]
+        payload = _get_json(f"{GECKOTERMINAL}/networks/{chain}/pools/multi/{','.join(batch)}", timeout,
+                            retries=retries, backoff_s=backoff_s)
+        out.update(parse_wallet_counts(payload))
     return out
 
 
