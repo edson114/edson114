@@ -561,3 +561,22 @@ def test_momentum_reason_needs_both_windows_green():
     assert not any("trending up" in r or "momentum" in r for r in flat.reasons)
     up = score_market(_pair(price_change={"m5": 0.0, "h1": 8.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
     assert any(r.startswith("trending up") for r in up.reasons)
+
+
+def test_crash_rejections_get_their_own_bucket():
+    from memecoin_scanner.report import _rejection_bucket
+
+    assert _rejection_bucket("crashed: -60% in 24h") == "crashed in 24h"
+    assert _rejection_bucket("dumping: -30% in 1h") == "dumping"
+
+
+def test_fetch_safety_retries_with_longer_backoff(monkeypatch):
+    seen = {}
+
+    def fake(url, timeout, params=None, retries=2, backoff_s=1.5):
+        seen.update(retries=retries, backoff_s=backoff_s)
+        return None
+
+    monkeypatch.setattr(data, "_get_json", fake)
+    assert data.fetch_safety(ADDR, 1).available is False
+    assert seen == {"retries": 3, "backoff_s": 3.0}

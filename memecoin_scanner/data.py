@@ -347,8 +347,10 @@ def parse_rugcheck_report(report: dict) -> SafetyReport:
     )
 
 
-def fetch_safety(token_address: str, timeout: float) -> SafetyReport:
-    report = _get_json(f"{RUGCHECK}/tokens/{token_address}/report", timeout)
+def fetch_safety(token_address: str, timeout: float, retries: int = 3, backoff_s: float = 3.0) -> SafetyReport:
+    # RugCheck rate-limits bursts; an unanswered check leaves a pick UNVERIFIED,
+    # so it gets more patience (3s, 6s, 9s) than the discovery lists.
+    report = _get_json(f"{RUGCHECK}/tokens/{token_address}/report", timeout, retries=retries, backoff_s=backoff_s)
     if not isinstance(report, dict) or not report:
         return SafetyReport(available=False)
     try:

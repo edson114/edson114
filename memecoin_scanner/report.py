@@ -56,6 +56,7 @@ _REJECTION_BUCKETS = (
     ("rugged", "rugged"),
     ("min old", "too new"),
     ("dumping", "dumping"),
+    ("crashed", "crashed in 24h"),
     ("liquidity", "low liquidity"),
     ("above ceiling", "market cap too big"),
     ("below floor", "market cap too small"),
