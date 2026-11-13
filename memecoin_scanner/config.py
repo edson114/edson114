@@ -11,7 +11,8 @@ edge. Most meme coins go to zero; the gates are there to throw out the
 obvious rugs and dead charts, not to make anything safe.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -103,4 +104,40 @@ class Config:
         (10.0, "trail the last 25% with a 30% trailing stop"),
     )
 
+    # --- Fast mode only (see fast_config); off in the standard scan ---
+    mode: str = "standard"
+    max_age_hours: Optional[float] = None  # only coins younger than this
+    min_volume_accel: float = 0.0  # last hour's volume vs the 6h hourly pace
+    time_stop_hours: Optional[float] = None  # sell if it hasn't moved by then
+    time_stop_min_gain_pct: float = 20.0
+
     request_timeout_s: float = 15.0
+
+
+def fast_config(base: Optional[Config] = None) -> Config:
+    """Short-term, high-turnover rules (`run-scan --fast`).
+
+    Built from the traits publicly reported for fast meme traders such as
+    Kimchi (@kimchi1x): short holds, speed, turning capital over quickly,
+    and roughly +50% as a day's target. His actual rules aren't public, so
+    this is a style, not a copy of anyone's strategy, and it isn't
+    backtested.
+    """
+    base = base or Config()
+    return replace(
+        base,
+        mode="fast",
+        max_age_hours=48.0,  # fresh coins and new narratives move fastest
+        min_volume_accel=1.2,  # only coins speeding up right now
+        swing_lookback_candles=12,  # the last hour's leg, not 3h
+        stop_loss_pct=25.0,
+        min_stop_pct=10.0,
+        take_profit_ladder=(
+            (1.5, "sell 50% (+50%: your stake and some profit are out)"),
+            (2.0, "sell another 25%"),
+            (3.0, "trail the last 25% with a 20% trailing stop"),
+        ),
+        time_stop_hours=4.0,
+        time_stop_min_gain_pct=20.0,
+        output_dir="reports/memecoins/fast",
+    )

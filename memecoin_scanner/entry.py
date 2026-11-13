@@ -180,6 +180,13 @@ def plan_entry(p: PairSnapshot, candles: Optional[List[Candle]], cfg: Config) ->
             note = (f"the whole recent move is under the 12h VWAP ({_fmt(vw)}): a downtrend; buy only if it "
                     f"breaks back above {_fmt(vw)}")
 
+    # In the zone but dropping hard on the last 5m candle: let it base first.
+    m5 = p.price_change.get("m5", 0.0)
+    if action == "BUY NOW" and m5 <= cfg.falling_m5_pct:
+        action = "WAIT"
+        note = (f"price is in the zone but falling right now ({m5:+.0f}% in 5m): buy only once it stops making "
+                f"new 5m lows")
+
     structural = low * (1 - cfg.stop_below_swing_low_pct / 100)
     stop = min(entry * (1 - cfg.min_stop_pct / 100), max(entry * (1 - cfg.stop_loss_pct / 100), structural))
     return EntryPlan(

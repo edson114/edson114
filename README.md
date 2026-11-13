@@ -1209,6 +1209,7 @@ run-scan                   # live scan, saves to reports/memecoins/
 run-scan --no-save         # print only
 run-scan --top 10          # more picks
 run-scan --self-test       # offline, synthetic data
+run-scan --fast            # fast mode: fresh coins speeding up, quicker exits (see below)
 ```
 
 Without installing, `python -m memecoin_scanner` (or
@@ -1282,6 +1283,30 @@ zone, which is exactly when you don't want it.
 If GeckoTerminal won't answer (its free tier is rate-limited), the swing
 is estimated from DexScreener's 5m/1h % changes instead, and the plan
 says so. All thresholds live in `memecoin_scanner/config.py`.
+
+### Fast mode (`run-scan --fast`)
+
+An opt-in set of short-term, high-turnover rules, inspired by the style
+publicly reported for fast meme traders such as Kimchi (@kimchi1x):
+short holds, speed, turning money over quickly, and about +50% as a
+day's target. **His actual rules aren't public**, and nothing labeled a
+"Kimchi playbook" online is documented, so this is a style, not a copy
+of anyone's strategy. It isn't backtested either.
+
+| | Standard scan | Fast mode |
+|---|---|---|
+| Coins | any age over 1h | **under 48h old** |
+| Volume | scored | **must be speeding up** (last hour ≥ 1.2x the 6h hourly pace) |
+| Buy zone | pullback in the last **3h** leg | pullback in the last **1h** leg |
+| Stop | 15%-35% from entry | **10%-25%** from entry |
+| Take profits | 50% at 2x, 25% at 5x, trail from 10x (30%) | **50% at 1.5x**, 25% at 2x, trail from 3x (20%) |
+| Time stop | none | **sell if it isn't up 20% within 4 hours** |
+
+Everything else (safety gates, unique wallets, VWAP, the 24h crash
+filter) is the same. Reports are saved under `reports/memecoins/fast/`.
+Fast mode trades more often for smaller wins, so fees and slippage take
+a bigger share of each one: log the real proceeds with `trade-log` and
+compare its expectancy with the standard scan's before relying on it.
 
 ### Trade log
 

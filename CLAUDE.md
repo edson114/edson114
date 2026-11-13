@@ -17,6 +17,15 @@ scan, not the SPX/QQQ or small-cap scans:
    candles), and keep the not-financial-advice warning short.
 3. Commit the new report and push to the session's branch.
 
+## "run fast scan"
+
+**`run fast scan`** means `run-scan --fast`: short-term rules (coins under
+48h whose volume is speeding up, 1h swing, 50% sold at 1.5x, 4h time
+stop). Reply the same way as for "run scan" and include each pick's time
+stop. Say it's inspired by fast traders like Kimchi, never that it is his
+strategy: his rules aren't public. Reports land in
+`reports/memecoins/fast/`.
+
 ## Logging the user's trades
 
 When the user says they bought or sold a coin, log it with `trade-log`

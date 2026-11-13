@@ -4,6 +4,7 @@ Usage:
     python -m memecoin_scanner.scan
     python -m memecoin_scanner.scan --top 5 --no-save
     python -m memecoin_scanner.scan --self-test   # offline, synthetic data
+    python -m memecoin_scanner.scan --fast        # fast mode (short-term, high-turnover)
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from . import data
-from .config import Config
+from .config import Config, fast_config
 from .data import PairSnapshot, SafetyReport
 from .entry import Candle, fetch_candles, plan_entry
 from .report import ScanStats, render_report
@@ -163,8 +164,9 @@ def _synthetic_candles(low: float, high: float, last: float, now: dt.datetime) -
     return out
 
 
-def _self_test_report(now: Optional[dt.datetime] = None) -> str:
+def _self_test_report(now: Optional[dt.datetime] = None, cfg: Optional[Config] = None) -> str:
     now = now or dt.datetime(2026, 1, 1, 12, 0, tzinfo=dt.timezone.utc)
+    cfg = cfg or Config()
     pairs = [
         _synthetic_pair("GOOD", "Good1111111111111111111111111111111111pump", now),
         _synthetic_pair("FRESH", "Fresh111111111111111111111111111111111pump", now,
@@ -186,7 +188,7 @@ def _self_test_report(now: Optional[dt.datetime] = None) -> str:
     safety[pairs[5].token_address] = replace(safety[pairs[5].token_address], top10_pct=62.0)
 
     picks, runners_up, stats = run_pipeline(
-        Config(),
+        cfg,
         discover=lambda: ({"solana": {p.token_address: {"synthetic"} for p in pairs}}, [], ["synthetic"]),
         fetch_pairs=lambda chain, addrs: [replace(p, sources=set()) for p in pairs if p.token_address in addrs],
         fetch_safety=lambda addr: safety.get(addr, SafetyReport(available=False)),
@@ -201,7 +203,7 @@ def _self_test_report(now: Optional[dt.datetime] = None) -> str:
             for p in pairs if p.symbol != "FRESH" and p.pair_address in pools
         },
     )
-    return render_report(picks, runners_up, stats, Config(), now)
+    return render_report(picks, runners_up, stats, cfg, now)
 
 
 def main(argv=None) -> int:
@@ -210,15 +212,17 @@ def main(argv=None) -> int:
     parser.add_argument("--output-dir", default=None, help="Override the reports output directory")
     parser.add_argument("--no-save", action="store_true", help="Print only; don't write a report file")
     parser.add_argument("--self-test", action="store_true", help="Run the pipeline on synthetic data (no network)")
+    parser.add_argument("--fast", action="store_true",
+                        help="Fast mode: fresh coins speeding up, quicker targets, a 4h time stop")
     args = parser.parse_args(argv)
 
-    cfg = Config()
+    cfg = fast_config() if args.fast else Config()
     if args.top:
         cfg = replace(cfg, top_n=args.top)
 
     now = dt.datetime.now(dt.timezone.utc)
     try:
-        report_md = _self_test_report() if args.self_test else run_scan(cfg, now)
+        report_md = _self_test_report(cfg=cfg) if args.self_test else run_scan(cfg, now)
     except Exception as exc:
         print(f"Scan failed: {exc}", file=sys.stderr)
         return 1

@@ -57,6 +57,8 @@ _REJECTION_BUCKETS = (
     ("min old", "too new"),
     ("dumping", "dumping"),
     ("crashed", "crashed in 24h"),
+    ("fast mode trades fresh", "too old for fast mode"),
+    ("not speeding up", "volume not accelerating"),
     ("liquidity", "low liquidity"),
     ("above ceiling", "market cap too big"),
     ("below floor", "market cap too small"),
@@ -87,6 +89,8 @@ def render_entry(e: EntryPlan, cfg: Config) -> List[str]:
         f"top wallets start selling.",
         f"- Take profits: {ladder}",
         f"- Size: at most {cfg.max_position_pct:g}% of your portfolio",
+        *([f"- Time stop: if it isn't up {cfg.time_stop_min_gain_pct:g}% within {cfg.time_stop_hours:g}h of "
+           f"buying, sell and move on (frees the money for the next setup)"] if cfg.time_stop_hours else []),
         f"- Levels: {e.method}: {basis}",
     ]
 
@@ -152,7 +156,8 @@ def render_pick(rank: int, sc: Scored, cfg: Config, now: dt.datetime) -> str:
 
 def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStats, cfg: Config,
                   now: dt.datetime) -> str:
-    out = [f"# Meme Coin Scan: {now.strftime('%Y-%m-%d %H:%M')} UTC", ""]
+    title = "Meme Coin Fast Scan" if cfg.mode == "fast" else "Meme Coin Scan"
+    out = [f"# {title}: {now.strftime('%Y-%m-%d %H:%M')} UTC", ""]
     out.append(
         "> **Not financial advice.** Meme coins are the riskiest thing you can buy: most go to zero, and a "
         "passing RugCheck does not rule out a rug. These are the coins that score best on momentum, buy "
@@ -160,6 +165,16 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
         "entirely, and check the chart in fomo before you buy."
     )
     out.append("")
+    if cfg.mode == "fast":
+        first = cfg.take_profit_ladder[0][0]
+        out.append(
+            f"**Fast mode:** short-term, high-turnover rules: only coins under {cfg.max_age_hours:g}h old whose "
+            f"volume is speeding up, a 1h swing for the buy zone, a {(first - 1) * 100:.0f}% first target, a "
+            f"-{cfg.stop_loss_pct:g}% max stop and a {cfg.time_stop_hours:g}h time stop. Inspired by the style "
+            "publicly reported for fast traders like Kimchi; his actual rules aren't public, and these aren't "
+            "backtested."
+        )
+        out.append("")
     out.append(
         f"Scanned {stats.discovered} tokens on {', '.join(cfg.chains)} → {stats.passed_market} passed market "
         f"gates → {stats.safety_checked} safety-checked → {stats.passed_safety} passed safety"
@@ -170,7 +185,7 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
         out.append("**No coin passed every gate this run.** Sitting out is a valid trade; run the scan again later.")
         out.append("")
     else:
-        out.append(f"## Top {len(picks)} picks")
+        out.append(f"## Top {len(picks)} pick{'s' if len(picks) != 1 else ''}")
         out.append("")
         out.extend(_summary_table(picks))
         out.append("")

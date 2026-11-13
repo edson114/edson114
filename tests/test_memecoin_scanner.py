@@ -580,3 +580,81 @@ def test_fetch_safety_retries_with_longer_backoff(monkeypatch):
     monkeypatch.setattr(data, "_get_json", fake)
     assert data.fetch_safety(ADDR, 1).available is False
     assert seen == {"retries": 3, "backoff_s": 3.0}
+
+
+# --- fast mode -------------------------------------------------------------------------
+
+def test_fast_config_is_opt_in_and_sets_the_short_term_rules():
+    from memecoin_scanner.config import fast_config
+
+    std, fast = Config(), fast_config()
+    assert std.mode == "standard" and std.max_age_hours is None and std.time_stop_hours is None
+    assert fast.mode == "fast" and fast.max_age_hours == 48.0 and fast.min_volume_accel == 1.2
+    assert fast.swing_lookback_candles == 12 and fast.stop_loss_pct == 25.0 and fast.min_stop_pct == 10.0
+    assert fast.take_profit_ladder[0][0] == 1.5 and fast.time_stop_hours == 4.0
+    assert fast.output_dir == "reports/memecoins/fast"
+    assert fast_config(replace(std, top_n=3)).top_n == 3  # keeps other settings
+
+
+def test_fast_gates_reject_old_coins_and_coins_not_speeding_up():
+    from memecoin_scanner.config import fast_config
+
+    fast = fast_config()
+    assert market_gate(_pair(), fast, NOW) is None  # 30h old, volume 1.8x the 6h pace
+    old = _pair(pair_created_at=NOW - dt.timedelta(days=5))
+    assert "fast mode trades fresh coins" in market_gate(old, fast, NOW)
+    assert market_gate(old, Config(), NOW) is None  # the standard scan doesn't care
+    slow = _pair(volume={"h24": 1_500_000.0, "h6": 600_000.0, "h1": 80_000.0, "m5": 7_000.0})
+    assert "not speeding up (0.8x" in market_gate(slow, fast, NOW)
+
+
+def test_fast_entry_uses_a_1h_swing_and_tighter_stop_band():
+    from memecoin_scanner.config import fast_config
+
+    fast = fast_config()
+    # 3h climb, then a 1h leg from 0.0024 to 0.0030 and a pullback to 0.00275.
+    candles = _candles(0.0010, 0.0024, 0.0024, rise=24, fall=1) + [
+        Candle(10_000 + 300 * i, 0.0024, 0.0024 + 0.00006 * (i + 1), 0.0024, 0.0024 + 0.00006 * (i + 1), 1_000.0)
+        for i in range(10)
+    ]
+    candles.append(Candle(20_000, 0.0030, 0.0030, 0.00275, 0.00275, 1_000.0))
+    e_fast = plan_entry(_pair(price_usd=0.00275), candles, fast)
+    e_std = plan_entry(_pair(price_usd=0.00275), candles, Config())
+    assert e_fast.swing_low > e_std.swing_low  # the 1h leg starts higher than the 3h one
+    assert "1h swing" in e_fast.method and "3h swing" in e_std.method
+    assert 10.0 - 1e-6 <= e_fast.stop_pct <= 25.0 + 1e-6
+
+
+def test_fast_report_explains_the_mode_and_prints_the_time_stop():
+    md = _self_test_report(NOW, cfg=__import__("memecoin_scanner.config", fromlist=["fast_config"]).fast_config())
+    assert md.startswith("# Meme Coin Fast Scan")
+    assert "**Fast mode:**" in md and "his actual rules aren't public" in md
+    assert "Time stop: if it isn't up 20% within 4h" in md and "1.5x = $" in md
+    std = _self_test_report(NOW)
+    assert "Fast mode" not in std and "Time stop" not in std
+
+
+def test_cli_fast_flag_saves_under_the_fast_folder(tmp_path, monkeypatch):
+    from memecoin_scanner import scan
+
+    seen = {}
+    monkeypatch.setattr(scan, "run_scan", lambda cfg, now: seen.setdefault("cfg", cfg) and "# report")
+    assert scan.main(["--fast", "--output-dir", str(tmp_path)]) == 0
+    assert seen["cfg"].mode == "fast" and len(list(tmp_path.glob("*.md"))) == 1
+
+
+def test_singular_pick_heading():
+    from memecoin_scanner.report import ScanStats
+
+    cfg = Config()
+    sc = apply_safety(score_market(_pair(), cfg, NOW), _safe(), cfg)
+    sc.entry = plan_entry(sc.pair, None, cfg)
+    assert "## Top 1 pick\n" in render_report([sc], [], ScanStats(), cfg, NOW)
+
+
+def test_falling_5m_candle_turns_buy_now_into_wait():
+    falling = _pair(price_usd=0.0021, price_change={"m5": -17.0, "h1": 22.0, "h6": 60.0, "h24": 240.0})
+    e = plan_entry(falling, _candles(0.0012, 0.0027, 0.0021), Config())
+    assert e.action == "WAIT" and "falling right now (-17% in 5m)" in e.note and e.entry == 0.0021
+    calm = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), Config())
+    assert calm.action == "BUY NOW"

@@ -91,6 +91,13 @@ def market_gate(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None)
         return f"dumping: {p.price_change['h6']:+.0f}% in 6h"
     if p.price_change.get("h24", 0.0) < cfg.max_drop_h24_pct:
         return f"crashed: {p.price_change['h24']:+.0f}% in 24h"
+    if cfg.max_age_hours is not None and age is not None and age > cfg.max_age_hours:
+        return f"older than {cfg.max_age_hours:g}h (fast mode trades fresh coins)"
+    if cfg.min_volume_accel > 0:
+        v6 = p.volume.get("h6", 0.0)
+        accel = p.volume.get("h1", 0.0) / (v6 / 6) if v6 > 0 else 0.0
+        if accel < cfg.min_volume_accel:
+            return f"volume not speeding up ({accel:.1f}x the 6h hourly pace)"
     return None
 
 
