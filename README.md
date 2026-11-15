@@ -939,6 +939,9 @@ python -m qqq_iron_condor.shares_backtest
 
 # Does the 10-year Treasury yield help? (see below)
 python -m qqq_iron_condor.rates_backtest
+
+# A smaller fixed target at your size: 5 contracts, +$500 (see below)
+python -m qqq_iron_condor.fixed_target_backtest
 ```
 
 All of it lives in `Config` (`daily_target_*` fields in
@@ -1163,6 +1166,49 @@ spiking (as of the prior close), it shows ⚠️ and suggests sitting out or
 sizing down. Trump's posts themselves aren't in any free, backtestable
 feed, so this tests the yield side of the idea only.
 
+### A smaller target: 5 contracts, +$500
+
+`fixed_target_backtest.py` (`reports/backtests/fixed-target-2026-11-15.md`)
+tests a $500 target at 5 contracts two ways, over Nov 2025 to Nov 2026 and
+Nov 2024 to Nov 2026.
+
+**1. RSI calls:** buy 5 calls at 0.85 delta, ~60 DTE, at the open when
+RSI(14) is under 70, and sell at +$500. The original rules had no rule
+for a trade that never reaches +$500, so the backtest sells with 5 days
+left to expiration.
+
+| Stop | Last year: win rate | Last year: net | Two years: net |
+|---|---|---|---|
+| None | 98% | **−$13,634** (+$11,086 closed, −$24,721 still open) | **+$12,071** |
+| −$500 | 45% | −$10,000 | −$21,500 |
+| −$1,000 | 62% | −$16,126 | −$28,444 |
+| −$2,000 | 79% | −$5,126 | −$22,095 |
+| −$3,000 | 84% | −$17,482 | −$43,610 |
+
+- **Without a stop**, the strategy wins almost every trade but has no
+  limit on losses. One trade bought before the spring sell-off lost
+  $23,078, and the one bought near October's high is down about $24,700.
+- **With a stop**, the win rate always lands just under break-even
+  (80% is needed with a −$2,000 stop). Buying calls at the open when
+  RSI is under 70 has no edge.
+
+**2. The daily plan's rules at 5 contracts** (+$500 target, −$2,000 hard
+stop, first-hour direction at 10:30, calls and puts):
+
+| Variant | Last year | Two years |
+|---|---|---|
+| Daily plan rules (0.80 delta) | +$4,795 (75% win) | +$1,991 |
+| …with 0.85 delta | +$5,219 | +$6,738 |
+| …same-hour ties scored as stops | +$672 | −$6,298 |
+| …2× slippage | +$191 | −$9,027 |
+| …3× slippage | −$13,331 | −$21,265 |
+| …calls only | +$104 | −$5,712 |
+
+This beats the RSI calls, but over two years it's close to break-even.
+It turns negative with pessimistic tie scoring or with 2× slippage, so
+the small edge doesn't survive realistic trading costs. Option prices
+are modeled from VIX, not real quotes.
+
 ### Limitations & caveats
 
 - The exit levels are Black-Scholes estimates at constant IV. An IV move
@@ -1206,6 +1252,7 @@ qqq_iron_condor/
   shares_backtest.py      # the daily $ target signal replayed on QQQ shares (no option modeling)
   rates.py                # 10-year Treasury yield read (^TNX): level, bp changes, spiking/rising/calm
   rates_backtest.py       # bond-put event study since 2000 + yield filters on the daily $ target signal
+  fixed_target_backtest.py # 5 contracts / +$500: RSI calls vs the daily plan's rules at that size
 tradingview/
   qqq_daily_target.pine   # the daily $ target plan as a TradingView indicator (levels, exits, alerts)
 tests/
@@ -1225,6 +1272,7 @@ tests/
   test_daily_target.py    # daily $ target levels, exit rules, and backtest mechanics
   test_shares_backtest.py # shares backtest exits, skip rules, costs, and report
   test_rates.py           # 10-year yield read, no-look-ahead states, event study, plan warning
+  test_fixed_target_backtest.py # fixed-target exits, RSI skip, expiry close, report
 smallcap_options/
   config.py               # all tunable parameters (universe filters, score weights, contract selection)
   data.py                 # yfinance-backed screener, price/intraday history, option chains, float, news
