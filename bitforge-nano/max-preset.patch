@@ -1,0 +1,38 @@
+diff --git a/main/http_server/forge-os/src/app/layout/app.topbar.component.ts b/main/http_server/forge-os/src/app/layout/app.topbar.component.ts
+index 26fad4a..9a55c2c 100644
+--- a/main/http_server/forge-os/src/app/layout/app.topbar.component.ts
++++ b/main/http_server/forge-os/src/app/layout/app.topbar.component.ts
+@@ -66,7 +66,7 @@ export class AppTopBarComponent {
+     public getPerformanceMode(info: ISystemInfo): { label: string, class: string } {
+         const mode = matchPerformanceMode(info.frequency, info.coreVoltage);
+         if (!mode) return { label: 'Custom', class: '' };
+-        return { label: mode.label, class: { eco: 'is-ok', medium: 'is-warn', power: 'is-bad' }[mode.id] };
++        return { label: mode.label, class: { eco: 'is-ok', medium: 'is-warn', power: 'is-bad', max: 'is-bad' }[mode.id] };
+     }
+ 
+ }
+diff --git a/main/http_server/forge-os/src/app/utils/performance-modes.ts b/main/http_server/forge-os/src/app/utils/performance-modes.ts
+index f30da01..1ef726f 100644
+--- a/main/http_server/forge-os/src/app/utils/performance-modes.ts
++++ b/main/http_server/forge-os/src/app/utils/performance-modes.ts
+@@ -1,6 +1,6 @@
+ // Presets offered on the Settings page. The top bar uses the same list to
+ // name the mode the miner is running in, so the two always agree.
+-export type PerformanceModeId = 'eco' | 'medium' | 'power';
++export type PerformanceModeId = 'eco' | 'medium' | 'power' | 'max';
+ 
+ export interface PerformanceMode {
+   id: PerformanceModeId;
+@@ -13,7 +13,11 @@ export interface PerformanceMode {
+ export const PERFORMANCE_MODES: PerformanceMode[] = [
+   { id: 'eco', label: 'Eco', frequency: 430, coreVoltage: 1000, description: 'Lowest power and heat' },
+   { id: 'medium', label: 'Medium', frequency: 525, coreVoltage: 1150, description: 'Factory default' },
+-  { id: 'power', label: 'Power', frequency: 610, coreVoltage: 1200, description: 'Most hashrate, runs hottest' },
++  { id: 'power', label: 'Power', frequency: 610, coreVoltage: 1200, description: 'High hashrate, runs hot' },
++  // Both ASICs share one 1.2 V regulator that warns at 38 A and faults at 40 A,
++  // so Max stays a step above Power rather than pushing to the limit. Above
++  // 75 °C the firmware drops to 50 MHz and stops until overheat mode is cleared.
++  { id: 'max', label: 'Max', frequency: 650, coreVoltage: 1225, description: 'Most hashrate, needs extra cooling' },
+ ];
+ 
+ export function matchPerformanceMode(frequency: number, coreVoltage: number): PerformanceMode | undefined {
