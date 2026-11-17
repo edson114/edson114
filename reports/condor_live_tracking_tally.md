@@ -46,22 +46,26 @@ instead of rebuilding from memory.
 | 2026-11-12 | 7550.84 | 7592.40 | 7580/7520 | loss | -$1,299.08 | 7590/7510 | loss | +$283.00 |
 | 2026-11-13 | 7616.85 | 7561.67 | 7645/7585 | loss | -$2,758.20 | 7655/7575 | loss | -$1,846.49 |
 | 2026-11-16 | 7513.98 | 7416.59 | 7545/7485 | loss | -$2,666.31 | 7555/7475 | loss | -$3,093.49 |
+| 2026-11-17 | 7411.02 | 7340.53 | 7440/7380 | loss | -$2,420.35 | 7450/7370 | loss | -$2,849.59 |
 
-**Totals over 23 trading days:**
-- **30pt/$20:** 9 wins / 14 losses, net P&L (2 contracts) = **-$12,311.83**
-- **40pt/$20:** 13 wins / 10 losses, net P&L (2 contracts) = **-$12,093.50**
+**Totals over 24 trading days:**
+- **30pt/$20:** 9 wins / 15 losses, net P&L (2 contracts) = **-$14,732.18**
+- **40pt/$20:** 13 wins / 11 losses, net P&L (2 contracts) = **-$14,943.09**
 
 Note: "win"/"loss" marks whether a short strike was breached by the close, not
 the sign of that day's P&L -- a small breach can still net positive if the
 day's credit comfortably covers it (e.g. 2026-10-20 and 2026-11-11 for 30pt,
 2026-11-12 for 40pt).
 
-**Takeaway so far:** both structures are net losers across this 21-day
-window, dragged down by a cluster of high-volatility days (10/30, 11/2, 11/4,
-11/5, 11/9) where the day's range blew through the $20 wing on one side
-regardless of starting distance. The 40pt structure wins more often (13 vs 9)
-because the extra 10 points of initial distance avoids some marginal
-breaches, but its lower entry credit means it doesn't actually net out ahead
-of the 30pt structure over the full sample -- consistent with the standing
-finding that extra OTM distance helps on borderline days but provides little
-protection once a move exceeds ~1-2%.
+**Takeaway so far:** both structures are net losers across this 24-day
+window, and the losses have accelerated sharply in the most recent stretch --
+four straight down/volatile days (11/12 call-side breach, 11/13, 11/16, 11/17
+put-side breaches) have erased what used to be a real gap between the two
+structures. The 40pt structure still has more wins (13 vs 9) because the
+extra 10 points of initial distance avoids some marginal breaches, but its
+lower entry credit means it no longer beats the 30pt structure on net P&L --
+the two are now essentially tied in total losses. This reinforces the
+standing finding that extra OTM distance helps only on borderline days and
+provides little protection once SPX is trending/moving >1% per day for
+multiple days in a row, which is exactly the regime this tracking window has
+just lived through.
