@@ -2,6 +2,6 @@ id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proc
 1,CLOSED,CJ,F4vEFNoH9H2oLYRabaQQ2Z6jAAi2AhRVdTdVH6Nn2J1q,2026-11-18,0.0002163310228,50.00,231127.2759,231127.2759,40.83,2026-11-18,0.0001766703353,-9.17,-18.3,no,yes,"paper bot, WAIT, score 66 | paper bot exit: STOP"
 2,CLOSED,BAWSAQ,4La95NEVJdYK9kr375SfKPXnLA8ef8GtsjfVfW27pump,2026-11-18,0.0005598877436,50.00,89303.6159,89303.6159,37.60,2026-11-18,0.0004210436495,-12.40,-24.8,no,yes,"paper bot, WAIT, score 66 | paper bot exit: STOP"
 3,OPEN,DIGS,9QT8K685Hrae4k11dhGXirdtpfAaimExtyfwt8cPpump,2026-11-18,0.0002865,50.00,174520.0698,0,0,,,,,no,yes,"paper bot, BUY NOW, score 65"
-4,OPEN,MAX,5qaP7oKUqKffwwo5DaEqDoTtsBLMpdbQTxEkCDaTpump,2026-11-18,0.001559603611,50.00,32059.42821,0,0,,,,,no,yes,"paper bot, WAIT, score 62"
+4,CLOSED,MAX,5qaP7oKUqKffwwo5DaEqDoTtsBLMpdbQTxEkCDaTpump,2026-11-18,0.001559603611,50.00,32059.42821,32059.42821,39.32,2026-11-18,0.001226406064,-10.68,-21.4,no,yes,"paper bot, WAIT, score 62 | paper bot exit: STOP"
 5,OPEN,CBUCKS,DtcicPCKTKeAh7TDEzTym3hXeoHAoMiBdYJhMYxZpump,2026-11-18,0.003227451664,50.00,15492.09878,0,0,,,,,no,yes,"paper bot, WAIT, score 61"
 6,OPEN,HOGE,FVzqGqRmr4UH1Fif6dewmwbJ1p4YUZCu8dcw4Efopump,2026-11-18,0.001461,50.00,34223.13484,0,0,,,,,no,yes,"paper bot, BUY NOW, score 57"
