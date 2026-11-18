@@ -152,8 +152,41 @@ journalctl -u nano-monitor -f
 
 ### Mac
 
-Run the step 6 command in Terminal and leave the window open. Set the Mac to
-never sleep while plugged in (System Settings > Battery or Energy).
+A MacBook works while it is at home, awake and on the same network as the
+miner. Closing the lid or leaving home pauses the watching. When the Mac is
+back, the monitor reports what it finds, such as an overheat shutdown still
+in place or a restart that happened in the meantime.
+
+1. Put the script in its own folder:
+
+   ```bash
+   mkdir -p ~/nano-monitor && mv ~/Downloads/nano_monitor.py ~/nano-monitor/
+   ```
+
+2. Start it through `caffeinate`, which keeps the Mac from sleeping while the
+   monitor runs:
+
+   ```bash
+   caffeinate -is python3 ~/nano-monitor/nano_monitor.py --miner 192.168.1.50 --ntfy-topic YOUR_TOPIC --expect-address YOUR_BTC_ADDRESS
+   ```
+
+   Leave that Terminal window open, the Mac plugged in and the lid open. The
+   screen can turn off.
+
+3. Before taking the MacBook out of the house, press Ctrl+C in that window.
+   Otherwise you get a "Miner offline" alert, because the Mac can't reach the
+   miner from another network.
+
+If something doesn't work:
+
+- **`python3` asks to install the command line developer tools:** click
+  Install, then run the command again.
+- **The miner's page opens in your browser, but `--once` says "No answer":**
+  open System Settings > Privacy & Security > Local Network and allow
+  Terminal (or iTerm) if it is listed.
+- **`--test` fails with `CERTIFICATE_VERIFY_FAILED`:** your Python came from
+  python.org. Open its folder in Applications and double-click
+  "Install Certificates.command".
 
 ## Telegram instead of (or as well as) ntfy
 
