@@ -35,6 +35,17 @@ age / narrative buckets that stand out, and anything that keeps failing.
 Remind them it's before fees and a small sample. Commit the new file in
 `reports/memecoins/review/` and push.
 
+## "bot status"
+
+The paper bot (`run-bot`, see README) runs hourly from GitHub Actions on
+the default branch and commits its state there. For **`bot status`**,
+`git fetch origin main` and read `reports/memecoins/bot/status.md` and
+`journal/paper_trades.csv` from `origin/main` (if it hasn't run there
+yet, say so). Report equity vs the start, open and pending positions,
+the last closed trades, and Phase 1 progress. It's paper only: never
+connect it to a real wallet or ask for keys. Going live needs the user's
+explicit decision after 50+ paper trades, on their own machine.
+
 ## Logging the user's trades
 
 When the user says they bought or sold a coin, log it with `trade-log`

@@ -160,18 +160,25 @@ Candles = List[Tuple[float, float, float, float, float]]  # (ts, open, high, low
 class Outcome:
     pick: Pick
     event: str  # TARGET / STOP / NONE / NO FILL / GONE / NO DATA / TOO RECENT
-    ret: Optional[float] = None  # plan return per $1 invested
+    ret: Optional[float] = None  # plan return per $1 invested (marked to market if still open)
     max_mult: Optional[float] = None  # best high in the horizon vs the scan price
     close_mult: Optional[float] = None  # last close in the horizon vs the scan price
+    filled_ts: Optional[float] = None  # when the entry filled
+    open_fraction: float = 0.0  # share of the position still held (only without liquidation)
+    last_price: Optional[float] = None
 
 
-def simulate(pick: Pick, candles: Candles, cfg: Config, horizon_h: float) -> Outcome:
+def simulate(pick: Pick, candles: Candles, cfg: Config, horizon_h: float,
+             liquidate_at_end: bool = True) -> Outcome:
+    """Replay the plan over the candles. With liquidate_at_end=False (the paper
+    bot, mid-trade) whatever is still held stays open and is marked at the last close."""
     t0 = pick.ts.timestamp()
     c = [k for k in candles if t0 <= k[0] < t0 + horizon_h * 3600]
     if not c:
         return Outcome(pick, "NO DATA")
     p0 = pick.price
-    out = Outcome(pick, "NONE", max_mult=max(k[2] for k in c) / p0, close_mult=c[-1][4] / p0)
+    out = Outcome(pick, "NONE", max_mult=max(k[2] for k in c) / p0, close_mult=c[-1][4] / p0,
+                  last_price=c[-1][4])
 
     E = pick.entry or p0
     S = pick.stop or E * (1 - cfg.stop_loss_pct / 100)
@@ -185,6 +192,7 @@ def simulate(pick: Pick, candles: Candles, cfg: Config, horizon_h: float) -> Out
     if start is None:
         out.event = "NO FILL"
         return out
+    out.filled_ts = c[start][0]
 
     targets = [m for m, _ in cfg.take_profit_ladder]
     fractions = (0.5, 0.25)  # of the original; the rest trails from the last target
@@ -213,9 +221,11 @@ def simulate(pick: Pick, candles: Candles, cfg: Config, horizon_h: float) -> Out
             # Trailing starts here; this candle's low may have come before its high,
             # so the floor is first checked on the next candle.
             trailing, peak = True, high
-    if held > 0:
+    if held > 0 and liquidate_at_end:
         cash += held * c[-1][4] / E
-    out.ret = cash - 1.0
+        held = 0.0
+    out.open_fraction = held
+    out.ret = cash + held * c[-1][4] / E - 1.0
     return out
 
 

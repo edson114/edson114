@@ -1377,6 +1377,50 @@ Note the Nov 18 review: 5 of the 6 picks under 24h old were stopped out,
 and the under-24h penalty applies in fast mode too, so fast picks will
 mostly be 1-2 days old.
 
+### Paper-trading bot (`run-bot`)
+
+Trades the scanner's picks **on paper**, 24/7: no wallet, no keys, no
+real orders. Each run (hourly from GitHub Actions, or a loop on your own
+machine):
+
+1. Updates every pending and open position by replaying 15-minute
+   candles since its scan through the same simulator `--review` uses:
+   WAIT entries fill only if the price reaches the entry within 24h, then
+   the stop, the 50%/25% take-profit ladder and the trailing stop apply.
+   Anything still open after 72 hours is sold at the last close; a coin
+   that stops trading entirely is counted as stopped out.
+2. Charges 2% per side for fees, price impact and slippage.
+3. Runs a scan and opens new paper positions from the top picks: $50
+   each, at most 4 pending or open, never a coin it already holds or
+   left in the last 24 hours, and nothing more once the day's realized
+   loss reaches 3% of the starting $1,000.
+
+It takes every pick the scan makes, including ones a human would skip:
+it's a test of the scanner, not of judgment. State is in
+`journal/paper_bot.json`, closed trades in `journal/paper_trades.csv`
+(`trade-log stats --path journal/paper_trades.csv` works on it), and a
+status page in `reports/memecoins/bot/status.md`.
+
+```bash
+run-bot --once                    # one cycle (what the hourly workflow runs)
+run-bot --loop --interval 60      # run on your own machine, a cycle every hour
+run-bot --status                  # the status page, without trading
+run-bot --reset --cash 1000 --stake 50   # start over (keeps the trade log)
+run-bot --fast                    # trade fast-mode picks instead
+```
+
+`.github/workflows/memecoin-paper-bot.yml` runs `--once` every hour at
+:17 and commits the state. GitHub only runs scheduled workflows from the
+default branch, so it starts once this is merged into `main` (or run it
+by hand from the Actions tab).
+
+**Going live is a separate, later step**, only if the paper bot shows a
+real profit after costs over 50+ trades. It would place real swaps
+through a Solana swap API from **your own machine**, with a **separate
+wallet holding only a small amount**, hard per-trade and per-day limits
+and a kill switch. Its key would never go in this repo, a chat, or
+GitHub.
+
 ### Trade log
 
 Log the trades you actually take, and the plan's Phase 1 numbers (win
@@ -1492,18 +1536,21 @@ memecoin_scanner/
   journal.py              # trade log (trade-log): buys, partial sells, Phase 1 stats
   narrative.py            # hot-narrative detection across the scanned coins
   review.py               # --review: grade saved picks against what happened next
+  bot.py                  # run-bot: paper-trading bot (hourly via GitHub Actions)
   report.py               # Markdown report rendering
   scan.py                 # CLI entrypoint / orchestration (+ offline self-test)
 tests/
   test_memecoin_scanner.py  # parsing, gates, scoring, pipeline and report (offline)
   test_memecoin_journal.py  # trade log: buys, partial sells, stats, CLI
   test_memecoin_review.py   # review: report parsing, plan simulation, dead coins, CLI
+  test_memecoin_bot.py      # paper bot: entries, fills, exits, limits, status, CLI
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
 reports/smallcap/         # daily small-cap momentum options scan reports land here
 reports/memecoins/        # meme coin scan reports land here (one .md + one .json per run)
 reports/memecoins/review/ # --review gradings of past picks
+reports/memecoins/bot/    # paper bot status page (journal/paper_bot.json + paper_trades.csv hold its state)
 reports/daily_target/     # daily $ target plans land here
 journal/                  # trade journal CSV (trades.csv) lands here
 journal/memecoin_trades.csv  # meme coin trade log (trade-log)
@@ -1512,4 +1559,5 @@ journal/memecoin_trades.csv  # meme coin trade log (trade-log)
   qqq-directional-signal.yml
   smallcap-options-scan.yml
   qqq-daily-target.yml
+  memecoin-paper-bot.yml  # hourly paper-trading bot run
 ```
