@@ -34,8 +34,8 @@ Problems that last (offline, overheat, wrong address, and others) repeat every
 ## What you need
 
 - A computer at home that stays on and is on the same network as the miner:
-  a Raspberry Pi, an old laptop, a NAS or a desktop. Python 3.8 or newer.
-  Nothing else to install.
+  a Raspberry Pi (Raspberry Pi OS or Kali Linux), an old laptop, a NAS or a
+  desktop. Python 3.8 or newer. Nothing else to install.
 - The **ntfy** app on your phone (free, Android and iPhone). Telegram also
   works; see below.
 
@@ -84,8 +84,29 @@ You should get "Monitoring started" right away. Leave it running.
 
 ### Raspberry Pi or Linux (systemd)
 
-Save this as `/etc/systemd/system/nano-monitor.service`, with your own values
-and the real path to the script:
+This works on Raspberry Pi OS, Kali Linux, Debian, Ubuntu and other Linux
+systems that use systemd. Check three things first:
+
+- **User name.** The example below uses `pi`, the Raspberry Pi OS default. On
+  Kali Linux it is usually `kali`. Run `whoami` to see yours, and use it for
+  `User=` and in the path to the script.
+- **Time zone.** The daily report goes out at 9:00 on the computer's clock,
+  and Kali images often come set to UTC. Run `timedatectl` to check. If it is
+  wrong, find your zone with `timedatectl list-timezones` and set it with
+  `sudo timedatectl set-timezone Your/Zone`.
+- **Network.** The Pi must be on your home network like any normal computer
+  (Ethernet or regular WiFi). On Kali, a WiFi adapter left in monitor mode or
+  a VPN with a kill switch stops it from reaching the miner.
+
+To copy the script from another computer to the Pi's home folder (use your
+user name and the Pi's address):
+
+```bash
+scp nano_monitor.py kali@PI_ADDRESS:~/
+```
+
+Save this as `/etc/systemd/system/nano-monitor.service`, with your own values,
+your user name and the real path to the script:
 
 ```ini
 [Unit]
