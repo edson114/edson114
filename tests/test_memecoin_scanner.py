@@ -742,3 +742,20 @@ def test_pipeline_attaches_themes_and_scores_the_bonus():
 
     md = rr(picks, [], stats, Config(), NOW)
     assert "## Hot narratives right now" in md and "**gta**: 3 coins" in md
+
+
+def test_themes_need_two_name_or_ticker_hits_and_ignore_links_and_common_words():
+    from memecoin_scanner.narrative import find_hot_themes
+
+    # "from"/"fan" only in descriptions, instagram only in links: no theme.
+    noisy = [_coin(f"N{i}", f"Coin {i}", description="from the fans, two of them",
+                   socials={"instagram": "https://instagram.com/x"}) for i in range(5)]
+    assert find_hot_themes(noisy) == {}
+    # One name hit plus descriptions isn't enough...
+    one = [_coin("GTA6", "GTA 6"), _coin("WSTD", "Wasted", description="gta vibes"),
+           _coin("LEON", "Leonida", description="gta 6 map")]
+    assert find_hot_themes(one) == {}
+    # ...two name hits plus a description hit is a theme of 3.
+    two = one + [_coin("GTAVI", "GTA VI")]
+    t = find_hot_themes(two)
+    assert list(t) == ["gta"] and t["gta"].size == 4

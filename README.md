@@ -1261,12 +1261,16 @@ what it found:
 
 | At the scan | Trades | Avg plan return | Stopped |
 |---|---|---|---|
-| Score under 50 | 6 | +59% | 33% |
-| Score 65+ | 6 | +0% | 83% |
-| Last hour resting (-10% to +20%) | 14 | +44% | 43% |
-| Last hour vertical (over +40%) | 4 | -29% | 75% |
+| All picks | 20 | +21% (median -15%) | 60% |
+| Score under 50 | 5 | +71% | 40% |
+| Score 65+ | 8 | -9% | 88% |
+| Last hour resting (-10% to +20%) | 14 | +41% | 50% |
+| Last hour vertical (over +40%) | 5 | -30% | 80% |
 | Coin 1-7 days old | 6 | +56% | 50% |
-| Coin under 24h old | 4 | +11% | 75% |
+| Coin under 24h old | 6 | -4% | 83% |
+
+(Before fees and slippage; the two picks that died completely count as
+stop-outs. Full table: `reports/memecoins/review/2026-11-18-0257.md`.)
 
 A study of that week's biggest Solana runners pointed the same way.
 Launch-hour pumps (15x-700x from a $2K-$150K market cap) were mostly back
@@ -1368,7 +1372,7 @@ filter) is the same. Reports are saved under `reports/memecoins/fast/`.
 Fast mode trades more often for smaller wins, so fees and slippage take
 a bigger share of each one: log the real proceeds with `trade-log` and
 compare its expectancy with the standard scan's before relying on it.
-Note the Nov 18 review: 3 of the 4 picks under 24h old were stopped out,
+Note the Nov 18 review: 5 of the 6 picks under 24h old were stopped out,
 and the under-24h penalty applies in fast mode too, so fast picks will
 mostly be 1-2 days old.
 
