@@ -235,6 +235,8 @@ def main(argv=None) -> int:
     parser.add_argument("--review", action="store_true",
                         help="Grade every saved pick on what happened after its scan (no new scan)")
     parser.add_argument("--horizon", type=float, default=72.0, help="Hours after each scan to grade (--review)")
+    parser.add_argument("--report", default=None,
+                        help="Only grade picks from reports whose name starts with this, e.g. 2026-11-18-0352 (--review)")
     args = parser.parse_args(argv)
 
     if args.review:
@@ -269,8 +271,10 @@ def _review_main(args) -> int:
     cfg = Config()
     root = Path(args.output_dir or cfg.output_dir)
     picks = review.load_picks(root)
+    if args.report:
+        picks = [p for p in picks if p.report.startswith(args.report)]
     if not picks:
-        print(f"No saved picks under {root}", file=sys.stderr)
+        print(f"No saved picks under {root}" + (f" from report {args.report}" if args.report else ""), file=sys.stderr)
         return 1
     t = cfg.request_timeout_s
     outcomes = review.run_review(

@@ -156,3 +156,14 @@ def test_cli_review(tmp_path, monkeypatch, capsys):
     assert scan.main(["--review", "--output-dir", str(tmp_path)]) == 0
     assert "# Scan Review" in capsys.readouterr().out
     assert len(list((tmp_path / "review").glob("*.md"))) == 1
+
+
+def test_cli_review_can_grade_one_report(tmp_path, monkeypatch, capsys):
+    picks = [_pick(symbol="KEEP", report="2026-11-18-0352.md"), _pick(symbol="SKIPME", report="2026-11-10-1212.md")]
+    monkeypatch.setattr(review, "load_picks", lambda root: picks)
+    monkeypatch.setattr(review, "fetch_history", lambda pool, chain, since, horizon, timeout: _path([1.0, 2.0]))
+    assert scan.main(["--review", "--report", "2026-11-18-0352", "--horizon", "24", "--no-save",
+                      "--output-dir", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert "$KEEP" in out and "$SKIPME" not in out and "graded on the 24 hours" in out
+    assert scan.main(["--review", "--report", "1999-01-01", "--output-dir", str(tmp_path)]) == 1

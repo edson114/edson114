@@ -1310,6 +1310,7 @@ saves to `reports/memecoins/review/`.
 ```bash
 run-scan --review               # grade everything at least 72h old
 run-scan --review --horizon 24  # a shorter window
+run-scan --review --horizon 24 --report 2026-11-18-0352   # just one scan's picks
 ```
 
 Run it every week or two: it's the only way to tell whether a change to
