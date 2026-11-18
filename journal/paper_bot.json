@@ -67,10 +67,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 54.03,
+   "value_usd": 66.05,
    "filled_ts": "2026-11-18T05:00:00+00:00",
    "journal_id": 3,
-   "last_price": 0.0003222209785852574,
+   "last_price": 0.00039390426290478484,
    "event": "NONE"
   },
   {
@@ -87,8 +87,12 @@
    "score": 62.4,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 51.59,
+   "filled_ts": "2026-11-18T13:45:00+00:00",
+   "journal_id": 4,
+   "last_price": 0.0016748563619086423,
+   "event": "NONE"
   },
   {
    "id": 5,
@@ -104,8 +108,12 @@
    "score": 61.2,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 51.97,
+   "filled_ts": "2026-11-18T13:15:00+00:00",
+   "journal_id": 5,
+   "last_price": 0.0034914634927102916,
+   "event": "NONE"
   },
   {
    "id": 6,
@@ -121,19 +129,19 @@
    "score": 56.6,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 52.78,
+   "filled_ts": "2026-11-18T13:15:00+00:00",
+   "journal_id": 6,
+   "last_price": 0.0016050993940894072,
+   "event": "NONE"
   }
  ],
- "runs": 2,
- "last_run": "2026-11-18T13:01:58.525730+00:00",
+ "runs": 3,
+ "last_run": "2026-11-18T14:12:48.069501+00:00",
  "last_log": [
-  "$CJ: bought $50 at 0.000216331",
-  "$CJ: closed (stopped out), -18% after costs, $-9.17",
-  "$BAWSAQ: bought $50 at 0.000559888",
-  "$BAWSAQ: closed (stopped out), -25% after costs, $-12.40",
-  "$DIGS: bought $50 at 0.0002865",
-  "$CBUCKS (score 61): WAIT, buy if it reaches 0.00322745 within 24h, stop 0.00274333",
-  "$HOGE (score 57): BUY NOW, buy at the scan price, stop 0.00094965"
+  "$Max: bought $50 at 0.0015596",
+  "$CBUCKS: bought $50 at 0.00322745",
+  "$HOGE: bought $50 at 0.001461"
  ]
 }
