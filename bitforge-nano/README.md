@@ -42,6 +42,8 @@ files again to get it back.
 
 ## What's in this folder
 
+- `monitor/`: a script that watches the miner from another computer at home
+  and sends alerts to your phone. See [monitor/README.md](monitor/README.md).
 - `max-preset.patch`: the source change (two UI files), against
   [WantClue/forge-os](https://github.com/WantClue/forge-os) commit `30c64e9`.
 - `firmware/bitforgeos.bin` and `firmware/www.bin`: built with ESP-IDF v6.0.2
