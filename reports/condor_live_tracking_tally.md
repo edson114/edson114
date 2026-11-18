@@ -47,10 +47,11 @@ instead of rebuilding from memory.
 | 2026-11-13 | 7616.85 | 7561.67 | 7645/7585 | loss | -$2,758.20 | 7655/7575 | loss | -$1,846.49 |
 | 2026-11-16 | 7513.98 | 7416.59 | 7545/7485 | loss | -$2,666.31 | 7555/7475 | loss | -$3,093.49 |
 | 2026-11-17 | 7411.02 | 7340.53 | 7440/7380 | loss | -$2,420.35 | 7450/7370 | loss | -$2,849.59 |
+| 2026-11-18 | 7355.69 | 7323.63 | 7385/7325 | loss | +$1,378.41 | 7395/7315 | WIN | +$1,225.19 |
 
-**Totals over 24 trading days:**
-- **30pt/$20:** 9 wins / 15 losses, net P&L (2 contracts) = **-$14,732.18**
-- **40pt/$20:** 13 wins / 11 losses, net P&L (2 contracts) = **-$14,943.09**
+**Totals over 25 trading days:**
+- **30pt/$20:** 9 wins / 16 losses, net P&L (2 contracts) = **-$13,353.77**
+- **40pt/$20:** 14 wins / 11 losses, net P&L (2 contracts) = **-$13,717.90**
 
 Note: "win"/"loss" marks whether a short strike was breached by the close, not
 the sign of that day's P&L -- a small breach can still net positive if the
