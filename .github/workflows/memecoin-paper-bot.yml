@@ -1,0 +1,46 @@
+name: Meme Coin Paper Bot
+
+on:
+  schedule:
+    # Every hour at :17 (GitHub delays jobs queued on the hour). Scheduled
+    # workflows only run from the default branch.
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# One run at a time: each run reads and rewrites the bot's state file.
+concurrency:
+  group: memecoin-paper-bot
+  cancel-in-progress: false
+
+jobs:
+  paper-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Paper trading only: no wallet, no keys, no real orders.
+      - name: Run one paper-trading cycle
+        run: python -m memecoin_scanner.bot --once
+
+      - name: Commit bot state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add journal/paper_bot.json journal/paper_trades.csv reports/memecoins/bot/
+          git diff --cached --quiet && exit 0
+          git commit -m "Paper bot run"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push

@@ -1,0 +1,60 @@
+# Notes for Claude
+
+## "run scan"
+
+When the user types **`run scan`** (on its own), they mean the meme coin
+scan, not the SPX/QQQ or small-cap scans:
+
+1. From the repo root, run `run-scan` (the console command from
+   `pyproject.toml`; if it isn't installed, run `pip install -e .` or use
+   `python -m memecoin_scanner`). It saves a report to
+   `reports/memecoins/`.
+2. Reply with the 5 picks: ticker, contract address (they paste it into
+   the fomo app), score, the entry action (BUY NOW / WAIT) with the buy
+   zone and entry price, the stop and take-profit levels, market cap,
+   liquidity, 1h/24h change, the main reasons and every risk flag. Say
+   which picks are labeled low conviction or use estimated levels (no
+   candles), and keep the not-financial-advice warning short.
+3. Commit the new report and push to the session's branch.
+
+## "run fast scan"
+
+**`run fast scan`** means `run-scan --fast`: short-term rules (coins under
+48h whose volume is speeding up, 1h swing, 50% sold at 1.5x, 4h time
+stop). Reply the same way as for "run scan" and include each pick's time
+stop. Say it's inspired by fast traders like Kimchi, never that it is his
+strategy: his rules aren't public. Reports land in
+`reports/memecoins/fast/`.
+
+## "run review"
+
+**`run review`** means `run-scan --review`: it grades every saved pick at
+least 72h old against what happened next (takes a few minutes; it's
+rate-limited). Reply with the summary table, the score / last-hour /
+age / narrative buckets that stand out, and anything that keeps failing.
+Remind them it's before fees and a small sample. Commit the new file in
+`reports/memecoins/review/` and push.
+
+## "bot status"
+
+The paper bot (`run-bot`, see README) runs hourly from GitHub Actions on
+the default branch and commits its state there. For **`bot status`**,
+`git fetch origin main` and read `reports/memecoins/bot/status.md` and
+`journal/paper_trades.csv` from `origin/main` (if it hasn't run there
+yet, say so). Report equity vs the start, open and pending positions,
+the last closed trades, and Phase 1 progress. It's paper only: never
+connect it to a real wallet or ask for keys. Going live needs the user's
+explicit decision after 50+ paper trades, on their own machine.
+
+## Logging the user's trades
+
+When the user says they bought or sold a coin, log it with `trade-log`
+(or `python -m memecoin_scanner.journal`): `buy --symbol --usd --price
+--contract`, `sell --id --price [--fraction 0.5] [--proceeds]`. If they
+don't give the fill price, log the latest quoted price with `--estimated`
+and ask for the real fill, then fix it with `correct --id --proceeds` (or
+`--price`). Show `trade-log stats` after each close, then
+commit `journal/memecoin_trades.csv` and push. Phase 1 of their plan is
+50 closed trades at a fixed $50-100 size before scaling.
+
+The fomo app has no API; don't claim the picks came from inside fomo.

@@ -1,0 +1,761 @@
+"""Offline unit tests for the meme coin scanner (no network)."""
+
+import datetime as dt
+from dataclasses import replace
+
+from memecoin_scanner import data
+from memecoin_scanner.config import Config
+from memecoin_scanner.data import SafetyReport, best_pair_per_token, parse_pair, parse_rugcheck_report
+from memecoin_scanner.entry import Candle, fetch_candles, parse_ohlcv, plan_entry, swing_from_candles, vwap
+from memecoin_scanner.report import _price, render_report
+from memecoin_scanner.scan import _self_test_report, _synthetic_pair, run_pipeline
+from memecoin_scanner.scoring import apply_safety, market_gate, safety_gate, score_market
+
+NOW = dt.datetime(2026, 1, 1, 12, 0, tzinfo=dt.timezone.utc)
+ADDR = "Tok11111111111111111111111111111111111pump"
+
+
+def _pair(**kw):
+    symbol = kw.pop("symbol", "TOK")
+    return _synthetic_pair(symbol, ADDR, NOW, **kw)
+
+
+def _candles(low, high, last, rise=24, fall=6, volume=1_000.0):
+    """Rise from low to high, then move to last; tight wicks. Oldest first."""
+    closes = [low + (high - low) * i / (rise - 1) for i in range(rise)]
+    closes += [high + (last - high) * i / fall for i in range(1, fall + 1)]
+    out, prev = [], closes[0]
+    for i, c in enumerate(closes):
+        out.append(Candle(1_000 + 300 * i, prev, max(prev, c), min(prev, c), c, volume))
+        prev = c
+    return out
+
+
+def _safe(**kw):
+    base = dict(available=True, mint_authority_revoked=True, freeze_authority_revoked=True,
+                lp_locked_pct=100.0, total_holders=5_000, top10_pct=18.0)
+    base.update(kw)
+    return SafetyReport(**base)
+
+
+# --- parsing -----------------------------------------------------------------
+
+def test_parse_pair_reads_dexscreener_fields():
+    raw = {
+        "chainId": "solana", "dexId": "pumpswap", "url": "https://dexscreener.com/solana/x",
+        "pairAddress": "PAIR", "baseToken": {"address": ADDR, "name": "Tok", "symbol": "TOK"},
+        "quoteToken": {"symbol": "SOL"}, "priceUsd": "0.0049",
+        "txns": {"h1": {"buys": 10, "sells": 5}}, "volume": {"h24": 1000, "h1": 50},
+        "priceChange": {"h1": 12.5}, "liquidity": {"usd": 5000}, "fdv": 90000, "marketCap": 80000,
+        "pairCreatedAt": int(NOW.timestamp() * 1000) - 3_600_000,
+        "info": {"websites": [{"url": "https://tok.xyz"}], "socials": [{"type": "twitter", "url": "https://x.com/tok"}]},
+        "boosts": {"active": 30},
+    }
+    p = parse_pair(raw)
+    assert p.symbol == "TOK" and p.quote_symbol == "SOL"
+    assert p.price_usd == 0.0049 and p.market_cap == 80000 and p.liquidity_usd == 5000
+    assert p.txns["h1"] == (10, 5) and p.buy_sell_ratio("h1") == 2.0
+    assert abs(p.age_hours(NOW) - 1.0) < 1e-6
+    assert p.socials == {"twitter": "https://x.com/tok"} and p.websites == ["https://tok.xyz"]
+    assert p.boosts_active == 30
+
+
+def test_parse_pair_falls_back_to_fdv_and_rejects_missing_address():
+    assert parse_pair({"baseToken": {}}) is None
+    p = parse_pair({"baseToken": {"address": ADDR}, "fdv": 123})
+    assert p.market_cap == 123 and p.age_hours(NOW) is None
+
+
+def test_best_pair_keeps_deepest_liquidity_and_merges_sources():
+    a = _pair(liquidity_usd=10_000.0, sources={"boosts"})
+    b = _pair(liquidity_usd=90_000.0, pair_address="DEEP", sources={"search"})
+    best = best_pair_per_token([a, b])
+    assert best[ADDR].pair_address == "DEEP"
+    assert best[ADDR].sources == {"boosts", "search"}
+
+
+def test_rugcheck_parser_excludes_pools_and_burn_from_concentration():
+    report = {
+        "mintAuthority": None, "freezeAuthority": None, "rugged": False, "totalHolders": 900,
+        "graphInsidersDetected": 3, "launchpad": {"name": "Pump.Fun"},
+        "knownAccounts": {"AMMOWNER": {"type": "AMM"}},
+        "markets": [{"pubkey": "POOL", "liquidityA": "POOLVAULT",
+                     "lp": {"lpLockedPct": 100, "lpLockedUSD": 90_000}},
+                    {"pubkey": "POOL2", "lp": {"lpLockedPct": 0, "lpLockedUSD": 0}}],
+        "topHolders": [
+            {"address": "POOLVAULT", "owner": "POOL", "pct": 30.0},
+            {"address": "X", "owner": "AMMOWNER", "pct": 10.0},
+            {"address": "B", "owner": "11111111111111111111111111111111", "pct": 5.0},
+            {"address": "W1", "owner": "whale1", "pct": 4.0},
+            {"address": "W2", "owner": "whale2", "pct": 2.5},
+        ],
+        "risks": [{"name": "Low liquidity", "level": "warn"}, {"name": "Copycat", "level": "danger", "value": "x"}],
+    }
+    s = parse_rugcheck_report(report)
+    assert s.mint_authority_revoked and s.freeze_authority_revoked and not s.rugged
+    assert s.top10_pct == 6.5
+    assert s.lp_locked_pct == 100.0  # USD-weighted, the empty market adds nothing
+    assert s.warn_risks == ["Low liquidity"] and s.danger_risks == ["Copycat (x)"]
+    assert s.total_holders == 900 and s.insiders_detected == 3 and s.launchpad == "Pump.Fun"
+
+
+def test_rugcheck_parser_flags_live_authorities():
+    s = parse_rugcheck_report({"mintAuthority": "DEV", "freezeAuthority": "DEV", "topHolders": []})
+    assert not s.mint_authority_revoked and not s.freeze_authority_revoked
+    assert s.top10_pct == 0
+
+
+def test_get_json_returns_none_on_errors(monkeypatch):
+    class Resp:
+        status_code = 404
+
+    monkeypatch.setattr(data._SESSION, "get", lambda *a, **k: Resp())
+    assert data._get_json("https://example.invalid", 1, retries=0) is None
+    assert data.fetch_safety(ADDR, 1).available is False
+
+
+# --- gates -------------------------------------------------------------------
+
+def test_market_gate_passes_a_healthy_pair():
+    assert market_gate(_pair(), Config(), NOW) is None
+
+
+def test_market_gate_rejections():
+    cfg = Config()
+    assert "liquidity" in market_gate(_pair(liquidity_usd=5_000.0), cfg, NOW)
+    assert "above ceiling" in market_gate(_pair(market_cap=900_000_000.0), cfg, NOW)
+    assert "below floor" in market_gate(_pair(market_cap=50_000.0), cfg, NOW)
+    assert "min old" in market_gate(_pair(pair_created_at=NOW - dt.timedelta(minutes=20)), cfg, NOW)
+    assert "dumping" in market_gate(_pair(price_change={"h1": -50.0, "h6": 0.0}), cfg, NOW)
+    assert "major" in market_gate(_pair(symbol="USDC"), cfg, NOW)
+    assert "quoted in" in market_gate(_pair(quote_symbol="FOO"), cfg, NOW)
+    assert "volume" in market_gate(_pair(volume={"h24": 10.0}), cfg, NOW)
+
+
+def test_safety_gate():
+    cfg = Config()
+    assert safety_gate(_safe(), cfg) is None
+    assert safety_gate(SafetyReport(available=False), cfg) is None  # flagged, not rejected
+    assert "mint" in safety_gate(_safe(mint_authority_revoked=False), cfg)
+    assert "freeze" in safety_gate(_safe(freeze_authority_revoked=False), cfg)
+    assert "rugged" in safety_gate(_safe(rugged=True), cfg)
+    assert "top-10" in safety_gate(_safe(top10_pct=60.0), cfg)
+    assert "danger" in safety_gate(_safe(danger_risks=["Copycat"]), cfg)
+
+
+# --- scoring -----------------------------------------------------------------
+
+def test_bot_sized_trades_discount_buy_pressure_and_penalize():
+    cfg = Config()
+    organic = score_market(_pair(), cfg, NOW)  # $80 average trade
+    bots = score_market(
+        _pair(txns={"h24": (90_000, 60_000), "h6": (40_000, 20_000), "h1": (8_000, 5_000), "m5": (900, 500)}),
+        cfg, NOW,
+    )  # $400K / 60K trades = ~$7 average
+    assert bots.components["buy_pressure"] < 0.5 * organic.components["buy_pressure"]
+    assert any("bot micro-trades" in r for _, r in bots.penalties)
+    assert not any("bot micro-trades" in r for _, r in organic.penalties)
+
+
+def test_penalties_for_late_entry_falling_candle_and_missing_socials():
+    sc = score_market(
+        _pair(price_change={"m5": -15.0, "h1": 10.0, "h6": 30.0, "h24": 4000.0}, socials={}, websites=[]),
+        Config(), NOW,
+    )
+    reasons = " | ".join(r for _, r in sc.penalties)
+    assert "late entry" in reasons and "falling right now" in reasons and "no website or socials" in reasons
+
+
+def test_smaller_cap_scores_more_upside_room():
+    cfg = Config()
+    small = score_market(_pair(market_cap=400_000.0, liquidity_usd=60_000.0), cfg, NOW)
+    big = score_market(_pair(market_cap=20_000_000.0, liquidity_usd=2_000_000.0), cfg, NOW)
+    assert small.components["upside_room"] > big.components["upside_room"]
+
+
+def test_safety_component_and_unverified_flag():
+    cfg = Config()
+    good = apply_safety(score_market(_pair(), cfg, NOW), _safe(), cfg)
+    concentrated = apply_safety(score_market(_pair(), cfg, NOW), _safe(top10_pct=40.0, total_holders=400), cfg)
+    unverified = apply_safety(score_market(_pair(), cfg, NOW), SafetyReport(available=False), cfg)
+    assert good.components["safety"] > concentrated.components["safety"] > 0
+    assert unverified.components["safety"] == 0
+    assert any("UNVERIFIED" in f for f in unverified.flags)
+
+
+def test_score_is_clamped():
+    sc = score_market(_pair(), Config(), NOW)
+    sc.penalties.append((500, "huge"))
+    assert sc.score == 0.0
+
+
+# --- pipeline + report ---------------------------------------------------------
+
+def _run(pairs, safety, cfg=None):
+    cfg = cfg or Config()
+    return run_pipeline(
+        cfg,
+        discover=lambda: ({"solana": {p.token_address: {"test"} for p in pairs}}, [], ["test"]),
+        fetch_pairs=lambda chain, addrs: [replace(p, sources=set()) for p in pairs if p.token_address in addrs],
+        fetch_safety=lambda addr: safety.get(addr, SafetyReport(available=False)),
+        now=NOW,
+    )
+
+
+def test_pipeline_ranks_verified_first_and_caps_top_n():
+    pairs = [_synthetic_pair(f"C{i}", f"Addr{i:02d}" + "1" * 34 + "pump", NOW) for i in range(8)]
+    safety = {p.token_address: _safe() for p in pairs[1:]}  # C0 unverified
+    picks, runners_up, stats = _run(pairs, safety)
+    assert len(picks) == 5 and len(runners_up) == 3
+    assert all(sc.safety.available for sc in picks)
+    assert runners_up[-1].pair.symbol == "C0"  # unverified sinks below verified at equal score
+    assert stats.discovered == 8 and stats.passed_market == 8 and stats.passed_safety == 8
+
+
+def test_pipeline_drops_unsafe_and_counts_rejections():
+    good = _synthetic_pair("GOOD", "Good" + "1" * 38 + "pump", NOW)
+    rug = _synthetic_pair("RUG", "Rugg" + "1" * 38 + "pump", NOW)
+    thin = _synthetic_pair("THIN", "Thin" + "1" * 38 + "pump", NOW, liquidity_usd=1_000.0)
+    safety = {good.token_address: _safe(), rug.token_address: _safe(freeze_authority_revoked=False)}
+    picks, _, stats = _run([good, rug, thin], safety)
+    assert [sc.pair.symbol for sc in picks] == ["GOOD"]
+    assert stats.safety_checked == 2 and sum(stats.rejections.values()) == 2
+
+
+def test_safety_checks_are_capped():
+    pairs = [_synthetic_pair(f"C{i}", f"Addr{i:02d}" + "1" * 34 + "pump", NOW) for i in range(6)]
+    calls = []
+    cfg = replace(Config(), max_safety_checks=3)
+    run_pipeline(
+        cfg,
+        discover=lambda: ({"solana": {p.token_address: set() for p in pairs}}, [], []),
+        fetch_pairs=lambda chain, addrs: list(pairs),
+        fetch_safety=lambda addr: calls.append(addr) or _safe(),
+        now=NOW,
+    )
+    assert len(calls) == 3
+
+
+def test_report_renders_contract_plan_and_low_conviction_label():
+    cfg = Config()
+    sc = apply_safety(score_market(_pair(), cfg, NOW), _safe(), cfg)
+    weak = apply_safety(score_market(_pair(), cfg, NOW), _safe(), cfg)
+    weak.penalties.append((60, "test penalty"))
+    from memecoin_scanner.report import ScanStats
+
+    sc.entry = plan_entry(sc.pair, _candles(0.0012, 0.0027, 0.0021), cfg)
+    weak.entry = plan_entry(weak.pair, None, cfg)
+    md = render_report([sc, weak], [], ScanStats(sources_ok=["test"], discovered=2), cfg, NOW)
+    assert f"`{ADDR}`" in md and "paste into fomo search" in md
+    assert "**Entry: BUY NOW.**" in md and "**Entry: WAIT.**" in md
+    assert "| 1 | $TOK | " in md and "| BUY NOW | $" in md  # summary table row
+    assert "Stop: $0.001365 (-35% from entry)" in md and "2x = $0.004200" in md
+    assert "candles unavailable" in md  # the estimated plan says so
+    assert md.count("(low conviction)") == 1
+    assert "Not financial advice" in md
+
+
+def test_report_with_no_picks_says_sit_out():
+    from memecoin_scanner.report import ScanStats
+
+    md = render_report([], [], ScanStats(), Config(), NOW)
+    assert "No coin passed every gate" in md
+
+
+def test_price_formatting_keeps_significant_digits():
+    assert _price(0.004856) == "$0.004856"
+    assert _price(0.00005369) == "$0.00005369"
+    assert _price(1.5) == "$1.5000"
+    assert _price(0) == "?"
+
+
+def test_self_test_report_end_to_end():
+    md = _self_test_report(NOW)
+    assert "### 1. $GOOD" in md
+    for rejected in ("$MINT", "$DUMP", "$THIN", "$WHALE"):
+        assert rejected not in md
+    assert "whale concentration: 1" in md and "mint not revoked: 1" in md
+
+
+def test_falling_candle_penalty_grows_with_the_drop():
+    cfg = Config()
+
+    def pts(m5):
+        sc = score_market(_pair(price_change={"m5": m5, "h1": 10.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
+        return sum(p for p, r in sc.penalties if "falling right now" in r)
+
+    assert pts(-5.0) == 0
+    assert pts(-10.0) == 4.0
+    assert 7.5 < pts(-22.0) < 8.0
+    assert pts(-60.0) == 10.0
+
+
+# --- entry points ----------------------------------------------------------------
+
+def test_run_scan_console_script_points_at_main():
+    import importlib
+    import tomllib
+    from pathlib import Path
+
+    pyproject = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text())
+    target = pyproject["project"]["scripts"]["run-scan"]
+    module_name, func_name = target.split(":")
+    from memecoin_scanner.scan import main
+
+    assert getattr(importlib.import_module(module_name), func_name) is main
+    assert "memecoin_scanner" in pyproject["tool"]["setuptools"]["packages"]
+
+
+def test_python_dash_m_package_runs_self_test():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    out = subprocess.run(
+        [sys.executable, "-m", "memecoin_scanner", "--self-test"],
+        cwd=Path(__file__).resolve().parent.parent, capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    assert "### 1. $GOOD" in out.stdout
+
+
+# --- entry plans -----------------------------------------------------------------
+
+def test_parse_ohlcv_sorts_oldest_first_and_drops_bad_rows():
+    payload = {"data": {"attributes": {"ohlcv_list": [
+        [300, 2, 3, 1, 2.5, 10], [0, 1, 2, 0.5, 1.5, 5], ["bad"], [600, 0, 0, 0, 0, 0],
+    ]}}}
+    candles = parse_ohlcv(payload)
+    assert [c.ts for c in candles] == [0, 300]
+    assert parse_ohlcv({"errors": []}) == [] and parse_ohlcv(None) == []
+
+
+def test_fetch_candles_uses_the_exact_pool_address(monkeypatch):
+    seen = {}
+
+    def fake(url, timeout, params=None, retries=2, backoff_s=1.5):
+        seen.update(url=url, params=params)
+        return None
+
+    monkeypatch.setattr(data, "_get_json", fake)
+    pair = _pair(pair_address="6wZc2vrqZKfLCa4hSabMXTLURj5GjjmkNHQL3hiJv9Zn")
+    assert fetch_candles(pair, Config()) is None
+    assert seen["url"].endswith("/networks/solana/pools/6wZc2vrqZKfLCa4hSabMXTLURj5GjjmkNHQL3hiJv9Zn/ohlcv/minute")
+    assert seen["params"] == {"aggregate": 5, "limit": 144}
+
+
+def test_swing_uses_the_low_before_the_high():
+    candles = _candles(1.0, 2.0, 1.5)
+    low, high = swing_from_candles(candles, 36)
+    assert low == 1.0 and high == 2.0
+    falling = list(reversed(_candles(1.0, 2.0, 2.0, fall=1)))  # high first, then down
+    low, high = swing_from_candles(falling, 36)
+    assert high == 2.0 and low == 1.0
+
+
+def test_vwap_weights_by_volume():
+    a = Candle(0, 1, 1, 1, 1, 100)
+    b = Candle(300, 4, 4, 4, 4, 300)
+    assert vwap([a, b]) == 3.25
+    assert vwap([Candle(0, 1, 1, 1, 1, 0)]) is None
+
+
+def test_entry_buy_now_inside_the_fib_zone():
+    cfg = Config()
+    e = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), cfg)
+    assert e.action == "BUY NOW" and e.entry == 0.0021
+    assert abs(e.zone_high - (0.0027 - 0.382 * 0.0015)) < 1e-9
+    assert abs(e.zone_low - (0.0027 - 0.618 * 0.0015)) < 1e-9
+    assert e.method.startswith("5m candles")
+
+
+def test_entry_wait_when_above_the_zone_sets_a_limit_in_it():
+    e = plan_entry(_pair(price_usd=0.0026), _candles(0.0012, 0.0027, 0.0026), Config())
+    assert e.action == "WAIT" and "above the zone" in e.note
+    assert e.zone_low < e.entry < e.zone_high and e.entry < e.price
+
+
+def _low_vwap(candles):
+    """Put almost all the volume on the first (lowest) candles so VWAP sits near the swing low."""
+    return [replace(c, volume=1e6 if i < 3 else 1.0) for i, c in enumerate(candles)]
+
+
+def test_entry_wait_when_dipped_under_the_zone():
+    e = plan_entry(_pair(price_usd=0.0014), _low_vwap(_candles(0.0012, 0.0027, 0.0014)), Config())
+    assert e.above_vwap is True
+    assert e.action == "WAIT" and "dipped under the zone" in e.note and e.entry == e.zone_low
+
+
+def test_below_vwap_blocks_buy_now_and_waits_for_a_reclaim():
+    # In the fib zone, but the 12h VWAP (heavy volume near the top) is above price.
+    candles = _candles(0.0012, 0.0027, 0.0018)
+    candles = [replace(c, volume=1e6 if 0.0019 <= c.close <= 0.0021 else 1.0) for c in candles]
+    e = plan_entry(_pair(price_usd=0.0018), candles, Config())
+    assert e.zone_low < e.price < e.vwap <= e.zone_high and e.above_vwap is False
+    assert e.action == "WAIT" and "under the 12h VWAP" in e.note and "climbs back above" in e.note
+    assert e.entry == e.vwap and e.stop < e.entry
+
+
+def test_vwap_above_the_whole_zone_is_a_downtrend_breakout_entry():
+    candles = _candles(0.0012, 0.0027, 0.0018)
+    candles = [replace(c, volume=1e6 if c.close >= 0.0026 else 1.0) for c in candles]
+    e = plan_entry(_pair(price_usd=0.0018), candles, Config())
+    assert e.vwap > e.zone_high
+    assert e.action == "WAIT" and e.entry == e.vwap and "downtrend" in e.note
+
+
+def test_above_vwap_keeps_buy_now_and_skip_is_unchanged():
+    e = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), Config())
+    assert e.above_vwap is True and e.action == "BUY NOW"
+    skip = plan_entry(_pair(price_usd=0.0010), _candles(0.0012, 0.0027, 0.0013), Config())
+    assert skip.action == "SKIP"
+    estimated = plan_entry(_pair(), None, Config())
+    assert estimated.vwap is None and estimated.above_vwap is None
+
+
+def test_wait_above_zone_says_alert_not_blind_limit():
+    e = plan_entry(_pair(price_usd=0.0026), _candles(0.0012, 0.0027, 0.0026), Config())
+    assert "price alert" in e.note and "limit buy" not in e.note
+
+
+# --- 24h crash gate ----------------------------------------------------------------
+
+def test_market_gate_rejects_a_24h_crash():
+    cfg = Config()
+    crashed = _pair(price_change={"m5": 0.0, "h1": 2.0, "h6": -8.0, "h24": -79.0})
+    assert "crashed: -79% in 24h" == market_gate(crashed, cfg, NOW)
+    assert market_gate(_pair(price_change={"m5": 0.0, "h1": 2.0, "h6": 5.0, "h24": -30.0}), cfg, NOW) is None
+
+
+# --- unique wallets ----------------------------------------------------------------
+
+def test_parse_wallet_counts_keeps_exact_pool_case():
+    payload = {"data": [
+        {"attributes": {"address": "Cns3TxMp6kArSNUF", "transactions": {
+            "h1": {"buys": 97, "sells": 67, "buyers": 59, "sellers": 54},
+            "h6": {"buys": 674, "sells": 445, "buyers": 281, "sellers": 286}}}},
+        {"attributes": {"address": "NoTxns"}},
+    ]}
+    out = data.parse_wallet_counts(payload)
+    assert out == {"Cns3TxMp6kArSNUF": {"h1": (59, 54), "h6": (281, 286)}}
+    assert data.parse_wallet_counts(None) == {} and data.parse_wallet_counts({"errors": []}) == {}
+
+
+def test_fetch_wallet_counts_batches_30_pools_per_call(monkeypatch):
+    urls = []
+
+    def fake(url, timeout, params=None, retries=2, backoff_s=1.5):
+        urls.append(url)
+        pools = url.rsplit("/", 1)[1].split(",")
+        return {"data": [{"attributes": {"address": a, "transactions": {"h1": {"buyers": 1, "sellers": 1}}}}
+                         for a in pools]}
+
+    monkeypatch.setattr(data, "_get_json", fake)
+    pools = [f"Pool{i}" for i in range(45)]
+    out = data.fetch_wallet_counts("solana", pools + [""], 1)
+    assert len(urls) == 2 and "/networks/solana/pools/multi/" in urls[0]
+    assert len(out) == 45 and out["Pool44"] == {"h1": (1, 1)}
+
+
+def test_wallet_ratio_drives_buy_pressure_and_flags_repeat_buyers():
+    cfg = Config()
+    # $STOKE on Nov 9: 672 buys vs 439 sells by count, but 275 vs 282 unique wallets.
+    stoke = _pair(txns={"h24": (2438, 1709), "h6": (672, 439), "h1": (107, 68), "m5": (7, 4)},
+                  volume={"h24": 700_000.0, "h6": 70_000.0, "h1": 10_000.0, "m5": 800.0})
+    counts_only = score_market(stoke, cfg, NOW)
+    stoke.wallets = {"h1": (58, 50), "h6": (275, 282)}
+    with_wallets = score_market(stoke, cfg, NOW)
+    assert with_wallets.components["buy_pressure"] < counts_only.components["buy_pressure"]
+    assert any("repeat-buying" in r for _, r in with_wallets.penalties)
+    assert not any("repeat-buying" in r for _, r in counts_only.penalties)
+
+    real = _pair()
+    real.wallets = {"h1": (300, 180), "h6": (1000, 700)}
+    sc = score_market(real, cfg, NOW)
+    assert any("unique wallets" in r for r in sc.reasons)
+    assert not any("repeat-buying" in r for _, r in sc.penalties)
+    assert _pair().wallet_ratio("h1") is None
+
+
+def test_pipeline_fetches_wallets_once_for_gate_survivors():
+    pairs = [_synthetic_pair(f"C{i}", f"Addr{i:02d}" + "1" * 34 + "pump", NOW) for i in range(3)]
+    pairs.append(_synthetic_pair("THIN", "Thin" + "1" * 38 + "pump", NOW, liquidity_usd=1_000.0))
+    calls = []
+
+    def wallets(chain, pools):
+        calls.append(list(pools))
+        return {pool: {"h1": (300, 150), "h6": (900, 600)} for pool in pools}
+
+    picks, _, stats = run_pipeline(
+        Config(),
+        discover=lambda: ({"solana": {p.token_address: set() for p in pairs}}, [], []),
+        fetch_pairs=lambda chain, addrs: [replace(p) for p in pairs],
+        fetch_safety=lambda addr: _safe(),
+        now=NOW,
+        fetch_wallets=wallets,
+    )
+    assert len(calls) == 1 and len(calls[0]) == 3  # THIN was gated out first
+    assert stats.wallet_data == 3 and all(sc.pair.wallets for sc in picks)
+    from memecoin_scanner.report import render_report as rr
+
+    assert "GeckoTerminal unique wallets for 3 of 3 coins" in rr(picks, [], stats, Config(), NOW)
+
+
+def test_entry_skip_when_below_the_swing_low():
+    e = plan_entry(_pair(price_usd=0.0010), _candles(0.0012, 0.0027, 0.0013), Config())
+    assert e.action == "SKIP"
+
+
+def test_stop_is_clamped_between_15_and_35_percent():
+    cfg = Config()
+    deep_leg = plan_entry(_pair(price_usd=0.0021), _candles(0.0005, 0.0027, 0.0021), cfg)
+    assert abs(deep_leg.stop_pct - 35.0) < 1e-6  # swing low far below: capped at -35%
+    flat = plan_entry(_pair(price_usd=1.00), _candles(0.99, 1.02, 1.00), cfg)
+    assert abs(flat.stop_pct - 15.0) < 1e-6  # swing low right under: at least -15%
+    mid = plan_entry(_pair(price_usd=1.00), _candles(0.80, 1.30, 1.00), cfg)
+    assert abs(mid.stop - 0.80 * 0.95) < 1e-9  # otherwise 5% under the swing low
+
+
+def test_take_profits_are_multiples_of_the_entry():
+    e = plan_entry(_pair(price_usd=0.0026), _candles(0.0012, 0.0027, 0.0026), Config())
+    assert [round(px / e.entry, 6) for _, px, _ in e.take_profits(Config())] == [2.0, 5.0, 10.0]
+
+
+def test_entry_falls_back_to_percent_changes_without_candles():
+    p = _pair(price_usd=1.20, price_change={"m5": 0.0, "h1": 20.0, "h6": 50.0, "h24": 80.0})
+    e = plan_entry(p, None, Config())
+    assert abs(e.swing_low - 1.0) < 1e-9 and abs(e.swing_high - 1.2) < 1e-9
+    assert "candles unavailable" in e.method and e.vwap is None
+
+
+def test_pipeline_replaces_skipped_picks_and_caps_candle_lookups():
+    pairs = [_synthetic_pair(f"C{i}", f"Addr{i:02d}" + "1" * 34 + "pump", NOW) for i in range(8)]
+    safety = {p.token_address: _safe() for p in pairs}
+    pairs[0] = replace(pairs[0], volume={**pairs[0].volume, "m5": 30_000.0})  # rank C0 first
+    looked_up = []
+
+    def candles_for(pair):
+        looked_up.append(pair.symbol)
+        if pair.symbol == "C0":  # already broke its swing low
+            return _candles(0.0025, 0.004, 0.0024)
+        return _candles(0.0012, 0.0027, pair.price_usd)
+
+    cfg = replace(Config(), max_entry_checks=6)
+    picks, runners_up, stats = run_pipeline(
+        cfg,
+        discover=lambda: ({"solana": {p.token_address: set() for p in pairs}}, [], []),
+        fetch_pairs=lambda chain, addrs: [replace(p) for p in pairs],
+        fetch_safety=lambda addr: safety[addr],
+        now=NOW,
+        fetch_candles=candles_for,
+    )
+    assert looked_up[0] == "C0" and "C0" not in [sc.pair.symbol for sc in picks]
+    assert len(picks) == 5 and all(sc.entry.action != "SKIP" for sc in picks)
+    assert runners_up[0].pair.symbol == "C0" and runners_up[0].entry.action == "SKIP"
+    assert stats.entry_skips == 1 and len(looked_up) == 6
+
+
+def test_momentum_reason_needs_both_windows_green():
+    cfg = Config()
+    flat = score_market(_pair(price_change={"m5": 0.0, "h1": 1.0, "h6": -1.0, "h24": 5.0}), cfg, NOW)
+    assert not any("trending up" in r or "momentum" in r for r in flat.reasons)
+    resting = score_market(_pair(price_change={"m5": 0.0, "h1": 8.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
+    assert any(r.startswith("strong day, resting hour") for r in resting.reasons)
+    hot_hour = score_market(_pair(price_change={"m5": 0.0, "h1": 50.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
+    assert any(r.startswith("trending up") for r in hot_hour.reasons)
+
+
+def test_crash_rejections_get_their_own_bucket():
+    from memecoin_scanner.report import _rejection_bucket
+
+    assert _rejection_bucket("crashed: -60% in 24h") == "crashed in 24h"
+    assert _rejection_bucket("dumping: -30% in 1h") == "dumping"
+
+
+def test_fetch_safety_retries_with_longer_backoff(monkeypatch):
+    seen = {}
+
+    def fake(url, timeout, params=None, retries=2, backoff_s=1.5):
+        seen.update(retries=retries, backoff_s=backoff_s)
+        return None
+
+    monkeypatch.setattr(data, "_get_json", fake)
+    assert data.fetch_safety(ADDR, 1).available is False
+    assert seen == {"retries": 3, "backoff_s": 3.0}
+
+
+# --- fast mode -------------------------------------------------------------------------
+
+def test_fast_config_is_opt_in_and_sets_the_short_term_rules():
+    from memecoin_scanner.config import fast_config
+
+    std, fast = Config(), fast_config()
+    assert std.mode == "standard" and std.max_age_hours is None and std.time_stop_hours is None
+    assert fast.mode == "fast" and fast.max_age_hours == 48.0 and fast.min_volume_accel == 1.2
+    assert fast.swing_lookback_candles == 12 and fast.stop_loss_pct == 25.0 and fast.min_stop_pct == 10.0
+    assert fast.take_profit_ladder[0][0] == 1.5 and fast.time_stop_hours == 4.0
+    assert fast.output_dir == "reports/memecoins/fast"
+    assert fast_config(replace(std, top_n=3)).top_n == 3  # keeps other settings
+
+
+def test_fast_gates_reject_old_coins_and_coins_not_speeding_up():
+    from memecoin_scanner.config import fast_config
+
+    fast = fast_config()
+    assert market_gate(_pair(), fast, NOW) is None  # 30h old, volume 1.8x the 6h pace
+    old = _pair(pair_created_at=NOW - dt.timedelta(days=5))
+    assert "fast mode trades fresh coins" in market_gate(old, fast, NOW)
+    assert market_gate(old, Config(), NOW) is None  # the standard scan doesn't care
+    slow = _pair(volume={"h24": 1_500_000.0, "h6": 600_000.0, "h1": 80_000.0, "m5": 7_000.0})
+    assert "not speeding up (0.8x" in market_gate(slow, fast, NOW)
+
+
+def test_fast_entry_uses_a_1h_swing_and_tighter_stop_band():
+    from memecoin_scanner.config import fast_config
+
+    fast = fast_config()
+    # 3h climb, then a 1h leg from 0.0024 to 0.0030 and a pullback to 0.00275.
+    candles = _candles(0.0010, 0.0024, 0.0024, rise=24, fall=1) + [
+        Candle(10_000 + 300 * i, 0.0024, 0.0024 + 0.00006 * (i + 1), 0.0024, 0.0024 + 0.00006 * (i + 1), 1_000.0)
+        for i in range(10)
+    ]
+    candles.append(Candle(20_000, 0.0030, 0.0030, 0.00275, 0.00275, 1_000.0))
+    e_fast = plan_entry(_pair(price_usd=0.00275), candles, fast)
+    e_std = plan_entry(_pair(price_usd=0.00275), candles, Config())
+    assert e_fast.swing_low > e_std.swing_low  # the 1h leg starts higher than the 3h one
+    assert "1h swing" in e_fast.method and "3h swing" in e_std.method
+    assert 10.0 - 1e-6 <= e_fast.stop_pct <= 25.0 + 1e-6
+
+
+def test_fast_report_explains_the_mode_and_prints_the_time_stop():
+    md = _self_test_report(NOW, cfg=__import__("memecoin_scanner.config", fromlist=["fast_config"]).fast_config())
+    assert md.startswith("# Meme Coin Fast Scan")
+    assert "**Fast mode:**" in md and "his actual rules aren't public" in md
+    assert "Time stop: if it isn't up 20% within 4h" in md and "1.5x = $" in md
+    std = _self_test_report(NOW)
+    assert "Fast mode" not in std and "Time stop" not in std
+
+
+def test_cli_fast_flag_saves_under_the_fast_folder(tmp_path, monkeypatch):
+    from memecoin_scanner import scan
+
+    seen = {}
+    monkeypatch.setattr(scan, "run_scan", lambda cfg, now, picks_out=None: seen.setdefault("cfg", cfg) and "# report")
+    assert scan.main(["--fast", "--output-dir", str(tmp_path)]) == 0
+    assert seen["cfg"].mode == "fast" and len(list(tmp_path.glob("*.md"))) == 1
+    assert len(list(tmp_path.glob("*.json"))) == 1  # sidecar for --review
+
+
+def test_singular_pick_heading():
+    from memecoin_scanner.report import ScanStats
+
+    cfg = Config()
+    sc = apply_safety(score_market(_pair(), cfg, NOW), _safe(), cfg)
+    sc.entry = plan_entry(sc.pair, None, cfg)
+    assert "## Top 1 pick\n" in render_report([sc], [], ScanStats(), cfg, NOW)
+
+
+def test_falling_5m_candle_turns_buy_now_into_wait():
+    falling = _pair(price_usd=0.0021, price_change={"m5": -17.0, "h1": 22.0, "h6": 60.0, "h24": 240.0})
+    e = plan_entry(falling, _candles(0.0012, 0.0027, 0.0021), Config())
+    assert e.action == "WAIT" and "falling right now (-17% in 5m)" in e.note and e.entry == 0.0021
+    calm = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), Config())
+    assert calm.action == "BUY NOW"
+
+
+# --- review fixes (Nov 2026): momentum shape, young coins, narratives -----------------
+
+def test_resting_hour_after_a_strong_day_beats_a_vertical_hour():
+    cfg = Config()
+    resting = score_market(_pair(price_change={"m5": 0.0, "h1": 5.0, "h6": 40.0, "h24": 150.0}), cfg, NOW)
+    vertical = score_market(_pair(price_change={"m5": 0.0, "h1": 110.0, "h6": 180.0, "h24": 260.0}), cfg, NOW)
+    assert resting.score > vertical.score + 10
+    assert any(r.startswith("strong day, resting hour") for r in resting.reasons)
+    assert any("vertical last hour (+110% in 1h)" in r for _, r in vertical.penalties)
+    assert not any("vertical" in r for _, r in resting.penalties)
+
+
+def test_young_coin_penalties_are_graded():
+    cfg = Config()
+
+    def pts(hours):
+        sc = score_market(_pair(pair_created_at=NOW - dt.timedelta(hours=hours)), cfg, NOW)
+        return sum(p for p, r in sc.penalties if "most coins this young die" in r)
+
+    assert pts(3) == 8 and pts(12) == 5 and pts(30) == 0
+
+
+def _coin(symbol, name, vol=500_000.0, h24=50.0, **kw):
+    addr = (symbol + "1" * 44)[:44]
+    return _synthetic_pair(symbol, addr, NOW, name=name, volume={"h24": vol, "h6": 100_000.0, "h1": 20_000.0, "m5": 2_000.0},
+                           price_change={"m5": 0.0, "h1": 2.0, "h6": 10.0, "h24": h24}, **kw)
+
+
+def test_hot_theme_found_across_name_and_symbol_variants():
+    from memecoin_scanner.narrative import find_hot_themes, theme_for
+
+    coins = [_coin("GTA6", "GTA 6"), _coin("GTAVI", "GTA VI"), _coin("GATO", "GTA6CAT"),
+             _coin("LEON", "State of Leonida", description="GTA 6 is coming"), _coin("DOGE2", "Doge Two")]
+    themes = find_hot_themes(coins)
+    assert list(themes) == ["gta"] and themes["gta"].size == 4 and themes["gta"].up_count == 4
+    assert theme_for(coins[3], themes).word == "gta" and theme_for(coins[4], themes) is None
+
+
+def test_theme_needs_volume_breadth_and_mostly_green_coins():
+    from memecoin_scanner.narrative import find_hot_themes
+
+    two = [_coin("CATA", "cat one"), _coin("CATB", "cat two")]
+    assert find_hot_themes(two) == {}  # only 2 coins
+    thin = [_coin(f"C{i}", "frog king", vol=60_000.0) for i in range(3)]
+    assert find_hot_themes(thin) == {}  # $180K combined < $1M
+    red = [_coin(f"R{i}", "frog king", h24=-30.0) for i in range(3)] + [_coin("R9", "frog king")]
+    assert find_hot_themes(red) == {}  # only 1 of 4 up
+    dust = [_coin(f"D{i}", "frog king", vol=10_000.0) for i in range(10)]
+    assert find_hot_themes(dust) == {}  # coins without real volume don't count
+    assert "frog" in find_hot_themes([_coin(f"F{i}", "frog king") for i in range(3)])
+
+
+def test_stopwords_and_url_noise_never_make_a_theme():
+    from memecoin_scanner.narrative import coin_words
+
+    p = _coin("ABC", "The Official Coin", description="https://www.example.com pump fun on solana")
+    words = coin_words(p)
+    assert "abc" in words and "example" in words
+    assert not words & {"the", "official", "coin", "https", "www", "com", "pump", "fun", "solana"}
+
+
+def test_pipeline_attaches_themes_and_scores_the_bonus():
+    coins = [_coin("GTA6", "GTA 6"), _coin("GTAVI", "GTA VI"), _coin("GATO", "GTA6CAT"), _coin("PEPE9", "Pepe Nine")]
+    picks, _, stats = run_pipeline(
+        Config(),
+        discover=lambda: ({"solana": {p.token_address: set() for p in coins}}, [], [],
+                          {coins[3].token_address: "a frog"}),
+        fetch_pairs=lambda chain, addrs: [replace(p) for p in coins],
+        fetch_safety=lambda addr: _safe(),
+        now=NOW,
+    )
+    by_sym = {sc.pair.symbol: sc for sc in picks}
+    assert "gta" in stats.themes
+    assert by_sym["GTA6"].components.get("narrative") == 6.0 and "narrative" not in by_sym["PEPE9"].components
+    assert by_sym["PEPE9"].pair.description == "a frog"
+    from memecoin_scanner.report import render_report as rr
+
+    md = rr(picks, [], stats, Config(), NOW)
+    assert "## Hot narratives right now" in md and "**gta**: 3 coins" in md
+
+
+def test_themes_need_two_name_or_ticker_hits_and_ignore_links_and_common_words():
+    from memecoin_scanner.narrative import find_hot_themes
+
+    # "from"/"fan" only in descriptions, instagram only in links: no theme.
+    noisy = [_coin(f"N{i}", f"Coin {i}", description="from the fans, two of them",
+                   socials={"instagram": "https://instagram.com/x"}) for i in range(5)]
+    assert find_hot_themes(noisy) == {}
+    # One name hit plus descriptions isn't enough...
+    one = [_coin("GTA6", "GTA 6"), _coin("WSTD", "Wasted", description="gta vibes"),
+           _coin("LEON", "Leonida", description="gta 6 map")]
+    assert find_hot_themes(one) == {}
+    # ...two name hits plus a description hit is a theme of 3.
+    two = one + [_coin("GTAVI", "GTA VI")]
+    t = find_hot_themes(two)
+    assert list(t) == ["gta"] and t["gta"].size == 4
