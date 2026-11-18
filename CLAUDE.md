@@ -26,6 +26,15 @@ stop. Say it's inspired by fast traders like Kimchi, never that it is his
 strategy: his rules aren't public. Reports land in
 `reports/memecoins/fast/`.
 
+## "run review"
+
+**`run review`** means `run-scan --review`: it grades every saved pick at
+least 72h old against what happened next (takes a few minutes; it's
+rate-limited). Reply with the summary table, the score / last-hour /
+age / narrative buckets that stand out, and anything that keeps failing.
+Remind them it's before fees and a small sample. Commit the new file in
+`reports/memecoins/review/` and push.
+
 ## Logging the user's trades
 
 When the user says they bought or sold a coin, log it with `trade-log`

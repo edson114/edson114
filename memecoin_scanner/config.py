@@ -55,7 +55,15 @@ class Config:
     # --- Penalties ---
     wash_volume_liquidity_ratio: float = 40.0  # 24h volume / liquidity
     late_entry_h24_pct: float = 1500.0  # already ran >15x today
-    young_age_hours: float = 3.0
+    # Nov 2026 review: every pick under ~20h old failed, and every pick up
+    # 40%+ in its last hour failed; winners were resting after a strong day.
+    young_age_hours: float = 24.0  # penalty below this; double below very_young
+    very_young_age_hours: float = 6.0
+    vertical_h1_pct: float = 40.0  # buying the spike
+    # Hot narratives (narrative.py): themes shared by 3+ active coins.
+    theme_min_coins: int = 3
+    theme_min_volume_h24: float = 1_000_000.0
+    theme_points: float = 6.0  # +2 per coin beyond the minimum, capped at 10
     insider_flag_count: int = 25
     falling_m5_pct: float = -10.0
     # Average 6h trade size (USD). At/below bot level buy pressure counts
@@ -103,6 +111,7 @@ class Config:
         (5.0, "sell another 25%"),
         (10.0, "trail the last 25% with a 30% trailing stop"),
     )
+    trail_stop_pct: float = 30.0  # for the last 25%, from the last target (used by --review)
 
     # --- Fast mode only (see fast_config); off in the standard scan ---
     mode: str = "standard"
@@ -137,6 +146,7 @@ def fast_config(base: Optional[Config] = None) -> Config:
             (2.0, "sell another 25%"),
             (3.0, "trail the last 25% with a 20% trailing stop"),
         ),
+        trail_stop_pct=20.0,
         time_stop_hours=4.0,
         time_stop_min_gain_pct=20.0,
         output_dir="reports/memecoins/fast",

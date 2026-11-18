@@ -23,6 +23,7 @@ class ScanStats:
     passed_safety: int = 0
     entry_skips: int = 0
     wallet_data: int = 0
+    themes: dict = field(default_factory=dict)  # word -> narrative.Theme
     rejections: Counter = field(default_factory=Counter)
 
 
@@ -208,6 +209,18 @@ def render_report(picks: List[Scored], runners_up: List[Scored], stats: ScanStat
                 f"| ${p.symbol} | {sc.score:.0f} | {_usd(p.market_cap)} | {_pct(p.price_change.get('h1', 0))} "
                 f"| {entry} | `{p.token_address}` |"
             )
+        out.append("")
+
+    if stats.themes:
+        out.append("## Hot narratives right now")
+        out.append("")
+        out.append("Themes shared by several active coins, most of them up on the day. Coins in a hot theme get a "
+                   "score bonus; themes run together, and fade together.")
+        out.append("")
+        for t in sorted(stats.themes.values(), key=lambda t: (-t.size, -t.volume_h24))[:5]:
+            syms = ", ".join("$" + s for s in t.symbols[:8])
+            out.append(f"- **{t.word}**: {t.size} coins, ${t.volume_h24 / 1e6:.1f}M 24h volume, "
+                       f"{t.up_count} up today ({syms})")
         out.append("")
 
     if stats.rejections:

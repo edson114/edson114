@@ -1,7 +1,7 @@
 """Gates and the 0-100 score.
 
 Score components (weights sum to 100):
-  momentum      25  1h and 6h price change in a "running, not blown off" band
+  momentum      25  a strong 24h/6h trend with a resting (not vertical) last hour
   buy_pressure  20  unique buyers vs sellers over 1h and 6h (trade counts
                     if wallet data is missing), discounted when the
                     average trade is bot-sized
@@ -9,6 +9,7 @@ Score components (weights sum to 100):
   liquidity     15  liquidity/market-cap ratio and absolute depth
   upside_room   10  smaller market cap = more room to multiply
   safety        15  holder count, top-10 concentration, LP locked (RugCheck)
+  narrative   +6-10  bonus when the coin shares a hot theme with 3+ active coins
 Penalties then come off for wash-trading-sized volume, bot micro-trades,
 repeat-buying wallets, an already-15x day, a falling 5m candle, very new pairs, missing socials, RugCheck warnings and insider clusters.
 """
@@ -127,11 +128,19 @@ def score_market(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None
     h6 = p.price_change.get("h6", 0.0)
     h24 = p.price_change.get("h24", 0.0)
 
-    mom = 0.5 * _band(h1, -10, 5, 60, 200) + 0.5 * _band(h6, -20, 15, 250, 1000)
+    # Reward a strong day/6h trend that is resting this hour (the setup past
+    # winners had), not a vertical last hour (every such past pick failed).
+    trend = 0.6 * _band(h24, -10, 30, 400, 3000) + 0.4 * _band(h6, -15, 10, 150, 600)
+    calm = _band(h1, -25, -8, 20, 60)
+    mom = 0.7 * trend + 0.3 * calm
     sc.components["momentum"] = 25 * mom
-    if mom >= 0.6 and h1 > 0 and h6 > 0:
-        label = "strong momentum" if h1 >= 15 else "trending up"
-        sc.reasons.append(f"{label}: {h1:+.0f}% 1h, {h6:+.0f}% 6h")
+    if trend >= 0.6 and calm >= 0.6:
+        sc.reasons.append(f"strong day, resting hour: {h24:+.0f}% 24h, {h6:+.0f}% 6h, {h1:+.0f}% 1h")
+    elif trend >= 0.6 and h6 > 0:
+        sc.reasons.append(f"trending up: {h24:+.0f}% 24h, {h6:+.0f}% 6h")
+    if h1 > cfg.vertical_h1_pct:
+        sc.penalties.append((8, f"vertical last hour ({h1:+.0f}% in 1h): buying the spike, and every past pick "
+                                f"like this failed"))
     m5 = p.price_change.get("m5", 0.0)
     if m5 <= cfg.falling_m5_pct:
         # 4 points at -10%, growing 0.3/pt, capped at 10.
@@ -192,7 +201,17 @@ def score_market(p: PairSnapshot, cfg: Config, now: Optional[dt.datetime] = None
         sc.penalties.append((8, f"already {h24:+,.0f}% in 24h: late entry, high pullback risk"))
     age = p.age_hours(now)
     if age is not None and age < cfg.young_age_hours:
-        sc.penalties.append((5, f"pair is {age:.1f}h old: no history, rug risk highest"))
+        pts = 8 if age < cfg.very_young_age_hours else 5
+        sc.penalties.append((pts, f"pair is {age:.1f}h old: most coins this young die, and every past pick under "
+                                  f"20h failed"))
+    if p.theme_word:
+        pts = min(10.0, cfg.theme_points + 2 * (p.theme_size - cfg.theme_min_coins))
+        sc.components["narrative"] = pts
+        others = [s for s in p.theme_symbols if s != p.symbol][:5]
+        sc.reasons.append(
+            f"part of a hot narrative: '{p.theme_word}' ({p.theme_size} coins, "
+            f"${p.theme_volume_h24 / 1e6:.1f}M 24h volume; with {', '.join('$' + s for s in others)})"
+        )
     if not p.socials and not p.websites:
         sc.penalties.append((5, "no website or socials listed"))
     elif "twitter" not in p.socials:

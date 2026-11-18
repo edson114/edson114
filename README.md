@@ -1210,6 +1210,7 @@ run-scan --no-save         # print only
 run-scan --top 10          # more picks
 run-scan --self-test       # offline, synthetic data
 run-scan --fast            # fast mode: fresh coins speeding up, quicker exits (see below)
+run-scan --review          # grade every saved pick on what happened next (see below)
 ```
 
 Without installing, `python -m memecoin_scanner` (or
@@ -1234,21 +1235,81 @@ so run it from the repo root or pass `--output-dir`.
 
 | Component | Points | What earns them |
 |---|---|---|
-| Momentum | 25 | 1h change in +5%..+60% and 6h in +15%..+250%, fading to 0 past +200% / +1000% (blow-offs) |
+| Momentum | 25 | a strong day and 6h (+30%..+400% in 24h, +10%..+150% in 6h) with a **resting** last hour (-8%..+20%); a vertical hour earns nothing |
 | Buy pressure | 20 | unique buyer/seller wallets over 1h and 6h (trade counts if wallet data is missing); discounted when the average trade is bot-sized ($10-$40) |
 | Acceleration | 15 | last hour's volume vs the 6h hourly pace, and the last 5m vs the 1h pace |
 | Liquidity | 15 | liquidity as a % of market cap (3%-12%) and absolute depth ($30K-$500K) |
 | Upside room | 10 | smaller market cap scores higher ($300K-$30M, log scale) |
 | Safety | 15 | holder count, top-10 concentration, LP locked/burned |
+| Narrative | +6 to +10 | bonus when the coin shares a **hot theme** with 3+ active coins (see below) |
 
 Penalties come off for 24h volume over 40x liquidity (wash trading),
 an average trade under $15 (bot micro-trades), trade counts showing
 1.3x+ more buys while unique buyers barely outnumber sellers (a few
 wallets repeat-buying), +1500% already in 24h
 (late entry), -10% or worse in the last 5m (4-10 points, more for a
-bigger drop), a pair under 3 hours old, no
+bigger drop), a vertical last hour (+40% or more: 8 points), a pair
+under 24 hours old (5 points, 8 under 6 hours), no
 socials, RugCheck warnings, and 25+ linked insider wallets. Paid
 DexScreener boosts are flagged, not penalized.
+
+### What the Nov 18 review changed
+
+`run-scan --review` (below) graded the first 22 picks. The old score
+was ranking backwards, so the momentum rules above were rebuilt from
+what it found:
+
+| At the scan | Trades | Avg plan return | Stopped |
+|---|---|---|---|
+| Score under 50 | 6 | +59% | 33% |
+| Score 65+ | 6 | +0% | 83% |
+| Last hour resting (-10% to +20%) | 14 | +44% | 43% |
+| Last hour vertical (over +40%) | 4 | -29% | 75% |
+| Coin 1-7 days old | 6 | +56% | 50% |
+| Coin under 24h old | 4 | +11% | 75% |
+
+A study of that week's biggest Solana runners pointed the same way.
+Launch-hour pumps (15x-700x from a $2K-$150K market cap) were mostly back
+down 78-100% from their peaks and are won by bots in the first minutes,
+so the gates still skip them. The catchable explosions were second legs
+on coins 10-14 days old at $0.8M-$3.4M market cap (WASTED 9.5x, BLOB 8x,
+GTA6 6.4x, Leonida 3.7x), running for 2-6 days, and most shared one
+narrative (GTA 6). Hence the narrative bonus. 22 picks is a small sample
+and these rules were drawn from it, so they're only proven once future
+reviews confirm them.
+
+### Hot narratives
+
+Meme coins explode in clusters. Each scan pulls words from every priced
+coin's name, symbol, description, social handles and website, and calls
+a word **hot** when 3+ coins with $50K+ 24h volume carry it (or a short
+variant of it: "gta" covers "gtavi"), their combined 24h volume is $1M+,
+and at least 60% of them are up on the day. Coins in a hot theme get +6
+points (+2 per extra coin, up to +10), and the report lists the themes.
+It's a heuristic: coins that reference a theme without a shared word
+(WASTED and Leonida are GTA references) are only caught through words
+that do overlap, like a description or a social handle.
+
+### Review: grade every past pick (`run-scan --review`)
+
+Reads every saved report (the JSON sidecar each scan now writes, or the
+Markdown for older ones), pulls 15-minute GeckoTerminal candles for the
+72 hours after each scan, and simulates that report's own plan: BUY NOW
+fills at the scan price, WAIT only if the entry is reached within 24h;
+then the stop, the 50%/25% take-profit ladder and the trailing stop.
+A candle that touches both the stop and a target counts as stopped (worst
+case), and a coin that no longer trades anywhere counts as a stop-out
+(GONE). Results are before fees and slippage. The review breaks the
+results down by score, last-hour move, age, mode and narrative, and
+saves to `reports/memecoins/review/`.
+
+```bash
+run-scan --review               # grade everything at least 72h old
+run-scan --review --horizon 24  # a shorter window
+```
+
+Run it every week or two: it's the only way to tell whether a change to
+the scan actually helped.
 
 ### Entry point: where to buy
 
@@ -1307,6 +1368,9 @@ filter) is the same. Reports are saved under `reports/memecoins/fast/`.
 Fast mode trades more often for smaller wins, so fees and slippage take
 a bigger share of each one: log the real proceeds with `trade-log` and
 compare its expectancy with the standard scan's before relying on it.
+Note the Nov 18 review: 3 of the 4 picks under 24h old were stopped out,
+and the under-24h penalty applies in fast mode too, so fast picks will
+mostly be 1-2 days old.
 
 ### Trade log
 
@@ -1421,16 +1485,20 @@ memecoin_scanner/
   scoring.py              # market + safety gates and the 0-100 score
   entry.py                # entry point: 5m candles, buy zone, BUY NOW/WAIT/SKIP, stop, take-profits
   journal.py              # trade log (trade-log): buys, partial sells, Phase 1 stats
+  narrative.py            # hot-narrative detection across the scanned coins
+  review.py               # --review: grade saved picks against what happened next
   report.py               # Markdown report rendering
   scan.py                 # CLI entrypoint / orchestration (+ offline self-test)
 tests/
   test_memecoin_scanner.py  # parsing, gates, scoring, pipeline and report (offline)
   test_memecoin_journal.py  # trade log: buys, partial sells, stats, CLI
+  test_memecoin_review.py   # review: report parsing, plan simulation, dead coins, CLI
 reports/                  # daily iron condor reports land here
 reports/signals/          # directional signal reports land here
 reports/backtests/        # backtest reports land here (iron condor + directional)
 reports/smallcap/         # daily small-cap momentum options scan reports land here
-reports/memecoins/        # meme coin scan reports land here (one per run)
+reports/memecoins/        # meme coin scan reports land here (one .md + one .json per run)
+reports/memecoins/review/ # --review gradings of past picks
 reports/daily_target/     # daily $ target plans land here
 journal/                  # trade journal CSV (trades.csv) lands here
 journal/memecoin_trades.csv  # meme coin trade log (trade-log)

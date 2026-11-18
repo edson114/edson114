@@ -559,8 +559,10 @@ def test_momentum_reason_needs_both_windows_green():
     cfg = Config()
     flat = score_market(_pair(price_change={"m5": 0.0, "h1": 1.0, "h6": -1.0, "h24": 5.0}), cfg, NOW)
     assert not any("trending up" in r or "momentum" in r for r in flat.reasons)
-    up = score_market(_pair(price_change={"m5": 0.0, "h1": 8.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
-    assert any(r.startswith("trending up") for r in up.reasons)
+    resting = score_market(_pair(price_change={"m5": 0.0, "h1": 8.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
+    assert any(r.startswith("strong day, resting hour") for r in resting.reasons)
+    hot_hour = score_market(_pair(price_change={"m5": 0.0, "h1": 50.0, "h6": 30.0, "h24": 50.0}), cfg, NOW)
+    assert any(r.startswith("trending up") for r in hot_hour.reasons)
 
 
 def test_crash_rejections_get_their_own_bucket():
@@ -638,9 +640,10 @@ def test_cli_fast_flag_saves_under_the_fast_folder(tmp_path, monkeypatch):
     from memecoin_scanner import scan
 
     seen = {}
-    monkeypatch.setattr(scan, "run_scan", lambda cfg, now: seen.setdefault("cfg", cfg) and "# report")
+    monkeypatch.setattr(scan, "run_scan", lambda cfg, now, picks_out=None: seen.setdefault("cfg", cfg) and "# report")
     assert scan.main(["--fast", "--output-dir", str(tmp_path)]) == 0
     assert seen["cfg"].mode == "fast" and len(list(tmp_path.glob("*.md"))) == 1
+    assert len(list(tmp_path.glob("*.json"))) == 1  # sidecar for --review
 
 
 def test_singular_pick_heading():
@@ -658,3 +661,84 @@ def test_falling_5m_candle_turns_buy_now_into_wait():
     assert e.action == "WAIT" and "falling right now (-17% in 5m)" in e.note and e.entry == 0.0021
     calm = plan_entry(_pair(price_usd=0.0021), _candles(0.0012, 0.0027, 0.0021), Config())
     assert calm.action == "BUY NOW"
+
+
+# --- review fixes (Nov 2026): momentum shape, young coins, narratives -----------------
+
+def test_resting_hour_after_a_strong_day_beats_a_vertical_hour():
+    cfg = Config()
+    resting = score_market(_pair(price_change={"m5": 0.0, "h1": 5.0, "h6": 40.0, "h24": 150.0}), cfg, NOW)
+    vertical = score_market(_pair(price_change={"m5": 0.0, "h1": 110.0, "h6": 180.0, "h24": 260.0}), cfg, NOW)
+    assert resting.score > vertical.score + 10
+    assert any(r.startswith("strong day, resting hour") for r in resting.reasons)
+    assert any("vertical last hour (+110% in 1h)" in r for _, r in vertical.penalties)
+    assert not any("vertical" in r for _, r in resting.penalties)
+
+
+def test_young_coin_penalties_are_graded():
+    cfg = Config()
+
+    def pts(hours):
+        sc = score_market(_pair(pair_created_at=NOW - dt.timedelta(hours=hours)), cfg, NOW)
+        return sum(p for p, r in sc.penalties if "most coins this young die" in r)
+
+    assert pts(3) == 8 and pts(12) == 5 and pts(30) == 0
+
+
+def _coin(symbol, name, vol=500_000.0, h24=50.0, **kw):
+    addr = (symbol + "1" * 44)[:44]
+    return _synthetic_pair(symbol, addr, NOW, name=name, volume={"h24": vol, "h6": 100_000.0, "h1": 20_000.0, "m5": 2_000.0},
+                           price_change={"m5": 0.0, "h1": 2.0, "h6": 10.0, "h24": h24}, **kw)
+
+
+def test_hot_theme_found_across_name_and_symbol_variants():
+    from memecoin_scanner.narrative import find_hot_themes, theme_for
+
+    coins = [_coin("GTA6", "GTA 6"), _coin("GTAVI", "GTA VI"), _coin("GATO", "GTA6CAT"),
+             _coin("LEON", "State of Leonida", description="GTA 6 is coming"), _coin("DOGE2", "Doge Two")]
+    themes = find_hot_themes(coins)
+    assert list(themes) == ["gta"] and themes["gta"].size == 4 and themes["gta"].up_count == 4
+    assert theme_for(coins[3], themes).word == "gta" and theme_for(coins[4], themes) is None
+
+
+def test_theme_needs_volume_breadth_and_mostly_green_coins():
+    from memecoin_scanner.narrative import find_hot_themes
+
+    two = [_coin("CATA", "cat one"), _coin("CATB", "cat two")]
+    assert find_hot_themes(two) == {}  # only 2 coins
+    thin = [_coin(f"C{i}", "frog king", vol=60_000.0) for i in range(3)]
+    assert find_hot_themes(thin) == {}  # $180K combined < $1M
+    red = [_coin(f"R{i}", "frog king", h24=-30.0) for i in range(3)] + [_coin("R9", "frog king")]
+    assert find_hot_themes(red) == {}  # only 1 of 4 up
+    dust = [_coin(f"D{i}", "frog king", vol=10_000.0) for i in range(10)]
+    assert find_hot_themes(dust) == {}  # coins without real volume don't count
+    assert "frog" in find_hot_themes([_coin(f"F{i}", "frog king") for i in range(3)])
+
+
+def test_stopwords_and_url_noise_never_make_a_theme():
+    from memecoin_scanner.narrative import coin_words
+
+    p = _coin("ABC", "The Official Coin", description="https://www.example.com pump fun on solana")
+    words = coin_words(p)
+    assert "abc" in words and "example" in words
+    assert not words & {"the", "official", "coin", "https", "www", "com", "pump", "fun", "solana"}
+
+
+def test_pipeline_attaches_themes_and_scores_the_bonus():
+    coins = [_coin("GTA6", "GTA 6"), _coin("GTAVI", "GTA VI"), _coin("GATO", "GTA6CAT"), _coin("PEPE9", "Pepe Nine")]
+    picks, _, stats = run_pipeline(
+        Config(),
+        discover=lambda: ({"solana": {p.token_address: set() for p in coins}}, [], [],
+                          {coins[3].token_address: "a frog"}),
+        fetch_pairs=lambda chain, addrs: [replace(p) for p in coins],
+        fetch_safety=lambda addr: _safe(),
+        now=NOW,
+    )
+    by_sym = {sc.pair.symbol: sc for sc in picks}
+    assert "gta" in stats.themes
+    assert by_sym["GTA6"].components.get("narrative") == 6.0 and "narrative" not in by_sym["PEPE9"].components
+    assert by_sym["PEPE9"].pair.description == "a frog"
+    from memecoin_scanner.report import render_report as rr
+
+    md = rr(picks, [], stats, Config(), NOW)
+    assert "## Hot narratives right now" in md and "**gta**: 3 coins" in md

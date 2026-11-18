@@ -73,6 +73,12 @@ class PairSnapshot:
     sources: set = field(default_factory=set)
     # Unique wallets per window from GeckoTerminal: window -> (buyers, sellers).
     wallets: Dict[str, Tuple[int, int]] = field(default_factory=dict)
+    description: str = ""  # from DexScreener boosts/profiles, when listed
+    # Hot narrative this coin belongs to (see narrative.py), set by the pipeline.
+    theme_word: str = ""
+    theme_size: int = 0
+    theme_volume_h24: float = 0.0
+    theme_symbols: tuple = ()
 
     def age_hours(self, now: Optional[dt.datetime] = None) -> Optional[float]:
         if self.pair_created_at is None:
@@ -157,8 +163,10 @@ def discover_token_addresses(chains: Iterable[str], search_queries: Iterable[str
     """Collect candidate token addresses per chain from several free lists.
 
     Returns (addresses: {chain: {address: set(source names)}},
-             prefetched_pairs: list[PairSnapshot], sources_ok: list[str]).
+             prefetched_pairs: list[PairSnapshot], sources_ok: list[str],
+             descriptions: {address: text from boosts/profiles}).
     """
+    descriptions: Dict[str, str] = {}
     chains = set(chains)
     found: Dict[str, Dict[str, set]] = {c: {} for c in chains}
     prefetched: List[PairSnapshot] = []
@@ -180,6 +188,8 @@ def discover_token_addresses(chains: Iterable[str], search_queries: Iterable[str
             sources_ok.append(source)
             for item in data:
                 add(item.get("chainId"), item.get("tokenAddress"), source)
+                if item.get("description") and item.get("tokenAddress"):
+                    descriptions.setdefault(item["tokenAddress"], str(item["description"])[:500])
 
     for q in search_queries:
         data = _get_json(DEXSCREENER + "/latest/dex/search", timeout, params={"q": q})
@@ -211,7 +221,7 @@ def discover_token_addresses(chains: Iterable[str], search_queries: Iterable[str
             if base_id.startswith(chain + "_"):
                 add(chain, base_id[len(chain) + 1:], source)
 
-    return found, prefetched, sources_ok
+    return found, prefetched, sources_ok, descriptions
 
 
 def fetch_pairs(chain: str, addresses: List[str], timeout: float) -> List[PairSnapshot]:

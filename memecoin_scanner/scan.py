@@ -5,6 +5,7 @@ Usage:
     python -m memecoin_scanner.scan --top 5 --no-save
     python -m memecoin_scanner.scan --self-test   # offline, synthetic data
     python -m memecoin_scanner.scan --fast        # fast mode (short-term, high-turnover)
+    python -m memecoin_scanner.scan --review      # grade every saved pick on what happened next
 """
 
 from __future__ import annotations
@@ -17,10 +18,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from . import data
+from . import data, review
 from .config import Config, fast_config
 from .data import PairSnapshot, SafetyReport
 from .entry import Candle, fetch_candles, plan_entry
+from .narrative import find_hot_themes, theme_for
 from .report import ScanStats, render_report
 from .scoring import Scored, apply_safety, market_gate, safety_gate, score_market
 
@@ -38,7 +40,9 @@ def run_pipeline(
 ) -> Tuple[List[Scored], List[Scored], ScanStats]:
     """Discover → price → market gates → safety on the best → rank → entry plans."""
     stats = ScanStats()
-    found, prefetched, stats.sources_ok = discover()
+    discovered = discover()
+    found, prefetched, stats.sources_ok = discovered[:3]
+    descriptions = discovered[3] if len(discovered) > 3 else {}
 
     all_pairs: List[PairSnapshot] = list(prefetched)
     for chain, addr_sources in found.items():
@@ -51,6 +55,17 @@ def run_pipeline(
 
     best = data.best_pair_per_token(all_pairs)
     stats.priced = len(best)
+
+    # Hot narratives across everything priced (rejected coins count too: they
+    # show where the market's attention is).
+    for p in best.values():
+        p.description = descriptions.get(p.token_address, p.description)
+    stats.themes = find_hot_themes(best.values(), cfg.theme_min_coins, cfg.theme_min_volume_h24)
+    for p in best.values():
+        t = theme_for(p, stats.themes)
+        if t:
+            p.theme_word, p.theme_size, p.theme_volume_h24 = t.word, t.size, t.volume_h24
+            p.theme_symbols = tuple(t.symbols)
 
     passed: List[PairSnapshot] = []
     for p in best.values():
@@ -116,7 +131,8 @@ def run_pipeline(
     return picks, runners_up, stats
 
 
-def run_scan(cfg: Config, now: Optional[dt.datetime] = None) -> str:
+def run_scan(cfg: Config, now: Optional[dt.datetime] = None, picks_out: Optional[list] = None) -> str:
+    """The scan's Markdown report; the picks are appended to `picks_out` when given."""
     now = now or dt.datetime.now(dt.timezone.utc)
     t = cfg.request_timeout_s
     picks, runners_up, stats = run_pipeline(
@@ -132,6 +148,8 @@ def run_scan(cfg: Config, now: Optional[dt.datetime] = None) -> str:
     )
     if stats.priced == 0:
         raise RuntimeError("no market data came back from DexScreener (network down or blocked?)")
+    if picks_out is not None:
+        picks_out.extend(picks)
     return render_report(picks, runners_up, stats, cfg, now)
 
 
@@ -146,7 +164,7 @@ def _synthetic_pair(symbol: str, address: str, now: dt.datetime, **kw) -> PairSn
         txns={"h24": (9_000, 6_000), "h6": (3_000, 2_000), "h1": (800, 500), "m5": (90, 50)},
         price_change={"m5": 3.0, "h1": 22.0, "h6": 60.0, "h24": 240.0},
         pair_created_at=now - dt.timedelta(hours=30), url=f"https://dexscreener.com/solana/{address}",
-        websites=["https://example.com"], socials={"twitter": "https://x.com/example"},
+        websites=[f"https://{symbol.lower()}coin.xyz"], socials={"twitter": f"https://x.com/{symbol.lower()}_on_sol"},
     )
     base.update(kw)
     return PairSnapshot(**base)
@@ -214,15 +232,22 @@ def main(argv=None) -> int:
     parser.add_argument("--self-test", action="store_true", help="Run the pipeline on synthetic data (no network)")
     parser.add_argument("--fast", action="store_true",
                         help="Fast mode: fresh coins speeding up, quicker targets, a 4h time stop")
+    parser.add_argument("--review", action="store_true",
+                        help="Grade every saved pick on what happened after its scan (no new scan)")
+    parser.add_argument("--horizon", type=float, default=72.0, help="Hours after each scan to grade (--review)")
     args = parser.parse_args(argv)
+
+    if args.review:
+        return _review_main(args)
 
     cfg = fast_config() if args.fast else Config()
     if args.top:
         cfg = replace(cfg, top_n=args.top)
 
     now = dt.datetime.now(dt.timezone.utc)
+    picks: list = []
     try:
-        report_md = _self_test_report(cfg=cfg) if args.self_test else run_scan(cfg, now)
+        report_md = _self_test_report(cfg=cfg) if args.self_test else run_scan(cfg, now, picks_out=picks)
     except Exception as exc:
         print(f"Scan failed: {exc}", file=sys.stderr)
         return 1
@@ -233,7 +258,35 @@ def main(argv=None) -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{now.strftime('%Y-%m-%d-%H%M')}.md"
         out_path.write_text(report_md)
+        # Machine-readable picks (exact pool, plan) so --review can grade them later.
+        out_path.with_suffix(".json").write_text(review.picks_to_json(picks, cfg, now, out_path.name))
         print(f"\nSaved report to {out_path}", file=sys.stderr)
+    return 0
+
+
+def _review_main(args) -> int:
+    now = dt.datetime.now(dt.timezone.utc)
+    cfg = Config()
+    root = Path(args.output_dir or cfg.output_dir)
+    picks = review.load_picks(root)
+    if not picks:
+        print(f"No saved picks under {root}", file=sys.stderr)
+        return 1
+    t = cfg.request_timeout_s
+    outcomes = review.run_review(
+        picks, now, args.horizon,
+        resolve_pools=lambda contracts: review.resolve_pools_live(contracts, t),
+        history=lambda pool, since: review.fetch_history(pool, "solana", since, args.horizon, t),
+        pause_s=cfg.candle_pause_s,
+    )
+    md = review.render_review(outcomes, args.horizon, now)
+    print(md)
+    if not args.no_save:
+        out_dir = root / "review"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{now.strftime('%Y-%m-%d-%H%M')}.md"
+        out_path.write_text(md)
+        print(f"\nSaved review to {out_path}", file=sys.stderr)
     return 0
 
 
