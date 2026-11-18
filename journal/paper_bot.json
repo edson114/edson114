@@ -1,8 +1,8 @@
 {
  "version": 1,
  "starting_cash": 1000.0,
- "cash": 800.0,
- "next_id": 5,
+ "cash": 778.4340536832618,
+ "next_id": 7,
  "positions": [
   {
    "id": 1,
@@ -18,8 +18,15 @@
    "score": 66.0,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "closed",
+   "value_usd": 40.83,
+   "filled_ts": "2026-11-18T09:30:00+00:00",
+   "journal_id": 1,
+   "last_price": 8.873111388277595e-05,
+   "event": "STOP",
+   "closed_ts": "2026-11-18T13:01:58.525730+00:00",
+   "ret": -0.15000000000000013,
+   "ret_net": -0.18333333333333346
   },
   {
    "id": 2,
@@ -35,8 +42,15 @@
    "score": 65.7,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "closed",
+   "value_usd": 37.6,
+   "filled_ts": "2026-11-18T05:00:00+00:00",
+   "journal_id": 2,
+   "last_price": 0.00024058880127309255,
+   "event": "STOP",
+   "closed_ts": "2026-11-18T13:01:58.525730+00:00",
+   "ret": -0.21729112740965306,
+   "ret_net": -0.24798559300143141
   },
   {
    "id": 3,
@@ -52,8 +66,12 @@
    "score": 65.3,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 54.03,
+   "filled_ts": "2026-11-18T05:00:00+00:00",
+   "journal_id": 3,
+   "last_price": 0.0003222209785852574,
+   "event": "NONE"
   },
   {
    "id": 4,
@@ -71,14 +89,51 @@
    "stake_usd": 50.0,
    "status": "pending",
    "value_usd": 50.0
+  },
+  {
+   "id": 5,
+   "symbol": "CBUCKS",
+   "contract": "DtcicPCKTKeAh7TDEzTym3hXeoHAoMiBdYJhMYxZpump",
+   "pool": "B4Cp45PGifVM5FAXfh6AeV8QZ3eUNQnqGBw7KuC7MHnB",
+   "chain": "solana",
+   "scan_ts": "2026-11-18T13:01:58.525730+00:00",
+   "action": "WAIT",
+   "price": 0.003157,
+   "entry": 0.0032274516639064425,
+   "stop": 0.0027433339143204762,
+   "score": 61.2,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
+  },
+  {
+   "id": 6,
+   "symbol": "HOGE",
+   "contract": "FVzqGqRmr4UH1Fif6dewmwbJ1p4YUZCu8dcw4Efopump",
+   "pool": "7CNC9gGegzEfFK8fLXiYUhdtMEeFPQZoND56U1Mxhnor",
+   "chain": "solana",
+   "scan_ts": "2026-11-18T13:01:58.525730+00:00",
+   "action": "BUY NOW",
+   "price": 0.001461,
+   "entry": 0.001461,
+   "stop": 0.00094965,
+   "score": 56.6,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
   }
  ],
- "runs": 1,
- "last_run": "2026-11-18T04:55:24.136557+00:00",
+ "runs": 2,
+ "last_run": "2026-11-18T13:01:58.525730+00:00",
  "last_log": [
-  "$CJ (score 66): WAIT, buy if it reaches 0.000216331 within 24h, stop 0.000183881",
-  "$BAWSAQ (score 66): WAIT, buy if it reaches 0.000559888 within 24h, stop 0.000438229",
-  "$DIGS (score 65): BUY NOW, buy at the scan price, stop 0.000243525",
-  "$Max (score 62): WAIT, buy if it reaches 0.0015596 within 24h, stop 0.00127646"
+  "$CJ: bought $50 at 0.000216331",
+  "$CJ: closed (stopped out), -18% after costs, $-9.17",
+  "$BAWSAQ: bought $50 at 0.000559888",
+  "$BAWSAQ: closed (stopped out), -25% after costs, $-12.40",
+  "$DIGS: bought $50 at 0.0002865",
+  "$CBUCKS (score 61): WAIT, buy if it reaches 0.00322745 within 24h, stop 0.00274333",
+  "$HOGE (score 57): BUY NOW, buy at the scan price, stop 0.00094965"
  ]
 }
