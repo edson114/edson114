@@ -48,25 +48,26 @@ instead of rebuilding from memory.
 | 2026-11-16 | 7513.98 | 7416.59 | 7545/7485 | loss | -$2,666.31 | 7555/7475 | loss | -$3,093.49 |
 | 2026-11-17 | 7411.02 | 7340.53 | 7440/7380 | loss | -$2,420.35 | 7450/7370 | loss | -$2,849.59 |
 | 2026-11-18 | 7355.69 | 7323.63 | 7385/7325 | loss | +$1,378.41 | 7395/7315 | WIN | +$1,225.19 |
+| 2026-11-19 | 7389.26 | 7175.83 | 7420/7360 | loss | -$2,512.94 | 7430/7350 | loss | -$2,943.14 |
 
-**Totals over 25 trading days:**
-- **30pt/$20:** 9 wins / 16 losses, net P&L (2 contracts) = **-$13,353.77**
-- **40pt/$20:** 14 wins / 11 losses, net P&L (2 contracts) = **-$13,717.90**
+**Totals over 26 trading days:**
+- **30pt/$20:** 9 wins / 17 losses, net P&L (2 contracts) = **-$15,866.71**
+- **40pt/$20:** 14 wins / 12 losses, net P&L (2 contracts) = **-$16,661.04**
 
 Note: "win"/"loss" marks whether a short strike was breached by the close, not
 the sign of that day's P&L -- a small breach can still net positive if the
 day's credit comfortably covers it (e.g. 2026-10-20 and 2026-11-11 for 30pt,
 2026-11-12 for 40pt).
 
-**Takeaway so far:** both structures are net losers across this 24-day
-window, and the losses have accelerated sharply in the most recent stretch --
-four straight down/volatile days (11/12 call-side breach, 11/13, 11/16, 11/17
-put-side breaches) have erased what used to be a real gap between the two
-structures. The 40pt structure still has more wins (13 vs 9) because the
-extra 10 points of initial distance avoids some marginal breaches, but its
-lower entry credit means it no longer beats the 30pt structure on net P&L --
-the two are now essentially tied in total losses. This reinforces the
-standing finding that extra OTM distance helps only on borderline days and
-provides little protection once SPX is trending/moving >1% per day for
-multiple days in a row, which is exactly the regime this tracking window has
-just lived through.
+**Takeaway so far:** both structures are net losers across this 26-day
+window, and the losses have accelerated sharply in the most recent stretch.
+2026-11-19 was one of the single worst days of the whole tracking period --
+SPX swung from +$26 to -$195 off the open intraday before closing -2.89%,
+blowing through the $20 wing on the put side for both structures regardless
+of starting distance. The 40pt structure still has slightly more wins (14 vs
+9) because the extra 10 points of initial distance avoids some marginal
+breaches, but it no longer beats the 30pt structure on net P&L -- it is now
+running a slightly larger net loss. This reinforces the standing finding
+that extra OTM distance helps only on borderline days and provides little
+protection once SPX moves several percent in a session, which this tracking
+window has now seen multiple times (10/30, 11/5, 11/19 among the worst).
