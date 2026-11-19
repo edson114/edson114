@@ -1,8 +1,8 @@
-# Paper Bot: 2026-11-19 13:25 UTC
+# Paper Bot: 2026-11-19 22:15 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $964.78** (-3.5% vs the $1,000 start). Cash $835.22, 2 open, 0 pending, 5 closed. Runs: 6.
+**Equity: $953.66** (-4.6% vs the $1,000 start). Cash $835.22, 2 open, 0 pending, 5 closed. Runs: 7.
 
 Phase 1 progress: 5/50 closed trades (2 open)  
 Win rate: 0% (0 wins, 5 losses)  
@@ -16,8 +16,8 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 3 | $DIGS | 0.0002865 | 0.000427782 | $71.73 | +43% | 0.000243525 | 2026-11-18T05:00 |
-| 5 | $CBUCKS | 0.00322745 | 0.00388524 | $57.83 | +16% | 0.00274333 | 2026-11-18T13:15 |
+| 3 | $DIGS | 0.0002865 | 0.000363087 | $60.88 | +22% | 0.000243525 | 2026-11-18T05:00 |
+| 5 | $CBUCKS | 0.00322745 | 0.00386682 | $57.56 | +15% | 0.00274333 | 2026-11-18T13:15 |
 
 ## Last closed
 
@@ -31,7 +31,4 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 ## Last run
 
-- $HOGE: closed (stopped out), -38% after costs, $-18.77
-- $SHIT: bought $50 at 0.002972
-- $SHIT: closed (stopped out), -28% after costs, $-13.76
 - daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)
