@@ -1,8 +1,8 @@
-# Paper Bot: 2026-11-20 13:06 UTC
+# Paper Bot: 2026-11-20 21:15 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $905.68** (-9.4% vs the $1,000 start). Cash $846.88, 1 open, 0 pending, 8 closed. Runs: 9.
+**Equity: $901.87** (-9.8% vs the $1,000 start). Cash $846.88, 1 open, 0 pending, 8 closed. Runs: 10.
 
 Phase 1 progress: 8/50 closed trades (1 open)  
 Win rate: 0% (0 wins, 8 losses)  
@@ -16,7 +16,7 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 5 | $CBUCKS | 0.00322745 | 0.00395041 | $58.80 | +18% | 0.00274333 | 2026-11-18T13:15 |
+| 5 | $CBUCKS | 0.00322745 | 0.00369437 | $54.99 | +10% | 0.00274333 | 2026-11-18T13:15 |
 
 ## Last closed
 
@@ -33,9 +33,4 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 ## Last run
 
-- $DIGS: closed (stopped out), -18% after costs, $-9.17
-- $BUCKME: bought $50 at 0.000226
-- $BUCKME: closed (stopped out), -21% after costs, $-10.39
-- $HNYDRIP: bought $50 at 0.000157574
-- $HNYDRIP: closed (stopped out), -38% after costs, $-18.77
 - daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)

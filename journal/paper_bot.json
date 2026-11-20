@@ -115,10 +115,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 58.8,
+   "value_usd": 54.99,
    "filled_ts": "2026-11-18T13:15:00+00:00",
    "journal_id": 5,
-   "last_price": 0.0039504140920431155,
+   "last_price": 0.0036943708950271446,
    "event": "NONE"
   },
   {
@@ -218,14 +218,9 @@
    "ret_net": -0.37549019607843137
   }
  ],
- "runs": 9,
- "last_run": "2026-11-20T13:06:32.433764+00:00",
+ "runs": 10,
+ "last_run": "2026-11-20T21:15:00.232411+00:00",
  "last_log": [
-  "$DIGS: closed (stopped out), -18% after costs, $-9.17",
-  "$BUCKME: bought $50 at 0.000226",
-  "$BUCKME: closed (stopped out), -21% after costs, $-10.39",
-  "$HNYDRIP: bought $50 at 0.000157574",
-  "$HNYDRIP: closed (stopped out), -38% after costs, $-18.77",
   "daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)"
  ]
 }
