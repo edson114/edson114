@@ -1,8 +1,8 @@
 {
  "version": 1,
  "starting_cash": 1000.0,
- "cash": 835.2160573664895,
- "next_id": 8,
+ "cash": 735.2160573664895,
+ "next_id": 10,
  "positions": [
   {
    "id": 1,
@@ -67,10 +67,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 60.88,
+   "value_usd": 56.79,
    "filled_ts": "2026-11-18T05:00:00+00:00",
    "journal_id": 3,
-   "last_price": 0.00036308734765543894,
+   "last_price": 0.0003386796077648903,
    "event": "NONE"
   },
   {
@@ -112,10 +112,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 57.56,
+   "value_usd": 55.09,
    "filled_ts": "2026-11-18T13:15:00+00:00",
    "journal_id": 5,
-   "last_price": 0.0038668164950103694,
+   "last_price": 0.003700901108188932,
    "event": "NONE"
   },
   {
@@ -165,11 +165,46 @@
    "closed_ts": "2026-11-19T13:25:55.770776+00:00",
    "ret": -0.2456447133691353,
    "ret_net": -0.2752272736291692
+  },
+  {
+   "id": 8,
+   "symbol": "BUCKME",
+   "contract": "DEgAkPNxz3dtMsesD2FDkNA2S6sch5YWfGUDT7R2pump",
+   "pool": "H529Gpab6vKQ5ScwypJwmGB9NJhf4UdPmLWx6j6gkGa8",
+   "chain": "solana",
+   "scan_ts": "2026-11-20T03:33:14.533994+00:00",
+   "action": "BUY NOW",
+   "price": 0.000226,
+   "entry": 0.000226,
+   "stop": 0.00018633917722617597,
+   "score": 54.2,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
+  },
+  {
+   "id": 9,
+   "symbol": "HNYDRIP",
+   "contract": "FyCaKh6wXuot5NmqQMt5oBrSHh3wFk14w5M9dHQDpump",
+   "pool": "4pFkxaj1S1fKEHHqJhxVQp5aRBR195VN6d4o7wyn9nyc",
+   "chain": "solana",
+   "scan_ts": "2026-11-20T03:33:14.533994+00:00",
+   "action": "WAIT",
+   "price": 0.0002023,
+   "entry": 0.00015757404748527006,
+   "stop": 0.00010242313086542554,
+   "score": 53.8,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
   }
  ],
- "runs": 7,
- "last_run": "2026-11-19T22:15:40.360332+00:00",
+ "runs": 8,
+ "last_run": "2026-11-20T03:33:14.533994+00:00",
  "last_log": [
-  "daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)"
+  "$BUCKME (score 54): BUY NOW, buy at the scan price, stop 0.000186339",
+  "$HNYDRIP (score 54): WAIT, buy if it reaches 0.000157574 within 24h, stop 0.000102423"
  ]
 }
