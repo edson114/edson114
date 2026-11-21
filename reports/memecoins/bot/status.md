@@ -1,10 +1,10 @@
-# Paper Bot: 2026-11-21 02:32 UTC
+# Paper Bot: 2026-11-21 11:20 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $900.86** (-9.9% vs the $1,000 start). Cash $696.88, 1 open, 3 pending, 8 closed. Runs: 11.
+**Equity: $909.32** (-9.1% vs the $1,000 start). Cash $696.88, 4 open, 0 pending, 8 closed. Runs: 12.
 
-Phase 1 progress: 8/50 closed trades (1 open)  
+Phase 1 progress: 8/50 closed trades (4 open)  
 Win rate: 0% (0 wins, 8 losses)  
 Average win: n/a   Average loss: -25.8%  
 Expectancy: -25.8% per trade  
@@ -16,15 +16,10 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 5 | $CBUCKS | 0.00322745 | 0.00362663 | $53.98 | +8% | 0.00274333 | 2026-11-18T13:15 |
-
-## Waiting for entry
-
-| # | Coin | Score | Entry | Stop | Expires |
-|---|---|---|---|---|---|
-| 10 | $Huss | 79 | 0.0003389 | 0.000288065 | 11-22 02:32 |
-| 11 | $HOGE | 64 | 0.000765096 | 0.000650331 | 11-22 02:32 |
-| 12 | $FLOAT | 60 | 0.00358751 | 0.00301236 | 11-22 02:32 |
+| 5 | $CBUCKS | 0.00322745 | 0.0037785 | $56.24 | +12% | 0.00274333 | 2026-11-18T13:15 |
+| 10 | $Huss | 0.0003389 | 0.000431057 | $61.10 | +22% | 0.000288065 | 2026-11-21T02:45 |
+| 11 | $HOGE | 0.000765096 | 0.000823755 | $51.72 | +3% | 0.000650331 | 2026-11-21T04:15 |
+| 12 | $FLOAT | 0.00358751 | 0.00323962 | $43.38 | -13% | 0.00301236 | 2026-11-21T02:45 |
 
 ## Last closed
 
@@ -41,6 +36,6 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 ## Last run
 
-- $Huss (score 79): BUY NOW, buy at the scan price, stop 0.000288065
-- $HOGE (score 64): WAIT, buy if it reaches 0.000765096 within 24h, stop 0.000650331
-- $FLOAT (score 59): WAIT, buy if it reaches 0.00358751 within 24h, stop 0.00301236
+- $Huss: bought $50 at 0.0003389
+- $HOGE: bought $50 at 0.000765096
+- $FLOAT: bought $50 at 0.00358751

@@ -115,10 +115,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 53.98,
+   "value_usd": 56.24,
    "filled_ts": "2026-11-18T13:15:00+00:00",
    "journal_id": 5,
-   "last_price": 0.0036266328431984324,
+   "last_price": 0.003778497135994149,
    "event": "NONE"
   },
   {
@@ -231,8 +231,12 @@
    "score": 79.4,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 61.1,
+   "filled_ts": "2026-11-21T02:45:00+00:00",
+   "journal_id": 10,
+   "last_price": 0.00043105667950407565,
+   "event": "NONE"
   },
   {
    "id": 11,
@@ -248,8 +252,12 @@
    "score": 64.2,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 51.72,
+   "filled_ts": "2026-11-21T04:15:00+00:00",
+   "journal_id": 11,
+   "last_price": 0.0008237552284419528,
+   "event": "NONE"
   },
   {
    "id": 12,
@@ -265,15 +273,19 @@
    "score": 59.5,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 43.38,
+   "filled_ts": "2026-11-21T02:45:00+00:00",
+   "journal_id": 12,
+   "last_price": 0.0032396195933114542,
+   "event": "NONE"
   }
  ],
- "runs": 11,
- "last_run": "2026-11-21T02:32:05.726658+00:00",
+ "runs": 12,
+ "last_run": "2026-11-21T11:20:18.923630+00:00",
  "last_log": [
-  "$Huss (score 79): BUY NOW, buy at the scan price, stop 0.000288065",
-  "$HOGE (score 64): WAIT, buy if it reaches 0.000765096 within 24h, stop 0.000650331",
-  "$FLOAT (score 59): WAIT, buy if it reaches 0.00358751 within 24h, stop 0.00301236"
+  "$Huss: bought $50 at 0.0003389",
+  "$HOGE: bought $50 at 0.000765096",
+  "$FLOAT: bought $50 at 0.00358751"
  ]
 }
