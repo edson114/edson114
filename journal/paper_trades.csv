@@ -13,3 +13,4 @@ id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proc
 12,CLOSED,FLOAT,Bv1a7cEj5aRnJQhMw4kRQqAFesMSd5LwcDnUzq52BMmr,2026-11-21,0.00358750958,50.00,13937.24501,13937.24501,40.34,2026-11-21,0.00289423281,-9.66,-19.3,no,yes,"paper bot, WAIT, score 60 | paper bot exit: STOP"
 13,CLOSED,DIGS,9QT8K685Hrae4k11dhGXirdtpfAaimExtyfwt8cPpump,2026-11-21,0.0003087736528,50.00,161930.9146,161930.9146,40.83,2026-11-22,0.0002521651498,-9.17,-18.3,no,yes,"paper bot, WAIT, score 72 | paper bot exit: STOP"
 14,OPEN,FIONA,B34nXKzCgsJb9ChLuSHPRpXLE3WFSWyeT8Cqkzzmpump,2026-11-21,0.001315230623,50.00,38016.14647,0,0,,,,,no,yes,"paper bot, WAIT, score 57"
+15,CLOSED,BLOB,8s11PkgQt4ZzdZ7oo84hK5t9HG1EvdgAjcg4W7Lpump,2026-11-22,0.007979267205,50.00,6266.239582,6266.239582,37.34,2026-11-22,0.005959326118,-12.66,-25.3,no,yes,"paper bot, WAIT, score 74 | paper bot exit: STOP"
