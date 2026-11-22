@@ -365,10 +365,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 50.23,
+   "value_usd": 66.26,
    "filled_ts": "2026-11-21T21:15:00+00:00",
    "journal_id": 14,
-   "last_price": 0.001375299630995588,
+   "last_price": 0.0018141881626632878,
    "event": "NONE"
   },
   {
@@ -389,10 +389,7 @@
    "value_usd": 50.0
   }
  ],
- "runs": 15,
- "last_run": "2026-11-22T08:06:08.911374+00:00",
- "last_log": [
-  "$DIGS: closed (stopped out), -18% after costs, $-9.17",
-  "$BLOB (score 74): WAIT, buy if it reaches 0.00797927 within 24h, stop 0.00620256"
- ]
+ "runs": 16,
+ "last_run": "2026-11-22T16:22:53.199892+00:00",
+ "last_log": []
 }
