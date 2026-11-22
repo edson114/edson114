@@ -11,3 +11,5 @@ id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proc
 10,CLOSED,HUSS,CUg7AzWL5p8imZVqqdjEPgRhUsXAkBMW5JxkSJ9fpump,2026-11-21,0.0003389,50.00,147536.1464,147536.1464,40.83,2026-11-21,0.0002767683333,-9.17,-18.3,no,yes,"paper bot, BUY NOW, score 79 | paper bot exit: STOP"
 11,CLOSED,HOGE,FVzqGqRmr4UH1Fif6dewmwbJ1p4YUZCu8dcw4Efopump,2026-11-21,0.0007650958029,50.00,65351.29302,65351.29302,40.83,2026-11-21,0.000624828239,-9.17,-18.3,no,yes,"paper bot, WAIT, score 64 | paper bot exit: STOP"
 12,CLOSED,FLOAT,Bv1a7cEj5aRnJQhMw4kRQqAFesMSd5LwcDnUzq52BMmr,2026-11-21,0.00358750958,50.00,13937.24501,13937.24501,40.34,2026-11-21,0.00289423281,-9.66,-19.3,no,yes,"paper bot, WAIT, score 60 | paper bot exit: STOP"
+13,OPEN,DIGS,9QT8K685Hrae4k11dhGXirdtpfAaimExtyfwt8cPpump,2026-11-21,0.0003087736528,50.00,161930.9146,0,0,,,,,no,yes,"paper bot, WAIT, score 72"
+14,OPEN,FIONA,B34nXKzCgsJb9ChLuSHPRpXLE3WFSWyeT8Cqkzzmpump,2026-11-21,0.001315230623,50.00,38016.14647,0,0,,,,,no,yes,"paper bot, WAIT, score 57"

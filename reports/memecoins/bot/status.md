@@ -1,25 +1,30 @@
-# Paper Bot: 2026-11-21 19:25 UTC
+# Paper Bot: 2026-11-22 00:24 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $878.63** (-12.1% vs the $1,000 start). Cash $678.63, 0 open, 4 pending, 12 closed. Runs: 13.
+**Equity: $904.05** (-9.6% vs the $1,000 start). Cash $678.63, 2 open, 2 pending, 12 closed. Runs: 14.
 
-Phase 1 progress: 12/50 closed trades (0 open)  
+Phase 1 progress: 12/50 closed trades (2 open)  
 Win rate: 8% (1 wins, 11 losses)  
 Average win: +19.5%   Average loss: -23.8%  
 Expectancy: -20.2% per trade  
-Total P&L: $-121.37   Today: $-18.26  
+Total P&L: $-121.37   Today: $+0.00  
 Too few trades to judge the edge yet; keep size fixed until 50.  
 Daily loss limit (-3% of $1,000 = -$30): ok
+
+## Open
+
+| # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
+|---|---|---|---|---|---|---|---|
+| 13 | $DIGS | 0.000308774 | 0.000288727 | $44.92 | -10% | 0.000262458 | 2026-11-21T19:30 |
+| 16 | $FIONA | 0.00131523 | 0.00220397 | $80.50 | +61% | 0.0008549 | 2026-11-21T21:15 |
 
 ## Waiting for entry
 
 | # | Coin | Score | Entry | Stop | Expires |
 |---|---|---|---|---|---|
-| 13 | $DIGS | 72 | 0.000308774 | 0.000262458 | 11-22 19:25 |
 | 14 | $greg | 67 | 0.000636527 | 0.000493727 | 11-22 19:25 |
 | 15 | $SHIT | 65 | 0.00246612 | 0.0016707 | 11-22 19:25 |
-| 16 | $FIONA | 57 | 0.00131523 | 0.0008549 | 11-22 19:25 |
 
 ## Last closed
 
@@ -38,11 +43,5 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 ## Last run
 
-- $CBUCKS: closed (72h time limit), +19% after costs, $+9.74
-- $Huss: closed (stopped out), -18% after costs, $-9.17
-- $HOGE: closed (stopped out), -18% after costs, $-9.17
-- $FLOAT: closed (stopped out), -19% after costs, $-9.66
-- $DIGS (score 72): WAIT, buy if it reaches 0.000308774 within 24h, stop 0.000262458
-- $greg (score 67): WAIT, buy if it reaches 0.000636527 within 24h, stop 0.000493727
-- $SHIT (score 65): WAIT, buy if it reaches 0.00246612 within 24h, stop 0.0016707
-- $FIONA (score 57): WAIT, buy if it reaches 0.00131523 within 24h, stop 0.0008549
+- $DIGS: bought $50 at 0.000308774
+- $FIONA: bought $50 at 0.00131523
