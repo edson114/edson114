@@ -50,25 +50,26 @@ instead of rebuilding from memory.
 | 2026-11-18 | 7355.69 | 7323.63 | 7385/7325 | loss | +$1,378.41 | 7395/7315 | WIN | +$1,225.19 |
 | 2026-11-19 | 7389.26 | 7175.83 | 7420/7360 | loss | -$2,512.94 | 7430/7350 | loss | -$2,943.14 |
 | 2026-11-20 | 7150.39 | 6910.39 | 7180/7120 | loss | -$2,097.91 | 7190/7110 | loss | -$2,510.20 |
+| 2026-11-23 | 7227.41 | 7237.17 | 7255/7195 | WIN | +$2,077.30 | 7265/7185 | WIN | +$1,682.25 |
 
-**Totals over 27 trading days:**
-- **30pt/$20:** 9 wins / 18 losses, net P&L (2 contracts) = **-$17,964.62**
-- **40pt/$20:** 14 wins / 13 losses, net P&L (2 contracts) = **-$19,171.24**
+**Totals over 28 trading days:**
+- **30pt/$20:** 10 wins / 18 losses, net P&L (2 contracts) = **-$15,887.32**
+- **40pt/$20:** 15 wins / 13 losses, net P&L (2 contracts) = **-$17,488.99**
 
 Note: "win"/"loss" marks whether a short strike was breached by the close, not
 the sign of that day's P&L -- a small breach can still net positive if the
 day's credit comfortably covers it (e.g. 2026-10-20 and 2026-11-11 for 30pt,
 2026-11-12 for 40pt).
 
-**Takeaway so far:** both structures are net losers across this 27-day
-window, and the final week has been a near-uninterrupted stretch of
-max-loss days. 2026-11-20 closed -3.36% (VIX spiked from 28.6% at the open
-to 38.2% at the close) on top of 11-19's -2.89% -- back-to-back days now
-rivaling or exceeding 11/5 as the worst of the whole tracking period. Both
-structures hit full max loss on the put side again, regardless of starting
-distance. The 40pt structure still has slightly more wins (14 vs 9) but a
-larger net loss than the 30pt structure, reinforcing the standing finding
-that extra OTM distance helps only on borderline days and provides no
-protection once SPX moves several percent in a session -- which has now
-happened repeatedly in the back half of this window (10/30, 11/5, 11/19,
-11/20).
+**Takeaway so far:** both structures are net losers across this 28-day
+window. The final week of October/November was a near-uninterrupted stretch
+of max-loss days (11/12 through 11/20), with 11/19 and 11/20 rivaling or
+exceeding 11/5 as the worst of the whole tracking period. 2026-11-23 broke
+that streak with a clean win for both structures -- despite a wild 143-point
+intraday range that briefly tested both the call and put wings, SPX closed
+back inside both structures' short strikes. The 40pt structure still has
+more wins (15 vs 10) but a larger net loss than the 30pt structure,
+reinforcing the standing finding that extra OTM distance helps only on
+borderline days and provides no protection once SPX moves several percent in
+a session -- which has now happened repeatedly in the back half of this
+window (10/30, 11/5, 11/19, 11/20).
