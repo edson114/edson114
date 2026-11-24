@@ -1,28 +1,30 @@
-# Paper Bot: 2026-11-23 14:51 UTC
+# Paper Bot: 2026-11-24 02:18 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $796.44** (-20.4% vs the $1,000 start). Cash $698.39, 1 open, 1 pending, 18 closed. Runs: 19.
+**Equity: $882.20** (-11.8% vs the $1,000 start). Cash $598.39, 2 open, 2 pending, 18 closed. Runs: 20.
 
-Phase 1 progress: 18/50 closed trades (1 open)  
+Phase 1 progress: 18/50 closed trades (2 open)  
 Win rate: 6% (1 wins, 17 losses)  
 Average win: +19.5%   Average loss: -24.8%  
 Expectancy: -22.4% per trade  
-Total P&L: $-201.60   Today: $-58.40  
+Total P&L: $-201.60   Today: $+0.00  
 Too few trades to judge the edge yet; keep size fixed until 50.  
-Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
+Daily loss limit (-3% of $1,000 = -$30): ok
 
 ## Open
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 16 | $FIONA | 0.00131523 | 0.0013154 | $48.05 | -4% | 0.0008549 | 2026-11-21T21:15 |
+| 16 | $FIONA | 0.00131523 | 0.00407784 | $122.51 | +145% | 0.0008549 | 2026-11-21T21:15 |
+| 21 | $HOGE | 0.000584137 | 0.000745405 | $61.30 | +23% | 0.000496517 | 2026-11-23T19:30 |
 
 ## Waiting for entry
 
 | # | Coin | Score | Entry | Stop | Expires |
 |---|---|---|---|---|---|
-| 21 | $HOGE | 58 | 0.000584137 | 0.000496517 | 11-24 03:45 |
+| 23 | $COPIUM | 62 | 0.000828885 | 0.000704552 | 11-25 02:18 |
+| 24 | $BRUH | 61 | 0.00808595 | 0.00687305 | 11-25 02:18 |
 
 ## Last closed
 
@@ -41,7 +43,6 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 ## Last run
 
-- $MCAT: closed (stopped out), -38% after costs, $-18.77
-- $UCASH: bought $50 at 0.00157417
-- $UCASH: closed (stopped out), -22% after costs, $-11.18
-- daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)
+- $HOGE: bought $50 at 0.000584137
+- $COPIUM (score 62): WAIT, buy if it reaches 0.000828885 within 24h, stop 0.000704552
+- $BRUH (score 61): WAIT, buy if it reaches 0.00808595 within 24h, stop 0.00687305

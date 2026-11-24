@@ -1,8 +1,8 @@
 {
  "version": 1,
  "starting_cash": 1000.0,
- "cash": 698.394696396971,
- "next_id": 23,
+ "cash": 598.394696396971,
+ "next_id": 25,
  "positions": [
   {
    "id": 1,
@@ -367,11 +367,11 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 48.05,
+   "value_usd": 122.51,
    "filled_ts": "2026-11-21T21:15:00+00:00",
    "journal_id": 14,
-   "last_price": 0.0013154038245122065,
-   "event": "NONE"
+   "last_price": 0.004077841225514551,
+   "event": "TARGET"
   },
   {
    "id": 17,
@@ -483,8 +483,12 @@
    "score": 57.7,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 61.3,
+   "filled_ts": "2026-11-23T19:30:00+00:00",
+   "journal_id": 20,
+   "last_price": 0.0007454054437095586,
+   "event": "NONE"
   },
   {
    "id": 22,
@@ -509,14 +513,47 @@
    "closed_ts": "2026-11-23T14:51:18.849373+00:00",
    "ret": -0.19188791828998086,
    "ret_net": -0.2235785881609621
+  },
+  {
+   "id": 23,
+   "symbol": "COPIUM",
+   "contract": "BAKsQrynzwadyACDMsg3J5R8a4CTvj1u7kEYyjq7pump",
+   "pool": "8rJw3DbbzfzKYF5tiNEsjqPyJtEPZg8dZ7dNb2SEbuPP",
+   "chain": "solana",
+   "scan_ts": "2026-11-24T02:18:18.748537+00:00",
+   "action": "WAIT",
+   "price": 0.0008106,
+   "entry": 0.0008288845284295426,
+   "stop": 0.0007045518491651113,
+   "score": 61.6,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
+  },
+  {
+   "id": 24,
+   "symbol": "BRUH",
+   "contract": "PgFtGGquvnv2zEkjG2N2QPvBTBrafuExGYEqahRpump",
+   "pool": "EhPzeSdXTyMvWZ1iy5NT3LrNjY1xbC1KGqSpL1kqNYiv",
+   "chain": "solana",
+   "scan_ts": "2026-11-24T02:18:18.748537+00:00",
+   "action": "WAIT",
+   "price": 0.007988,
+   "entry": 0.00808594513117969,
+   "stop": 0.006873053361502735,
+   "score": 61.4,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
   }
  ],
- "runs": 19,
- "last_run": "2026-11-23T14:51:18.849373+00:00",
+ "runs": 20,
+ "last_run": "2026-11-24T02:18:18.748537+00:00",
  "last_log": [
-  "$MCAT: closed (stopped out), -38% after costs, $-18.77",
-  "$UCASH: bought $50 at 0.00157417",
-  "$UCASH: closed (stopped out), -22% after costs, $-11.18",
-  "daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)"
+  "$HOGE: bought $50 at 0.000584137",
+  "$COPIUM (score 62): WAIT, buy if it reaches 0.000828885 within 24h, stop 0.000704552",
+  "$BRUH (score 61): WAIT, buy if it reaches 0.00808595 within 24h, stop 0.00687305"
  ]
 }

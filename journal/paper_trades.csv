@@ -18,3 +18,4 @@ id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proc
 17,CLOSED,SIDOOR,zcRvzm7gAfYGde8gRwaSYxNryL47SjLVUQLAf1bdoor,2026-11-22,0.0002612891656,50.00,191358.872,191358.872,31.23,2026-11-23,0.0001631776456,-18.77,-37.5,no,yes,"paper bot, WAIT, score 60 | paper bot exit: STOP"
 18,CLOSED,MCAT,BzPyyYCTmQNq2BcfQ4ANAvCYk54rnmQEXMFvFT8RhWMi,2026-11-22,0.0004522,50.00,110570.544,110570.544,31.23,2026-11-23,0.0002824033334,-18.77,-37.5,no,yes,"paper bot, BUY NOW, score 56 | paper bot exit: STOP"
 19,CLOSED,UCASH,7cFiqdT46zs7ooHWLFiLSaSQKLMibtokh9dBinsspump,2026-11-23,0.001574174591,50.00,31762.67759,31762.67759,38.82,2026-11-23,0.001222222858,-11.18,-22.4,no,yes,"paper bot, WAIT, score 52 | paper bot exit: STOP"
+20,OPEN,HOGE,FVzqGqRmr4UH1Fif6dewmwbJ1p4YUZCu8dcw4Efopump,2026-11-23,0.0005841372665,50.00,85596.31934,0,0,,,,,no,yes,"paper bot, WAIT, score 58"
