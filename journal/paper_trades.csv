@@ -21,5 +21,6 @@ id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proc
 20,OPEN,HOGE,FVzqGqRmr4UH1Fif6dewmwbJ1p4YUZCu8dcw4Efopump,2026-11-23,0.0005841372665,50.00,85596.31934,0,0,,,,,no,yes,"paper bot, WAIT, score 58"
 21,CLOSED,COPIUM,BAKsQrynzwadyACDMsg3J5R8a4CTvj1u7kEYyjq7pump,2026-11-24,0.0008288845284,50.00,60322.03315,60322.03315,40.83,2026-11-24,0.0006769223649,-9.17,-18.3,no,yes,"paper bot, WAIT, score 62 | paper bot exit: STOP"
 22,CLOSED,BRUH,PgFtGGquvnv2zEkjG2N2QPvBTBrafuExGYEqahRpump,2026-11-24,0.008085945131,50.00,6183.569043,6183.569043,40.83,2026-11-24,0.006603521858,-9.17,-18.3,no,yes,"paper bot, WAIT, score 61 | paper bot exit: STOP"
-23,OPEN,CATEBALL,4npJ3avxnGhCzKbWQpLrQXAHsjWzKr4JqBsbu5Fspump,2026-11-24,0.0008130960635,50.00,61493.349,0,0,,,,,no,yes,"paper bot, WAIT, score 75"
+23,CLOSED,CATEBALL,4npJ3avxnGhCzKbWQpLrQXAHsjWzKr4JqBsbu5Fspump,2026-11-24,0.0008130960635,50.00,61493.349,61493.349,31.23,2026-11-25,0.0005077864632,-18.77,-37.5,no,yes,"paper bot, WAIT, score 75 | paper bot exit: STOP"
 24,OPEN,NOHR,Jd3NCawdFiDNWpLiTtsMqoeoBMjC1ZQMrMScRVzpump,2026-11-24,0.003616108893,50.00,13827.01724,0,0,,,,,no,yes,"paper bot, WAIT, score 65"
+25,OPEN,JIMMY,38M2z4UCfZEkUHFzD48vhKQhFhNyRGto8pZbLjNipump,2026-11-24,0.001193,50.00,41911.14837,0,0,,,,,no,yes,"paper bot, BUY NOW, score 70"
