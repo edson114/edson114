@@ -1,8 +1,8 @@
 {
  "version": 1,
  "starting_cash": 1000.0,
- "cash": 604.0455007989501,
- "next_id": 30,
+ "cash": 576.1043243283619,
+ "next_id": 32,
  "positions": [
   {
    "id": 1,
@@ -487,10 +487,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 53.56,
+   "value_usd": 46.33,
    "filled_ts": "2026-11-23T19:30:00+00:00",
    "journal_id": 20,
-   "last_price": 0.0006512783322077115,
+   "last_price": 0.000563337997648158,
    "event": "NONE"
   },
   {
@@ -627,12 +627,15 @@
    "score": 70.1,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "open",
-   "value_usd": 48.59,
+   "status": "closed",
+   "value_usd": 31.23,
    "filled_ts": "2026-11-24T23:45:00+00:00",
    "journal_id": 25,
-   "last_price": 0.0012067748316932617,
-   "event": "NONE"
+   "last_price": 0.0007183252707732927,
+   "event": "STOP",
+   "closed_ts": "2026-11-26T02:53:43.066145+00:00",
+   "ret": -0.35,
+   "ret_net": -0.37549019607843137
   },
   {
    "id": 28,
@@ -649,10 +652,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 48.97,
+   "value_usd": 49.87,
    "filled_ts": "2026-11-25T17:15:00+00:00",
    "journal_id": 26,
-   "last_price": 0.000802645942186803,
+   "last_price": 0.0008172540061916896,
    "event": "NONE"
   },
   {
@@ -669,15 +672,58 @@
    "score": 63.5,
    "mode": "standard",
    "stake_usd": 50.0,
+   "status": "closed",
+   "value_usd": 40.83,
+   "filled_ts": "2026-11-25T19:30:00+00:00",
+   "journal_id": 27,
+   "last_price": 0.002325082627193403,
+   "event": "STOP",
+   "closed_ts": "2026-11-26T02:53:43.066145+00:00",
+   "ret": -0.15000000000000002,
+   "ret_net": -0.18333333333333335
+  },
+  {
+   "id": 30,
+   "symbol": "VINE",
+   "contract": "6AJcP7wuLwmRYLBNbi825wgguaPsWzPBEHcHndpRpump",
+   "pool": "58fzJMbX5PatnfJPqWWsqkVFPRKptkbb5r2vCw4Qq3z9",
+   "chain": "solana",
+   "scan_ts": "2026-11-26T02:53:43.066145+00:00",
+   "action": "WAIT",
+   "price": 0.009433,
+   "entry": 0.009527486538435994,
+   "stop": 0.008098363557670595,
+   "score": 60.0,
+   "mode": "standard",
+   "stake_usd": 50.0,
+   "status": "pending",
+   "value_usd": 50.0
+  },
+  {
+   "id": 31,
+   "symbol": "enu",
+   "contract": "9msLfYfXBrSbrApCZAPuPMCNmPqNtEL1VPKh1AEYpump",
+   "pool": "F8Ykd7drw4ytfNpG9L5r7XrRHwoYSNXFfR469U3LvjGp",
+   "chain": "solana",
+   "scan_ts": "2026-11-26T02:53:43.066145+00:00",
+   "action": "BUY NOW",
+   "price": 0.0002107,
+   "entry": 0.0002107,
+   "stop": 0.000179095,
+   "score": 55.6,
+   "mode": "standard",
+   "stake_usd": 50.0,
    "status": "pending",
    "value_usd": 50.0
   }
  ],
- "runs": 24,
- "last_run": "2026-11-25T19:24:37.959628+00:00",
+ "runs": 25,
+ "last_run": "2026-11-26T02:53:43.066145+00:00",
  "last_log": [
-  "$NOHR: closed (stopped out), -18% after costs, $-9.17",
-  "$Huss: bought $50 at 0.000787311",
-  "$FLOAT (score 63): BUY NOW, buy at the scan price, stop 0.00227715"
+  "$JIMMY: closed (stopped out), -38% after costs, $-18.77",
+  "$FLOAT: bought $50 at 0.002679",
+  "$FLOAT: closed (stopped out), -18% after costs, $-9.17",
+  "$VINE (score 60): WAIT, buy if it reaches 0.00952749 within 24h, stop 0.00809836",
+  "$enu (score 56): BUY NOW, buy at the scan price, stop 0.000179095"
  ]
 }
