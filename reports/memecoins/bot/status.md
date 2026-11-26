@@ -1,35 +1,30 @@
-# Paper Bot: 2026-11-26 02:53 UTC
+# Paper Bot: 2026-11-26 12:47 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $772.30** (-22.8% vs the $1,000 start). Cash $576.10, 2 open, 2 pending, 25 closed. Runs: 25.
+**Equity: $752.97** (-24.7% vs the $1,000 start). Cash $706.48, 1 open, 0 pending, 28 closed. Runs: 26.
 
-Phase 1 progress: 25/50 closed trades (2 open)  
-Win rate: 8% (2 wins, 23 losses)  
-Average win: +61.7%   Average loss: -24.8%  
-Expectancy: -17.9% per trade  
-Total P&L: $-223.89   Today: $-27.94  
+Phase 1 progress: 28/50 closed trades (1 open)  
+Win rate: 7% (2 wins, 26 losses)  
+Average win: +61.7%   Average loss: -23.5%  
+Expectancy: -17.4% per trade  
+Total P&L: $-243.52   Today: $-47.57  
 Too few trades to judge the edge yet; keep size fixed until 50.  
-Daily loss limit (-3% of $1,000 = -$30): ok
+Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 ## Open
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 21 | $HOGE | 0.000584137 | 0.000563338 | $46.33 | -7% | 0.000496517 | 2026-11-23T19:30 |
-| 28 | $Huss | 0.000787311 | 0.000817254 | $49.87 | -0% | 0.000669214 | 2026-11-25T17:15 |
-
-## Waiting for entry
-
-| # | Coin | Score | Entry | Stop | Expires |
-|---|---|---|---|---|---|
-| 30 | $VINE | 60 | 0.00952749 | 0.00809836 | 11-27 02:53 |
-| 31 | $enu | 56 | 0.0002107 | 0.000179095 | 11-27 02:53 |
+| 30 | $VINE | 0.00952749 | 0.00921961 | $46.49 | -7% | 0.00809836 | 2026-11-26T03:15 |
 
 ## Last closed
 
 | # | Coin | Result | After costs | P&L | Closed |
 |---|---|---|---|---|---|
+| 21 | $HOGE | NONE | -3% | $-1.29 | 2026-11-26T12:47 |
+| 28 | $Huss | STOP | -18% | $-9.17 | 2026-11-26T12:47 |
+| 31 | $enu | STOP | -18% | $-9.17 | 2026-11-26T12:47 |
 | 27 | $JIMMY | STOP | -38% | $-18.77 | 2026-11-26T02:53 |
 | 29 | $FLOAT | STOP | -18% | $-9.17 | 2026-11-26T02:53 |
 | 26 | $NOHR | STOP | -18% | $-9.17 | 2026-11-25T19:24 |
@@ -37,14 +32,12 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 | 16 | $FIONA | TARGET | +104% | $+51.93 | 2026-11-24T23:30 |
 | 23 | $COPIUM | STOP | -18% | $-9.17 | 2026-11-24T13:54 |
 | 24 | $BRUH | STOP | -18% | $-9.17 | 2026-11-24T13:54 |
-| 20 | $MCAT | STOP | -38% | $-18.77 | 2026-11-23T14:51 |
-| 22 | $UCASH | STOP | -22% | $-11.18 | 2026-11-23T14:51 |
-| 18 | $DESSA | STOP | -19% | $-9.68 | 2026-11-23T03:45 |
 
 ## Last run
 
-- $JIMMY: closed (stopped out), -38% after costs, $-18.77
-- $FLOAT: bought $50 at 0.002679
-- $FLOAT: closed (stopped out), -18% after costs, $-9.17
-- $VINE (score 60): WAIT, buy if it reaches 0.00952749 within 24h, stop 0.00809836
-- $enu (score 56): BUY NOW, buy at the scan price, stop 0.000179095
+- $HOGE: closed (72h time limit), -3% after costs, $-1.29
+- $Huss: closed (stopped out), -18% after costs, $-9.17
+- $VINE: bought $50 at 0.00952749
+- $enu: bought $50 at 0.0002107
+- $enu: closed (stopped out), -18% after costs, $-9.17
+- daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "starting_cash": 1000.0,
- "cash": 576.1043243283619,
+ "cash": 706.4778044397498,
  "next_id": 32,
  "positions": [
   {
@@ -486,12 +486,15 @@
    "score": 57.7,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "open",
-   "value_usd": 46.33,
+   "status": "closed",
+   "value_usd": 48.71,
    "filled_ts": "2026-11-23T19:30:00+00:00",
    "journal_id": 20,
-   "last_price": 0.000563337997648158,
-   "event": "NONE"
+   "last_price": 0.0005922549829235026,
+   "event": "NONE",
+   "closed_ts": "2026-11-26T12:47:38.031168+00:00",
+   "ret": 0.013896932930928196,
+   "ret_net": -0.025863731105578824
   },
   {
    "id": 22,
@@ -651,12 +654,15 @@
    "score": 58.8,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "open",
-   "value_usd": 49.87,
+   "status": "closed",
+   "value_usd": 40.83,
    "filled_ts": "2026-11-25T17:15:00+00:00",
    "journal_id": 26,
-   "last_price": 0.0008172540061916896,
-   "event": "NONE"
+   "last_price": 0.0007318264225245544,
+   "event": "STOP",
+   "closed_ts": "2026-11-26T12:47:38.031168+00:00",
+   "ret": -0.15000000000000013,
+   "ret_net": -0.18333333333333346
   },
   {
    "id": 29,
@@ -696,8 +702,12 @@
    "score": 60.0,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 46.49,
+   "filled_ts": "2026-11-26T03:15:00+00:00",
+   "journal_id": 28,
+   "last_price": 0.009219611928215018,
+   "event": "NONE"
   },
   {
    "id": 31,
@@ -713,17 +723,25 @@
    "score": 55.6,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "closed",
+   "value_usd": 40.83,
+   "filled_ts": "2026-11-26T03:00:00+00:00",
+   "journal_id": 29,
+   "last_price": 0.00017027844622530494,
+   "event": "STOP",
+   "closed_ts": "2026-11-26T12:47:38.031168+00:00",
+   "ret": -0.15000000000000002,
+   "ret_net": -0.18333333333333335
   }
  ],
- "runs": 25,
- "last_run": "2026-11-26T02:53:43.066145+00:00",
+ "runs": 26,
+ "last_run": "2026-11-26T12:47:38.031168+00:00",
  "last_log": [
-  "$JIMMY: closed (stopped out), -38% after costs, $-18.77",
-  "$FLOAT: bought $50 at 0.002679",
-  "$FLOAT: closed (stopped out), -18% after costs, $-9.17",
-  "$VINE (score 60): WAIT, buy if it reaches 0.00952749 within 24h, stop 0.00809836",
-  "$enu (score 56): BUY NOW, buy at the scan price, stop 0.000179095"
+  "$HOGE: closed (72h time limit), -3% after costs, $-1.29",
+  "$Huss: closed (stopped out), -18% after costs, $-9.17",
+  "$VINE: bought $50 at 0.00952749",
+  "$enu: bought $50 at 0.0002107",
+  "$enu: closed (stopped out), -18% after costs, $-9.17",
+  "daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)"
  ]
 }
