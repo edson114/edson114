@@ -1,8 +1,8 @@
-# Paper Bot: 2026-11-26 12:47 UTC
+# Paper Bot: 2026-11-26 22:24 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $752.97** (-24.7% vs the $1,000 start). Cash $706.48, 1 open, 0 pending, 28 closed. Runs: 26.
+**Equity: $751.46** (-24.9% vs the $1,000 start). Cash $706.48, 1 open, 0 pending, 28 closed. Runs: 27.
 
 Phase 1 progress: 28/50 closed trades (1 open)  
 Win rate: 7% (2 wins, 26 losses)  
@@ -16,7 +16,7 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 30 | $VINE | 0.00952749 | 0.00921961 | $46.49 | -7% | 0.00809836 | 2026-11-26T03:15 |
+| 30 | $VINE | 0.00952749 | 0.00892156 | $44.98 | -10% | 0.00809836 | 2026-11-26T03:15 |
 
 ## Last closed
 
@@ -35,9 +35,4 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 ## Last run
 
-- $HOGE: closed (72h time limit), -3% after costs, $-1.29
-- $Huss: closed (stopped out), -18% after costs, $-9.17
-- $VINE: bought $50 at 0.00952749
-- $enu: bought $50 at 0.0002107
-- $enu: closed (stopped out), -18% after costs, $-9.17
 - daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)
