@@ -1,22 +1,30 @@
-# Paper Bot: 2026-11-26 22:24 UTC
+# Paper Bot: 2026-11-27 05:07 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $751.46** (-24.9% vs the $1,000 start). Cash $706.48, 1 open, 0 pending, 28 closed. Runs: 27.
+**Equity: $751.53** (-24.8% vs the $1,000 start). Cash $556.48, 1 open, 3 pending, 28 closed. Runs: 28.
 
 Phase 1 progress: 28/50 closed trades (1 open)  
 Win rate: 7% (2 wins, 26 losses)  
 Average win: +61.7%   Average loss: -23.5%  
 Expectancy: -17.4% per trade  
-Total P&L: $-243.52   Today: $-47.57  
+Total P&L: $-243.52   Today: $+0.00  
 Too few trades to judge the edge yet; keep size fixed until 50.  
-Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
+Daily loss limit (-3% of $1,000 = -$30): ok
 
 ## Open
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 30 | $VINE | 0.00952749 | 0.00892156 | $44.98 | -10% | 0.00809836 | 2026-11-26T03:15 |
+| 30 | $VINE | 0.00952749 | 0.00893367 | $45.05 | -10% | 0.00809836 | 2026-11-26T03:15 |
+
+## Waiting for entry
+
+| # | Coin | Score | Entry | Stop | Expires |
+|---|---|---|---|---|---|
+| 32 | $CATE | 78 | 0.0187257 | 0.0159168 | 11-28 05:07 |
+| 33 | $CBUCKS | 63 | 0.00746711 | 0.00634704 | 11-28 05:07 |
+| 34 | $mihao | 60 | 0.00609 | 0.0051765 | 11-28 05:07 |
 
 ## Last closed
 
@@ -35,4 +43,6 @@ Daily loss limit (-3% of $1,000 = -$30): HIT: stop trading today
 
 ## Last run
 
-- daily loss limit hit (-$30 realized today): no new trades until tomorrow (UTC)
+- $CATE (score 78): WAIT, buy if it reaches 0.0187257 within 24h, stop 0.0159168
+- $CBUCKS (score 63): WAIT, buy if it reaches 0.00746711 within 24h, stop 0.00634704
+- $mihao (score 60): BUY NOW, buy at the scan price, stop 0.0051765
