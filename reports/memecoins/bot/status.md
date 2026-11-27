@@ -1,10 +1,10 @@
-# Paper Bot: 2026-11-27 05:07 UTC
+# Paper Bot: 2026-11-27 15:13 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $751.53** (-24.8% vs the $1,000 start). Cash $556.48, 1 open, 3 pending, 28 closed. Runs: 28.
+**Equity: $735.78** (-26.4% vs the $1,000 start). Cash $556.48, 4 open, 0 pending, 28 closed. Runs: 29.
 
-Phase 1 progress: 28/50 closed trades (1 open)  
+Phase 1 progress: 28/50 closed trades (4 open)  
 Win rate: 7% (2 wins, 26 losses)  
 Average win: +61.7%   Average loss: -23.5%  
 Expectancy: -17.4% per trade  
@@ -16,15 +16,10 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 30 | $VINE | 0.00952749 | 0.00893367 | $45.05 | -10% | 0.00809836 | 2026-11-26T03:15 |
-
-## Waiting for entry
-
-| # | Coin | Score | Entry | Stop | Expires |
-|---|---|---|---|---|---|
-| 32 | $CATE | 78 | 0.0187257 | 0.0159168 | 11-28 05:07 |
-| 33 | $CBUCKS | 63 | 0.00746711 | 0.00634704 | 11-28 05:07 |
-| 34 | $mihao | 60 | 0.00609 | 0.0051765 | 11-28 05:07 |
+| 30 | $VINE | 0.00952749 | 0.00857659 | $43.24 | -14% | 0.00809836 | 2026-11-26T03:15 |
+| 32 | $CATE | 0.0187257 | 0.0178951 | $45.91 | -8% | 0.0159168 | 2026-11-27T08:30 |
+| 33 | $CBUCKS | 0.00746711 | 0.00734646 | $47.26 | -5% | 0.00634704 | 2026-11-27T09:30 |
+| 34 | $mihao | 0.00609 | 0.00543741 | $42.89 | -14% | 0.0051765 | 2026-11-27T05:15 |
 
 ## Last closed
 
@@ -43,6 +38,6 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 ## Last run
 
-- $CATE (score 78): WAIT, buy if it reaches 0.0187257 within 24h, stop 0.0159168
-- $CBUCKS (score 63): WAIT, buy if it reaches 0.00746711 within 24h, stop 0.00634704
-- $mihao (score 60): BUY NOW, buy at the scan price, stop 0.0051765
+- $CATE: bought $50 at 0.0187257
+- $CBUCKS: bought $50 at 0.00746711
+- $mihao: bought $50 at 0.00609
