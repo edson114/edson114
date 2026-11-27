@@ -53,26 +53,28 @@ instead of rebuilding from memory.
 | 2026-11-23 | 7227.41 | 7237.17 | 7255/7195 | WIN | +$2,077.30 | 7265/7185 | WIN | +$1,682.25 |
 | 2026-11-24 | 7172.33 | 7201.09 | 7200/7140 | loss | +$1,555.17 | 7210/7130 | WIN | +$1,351.71 |
 | 2026-11-25 | 7060.33 | 7182.78 | 7090/7030 | loss | -$2,149.29 | 7100/7020 | loss | -$2,565.63 |
+| 2026-11-27 | 7262.61 | 7297.49 | 7295/7235 | loss | +$1,712.00 | 7305/7225 | WIN | +$1,630.00 |
 
-**Totals over 30 trading days:**
-- **30pt/$20:** 10 wins / 20 losses, net P&L (2 contracts) = **-$16,481.44**
-- **40pt/$20:** 16 wins / 14 losses, net P&L (2 contracts) = **-$18,702.91**
+**Totals over 31 trading days:**
+- **30pt/$20:** 10 wins / 21 losses, net P&L (2 contracts) = **-$14,769.44**
+- **40pt/$20:** 17 wins / 14 losses, net P&L (2 contracts) = **-$17,072.91**
 
 Note: "win"/"loss" marks whether a short strike was breached by the close, not
 the sign of that day's P&L -- a small breach can still net positive if the
-day's credit comfortably covers it (e.g. 2026-10-20, 2026-11-11 and
-2026-11-24 for 30pt, 2026-11-12 for 40pt).
+day's credit comfortably covers it (e.g. 2026-10-20, 2026-11-11, 2026-11-24
+and 2026-11-27 for 30pt, 2026-11-12 for 40pt). 2026-11-26 was Thanksgiving
+(market holiday, no row); 2026-11-27 was a half-day (NYSE closed 1:00pm ET),
+settled against that session's actual close.
 
-**Takeaway so far:** both structures are net losers across this 30-day
+**Takeaway so far:** both structures are net losers across this 31-day
 window. The final week of October/November was a near-uninterrupted stretch
 of max-loss days (11/12 through 11/20), with 11/19 and 11/20 rivaling or
-exceeding 11/5 as the worst of the whole tracking period. 11/23-11/24 gave a
-brief reprieve, but 11/25 swung back hard -- SPX opened down, dropped another
-1.3% intraday, then rallied +1.74% off the open into the close, blowing
-through the $20 wing on the CALL side this time (the opposite side from most
-of this stretch) for a full max loss on both structures. The 40pt structure
-still has more wins (16 vs 10) but a larger net loss than the 30pt structure,
-reinforcing the standing finding that extra OTM distance helps only on
-borderline days and provides no protection once SPX moves several percent in
-a session -- which has now happened on both sides of the market in this
-window (10/30, 11/5, 11/19, 11/20 on the downside; 11/25 on the upside).
+exceeding 11/5 as the worst of the whole tracking period. Since then, three
+of the last four sessions (11/23, 11/24, 11/27) have been calm, net-positive
+days for both structures, with only 11/25's violent round trip (max loss on
+the call side) breaking the recovery. The 40pt structure still has more wins
+(17 vs 10) but a larger net loss than the 30pt structure, reinforcing the
+standing finding that extra OTM distance helps only on borderline days and
+provides no protection once SPX moves several percent in a session -- which
+has now happened on both sides of the market in this window (10/30, 11/5,
+11/19, 11/20 on the downside; 11/25 on the upside).
