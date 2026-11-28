@@ -703,10 +703,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 47.02,
+   "value_usd": 46.19,
    "filled_ts": "2026-11-26T03:15:00+00:00",
    "journal_id": 28,
-   "last_price": 0.009324674754581342,
+   "last_price": 0.009160792085791456,
    "event": "NONE"
   },
   {
@@ -748,10 +748,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 45.42,
+   "value_usd": 45.09,
    "filled_ts": "2026-11-27T08:30:00+00:00",
    "journal_id": 30,
-   "last_price": 0.01770626088219538,
+   "last_price": 0.017577784380293015,
    "event": "NONE"
   },
   {
@@ -793,10 +793,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 47.92,
+   "value_usd": 45.04,
    "filled_ts": "2026-11-27T05:15:00+00:00",
    "journal_id": 32,
-   "last_price": 0.0060746631626058855,
+   "last_price": 0.005709544393893391,
    "event": "NONE"
   },
   {
@@ -814,16 +814,14 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 54.69,
+   "value_usd": 46.17,
    "filled_ts": "2026-11-27T23:45:00+00:00",
    "journal_id": 33,
-   "last_price": 0.018250558661662846,
+   "last_price": 0.015406668725902127,
    "event": "NONE"
   }
  ],
- "runs": 31,
- "last_run": "2026-11-28T07:59:14.365887+00:00",
- "last_log": [
-  "$PUMPCHAN: bought $50 at 0.01603"
- ]
+ "runs": 32,
+ "last_run": "2026-11-28T16:57:35.840275+00:00",
+ "last_log": []
 }
