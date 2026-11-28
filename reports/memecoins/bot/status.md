@@ -1,14 +1,14 @@
-# Paper Bot: 2026-11-27 23:33 UTC
+# Paper Bot: 2026-11-28 07:59 UTC
 
 > **Paper trading only:** no wallet, no real orders. It trades the scanner's picks under the plan's rules with $50 per trade and 2% costs each way, to find out whether the scan makes money before any real money is automated.
 
-**Equity: $732.18** (-26.8% vs the $1,000 start). Cash $547.31, 3 open, 1 pending, 29 closed. Runs: 30.
+**Equity: $742.36** (-25.8% vs the $1,000 start). Cash $547.31, 4 open, 0 pending, 29 closed. Runs: 31.
 
-Phase 1 progress: 29/50 closed trades (3 open)  
+Phase 1 progress: 29/50 closed trades (4 open)  
 Win rate: 7% (2 wins, 27 losses)  
 Average win: +61.7%   Average loss: -23.3%  
 Expectancy: -17.4% per trade  
-Total P&L: $-252.69   Today: $-9.17  
+Total P&L: $-252.69   Today: $+0.00  
 Too few trades to judge the edge yet; keep size fixed until 50.  
 Daily loss limit (-3% of $1,000 = -$30): ok
 
@@ -16,15 +16,10 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 | # | Coin | Entry | Now | Value | P&L after costs | Stop | Since |
 |---|---|---|---|---|---|---|---|
-| 30 | $VINE | 0.00952749 | 0.00908594 | $45.81 | -8% | 0.00809836 | 2026-11-26T03:15 |
-| 32 | $CATE | 0.0187257 | 0.0180489 | $46.30 | -7% | 0.0159168 | 2026-11-27T08:30 |
-| 34 | $mihao | 0.00609 | 0.00542068 | $42.76 | -14% | 0.0051765 | 2026-11-27T05:15 |
-
-## Waiting for entry
-
-| # | Coin | Score | Entry | Stop | Expires |
-|---|---|---|---|---|---|
-| 35 | $PUMPCHAN | 67 | 0.01603 | 0.0136255 | 11-28 23:33 |
+| 30 | $VINE | 0.00952749 | 0.00932467 | $47.02 | -6% | 0.00809836 | 2026-11-26T03:15 |
+| 32 | $CATE | 0.0187257 | 0.0177063 | $45.42 | -9% | 0.0159168 | 2026-11-27T08:30 |
+| 34 | $mihao | 0.00609 | 0.00607466 | $47.92 | -4% | 0.0051765 | 2026-11-27T05:15 |
+| 35 | $PUMPCHAN | 0.01603 | 0.0182506 | $54.69 | +9% | 0.0136255 | 2026-11-27T23:45 |
 
 ## Last closed
 
@@ -43,5 +38,4 @@ Daily loss limit (-3% of $1,000 = -$30): ok
 
 ## Last run
 
-- $CBUCKS: closed (stopped out), -18% after costs, $-9.17
-- $PUMPCHAN (score 67): BUY NOW, buy at the scan price, stop 0.0136255
+- $PUMPCHAN: bought $50 at 0.01603

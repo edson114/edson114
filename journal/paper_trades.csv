@@ -31,3 +31,4 @@ id,status,symbol,contract,opened_at,entry_price,cost_usd,tokens,tokens_sold,proc
 30,OPEN,CATE,Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump,2026-11-27,0.01872566529,50.00,2670.1321,0,0,,,,,no,yes,"paper bot, WAIT, score 78"
 31,CLOSED,CBUCKS,DtcicPCKTKeAh7TDEzTym3hXeoHAoMiBdYJhMYxZpump,2026-11-27,0.007467107814,50.00,6696.032954,6696.032954,40.83,2026-11-27,0.006098138049,-9.17,-18.3,no,yes,"paper bot, WAIT, score 63 | paper bot exit: STOP"
 32,OPEN,MIHAO,4CxjZyMNoF1p6eXHXHv1TWpS2X47CuUmLwtGe18spump,2026-11-27,0.00609,50.00,8210.180624,0,0,,,,,no,yes,"paper bot, BUY NOW, score 60"
+33,OPEN,PUMPCHAN,Fo2HAwr7ZAUM2bSZ7MWSi16e3aWGpbw5MsUDYCttpump,2026-11-27,0.01603,50.00,3119.151591,0,0,,,,,no,yes,"paper bot, BUY NOW, score 67"

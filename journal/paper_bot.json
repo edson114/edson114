@@ -703,10 +703,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 45.81,
+   "value_usd": 47.02,
    "filled_ts": "2026-11-26T03:15:00+00:00",
    "journal_id": 28,
-   "last_price": 0.009085937214547653,
+   "last_price": 0.009324674754581342,
    "event": "NONE"
   },
   {
@@ -748,10 +748,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 46.3,
+   "value_usd": 45.42,
    "filled_ts": "2026-11-27T08:30:00+00:00",
    "journal_id": 30,
-   "last_price": 0.01804890250532103,
+   "last_price": 0.01770626088219538,
    "event": "NONE"
   },
   {
@@ -793,10 +793,10 @@
    "mode": "standard",
    "stake_usd": 50.0,
    "status": "open",
-   "value_usd": 42.76,
+   "value_usd": 47.92,
    "filled_ts": "2026-11-27T05:15:00+00:00",
    "journal_id": 32,
-   "last_price": 0.005420681359721638,
+   "last_price": 0.0060746631626058855,
    "event": "NONE"
   },
   {
@@ -813,14 +813,17 @@
    "score": 67.0,
    "mode": "standard",
    "stake_usd": 50.0,
-   "status": "pending",
-   "value_usd": 50.0
+   "status": "open",
+   "value_usd": 54.69,
+   "filled_ts": "2026-11-27T23:45:00+00:00",
+   "journal_id": 33,
+   "last_price": 0.018250558661662846,
+   "event": "NONE"
   }
  ],
- "runs": 30,
- "last_run": "2026-11-27T23:33:29.130650+00:00",
+ "runs": 31,
+ "last_run": "2026-11-28T07:59:14.365887+00:00",
  "last_log": [
-  "$CBUCKS: closed (stopped out), -18% after costs, $-9.17",
-  "$PUMPCHAN (score 67): BUY NOW, buy at the scan price, stop 0.0136255"
+  "$PUMPCHAN: bought $50 at 0.01603"
  ]
 }
